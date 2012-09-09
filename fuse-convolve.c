@@ -97,7 +97,8 @@ static int fuseconv_readlink(const char *path, char *buf, size_t size) {
 static int fuseconv_open(const char *path, struct fuse_file_info *fi) {
   fprintf(stderr, "HZ ===== open('%s')\n", path);
   char path_buf[PATH_MAX];
-  const int fd = open(assemble_orig_path(path_buf, path), fi->flags);
+  const char *orig_path = assemble_orig_path(path_buf, path);
+  const int fd = open(orig_path, fi->flags);
 
   // We want to return partial reads. That way, we can separate reading the
   // ID3-tags from the stream.
@@ -110,7 +111,7 @@ static int fuseconv_open(const char *path, struct fuse_file_info *fi) {
   // The file-handle has the neat property to be 64 bit - so we can actually
   // store a pointer in there :) (Yay, someone was thinking while developing
   // that API).
-  fi->fh = (uint64_t) create_filter(fd, path);
+  fi->fh = (uint64_t) create_filter(fd, orig_path);
   return 0;
 }
 

@@ -30,7 +30,8 @@ public:
   virtual ~FileFilter() {}
 };
 
-// Very simple filter that just passes the original file through.
+// Very simple filter that just passes the original file through. Used for
+// everything that is not a sound-file.
 class PassThroughFilter : public FileFilter {
 public:
   PassThroughFilter(int filedes, const char *path) : filedes_(filedes) {

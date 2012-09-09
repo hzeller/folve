@@ -20,13 +20,13 @@
 
 #ifdef __cplusplus
 extern "C" {
-#endif
+#endif  /* __cplusplus */
 
 struct filter_interface_t {};
 
 // Create a new filter given the open filedescriptor and the path. Returns
 // that filter in an opaque FilterInterface*
-struct filter_interface_t *create_filter(int filedes, const char *path);
+struct filter_interface_t *create_filter(int filedes, const char *orig_path);
 
 // Read from the given filter at the file-offset "offset, up to "size" bytes
 // into  "buffer". Returns number of bytes read or a negative errno value.
@@ -39,5 +39,5 @@ int close_filter(struct filter_interface_t *filter);
 
 #ifdef __cplusplus
 }  // extern "C"
-#endif
+#endif  /* __cplusplus */
 

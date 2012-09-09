@@ -2,11 +2,20 @@ A fuse filesystem that takes an original path to wav and flac files and provides
 these files that are convolved on the fly using the zita convolver (usually
 used in jconvolve)
 
-To compile and install on Ubuntu
+** To compile on Ubuntu **
 
   $ sudo aptitude install libsndfile-dev libflac-dev libzita-convolver-dev libfuse-dev
   $ make
-  $ sudo make install
 
-Provide a filesystem.
+** Run **
+./fuse-convolve filter.conf /path/to/original/fileystem /mnt/mountpoint -f
+
+The '-f' lets it run in foreground (useful, since right now this spits out
+some debugging information.
+
+Access fileystem under /mnt/mountpoint, e.g.
+  mplayer /mnt/mountpoint/foo.flac
+
+(purely readonly; only reading files is supported).
+
 
