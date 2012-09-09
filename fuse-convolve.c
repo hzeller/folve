@@ -42,6 +42,8 @@ static const char *assemble_orig_path(char *buf, const char *path) {
   return buf;
 }
 
+// Essentially stat(). Just forward to the original filesystem (this
+// will by lying: our convolved files are of different size...)
 static int fuseconv_getattr(const char *path, struct stat *stbuf) {
   char path_buf[PATH_MAX];
   const int result = lstat(assemble_orig_path(path_buf, path), stbuf);
@@ -51,6 +53,7 @@ static int fuseconv_getattr(const char *path, struct stat *stbuf) {
   return 0;
 }
 
+// readdir(). Just forward to original filesystem.
 static int fuseconv_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
                             off_t offset, struct fuse_file_info *fi) {
   DIR *dp;
@@ -74,6 +77,7 @@ static int fuseconv_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
   return 0;
 }
 
+// readlink(): forward to original filesystem.
 static int fuseconv_readlink(const char *path, char *buf, size_t size) {
   char path_buf[PATH_MAX];
   const int result = readlink(assemble_orig_path(path_buf, path),
@@ -86,37 +90,45 @@ static int fuseconv_readlink(const char *path, char *buf, size_t size) {
 }
 
 static int fuseconv_open(const char *path, struct fuse_file_info *fi) {
+  fprintf(stderr, "HZ ===== open('%s')\n", path);
   char path_buf[PATH_MAX];
   const int result = open(assemble_orig_path(path_buf, path), fi->flags);
+
+  // We want to return partial reads. That way, we can separate reading the
+  // ID3-tags from the stream.
+  // In order to return partical content, we need to set the direct_io.
+  fi->direct_io = 1;
+
   if (result == -1)
     return -errno;
-
-  close(result);
+  fi->fh = result;
   return 0;
 }
 
 static int fuseconv_read(const char *path, char *buf, size_t size, off_t offset,
                          struct fuse_file_info *fi) {
-  char path_buf[PATH_MAX];
-  const int fd = open(assemble_orig_path(path_buf, path), O_RDONLY);
-  if (fd == -1)
-    return -errno;
-
-  int result = pread(fd, buf, size, offset);
+  const int result = pread(fi->fh, buf, size, offset);
   if (result == -1)
-    result = -errno;
-
-  close(fd);
+    return -errno;
   return result;
 }
 
+static int fuseconv_release(const char *path, struct fuse_file_info *fi) {
+  fprintf(stderr, "HZ ===== close('%s')\n", path);
+  return close(fi->fh) == -1 ? -errno : 0;
+}
 
 static struct fuse_operations fuseconv_operations = {
-  .getattr	= fuseconv_getattr,
+  // Basic operations to make navigation work.
   .readdir	= fuseconv_readdir,
+  .getattr	= fuseconv_getattr,
   .readlink	= fuseconv_readlink,
 
+  // open() and close() file.
   .open		= fuseconv_open,
+  .release      = fuseconv_release,
+
+  // Actual workhorse: reading a file.
   .read		= fuseconv_read,
 };
 
