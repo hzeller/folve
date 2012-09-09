@@ -13,6 +13,9 @@
 //  You should have received a copy of the GNU General Public License
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+// This is a pure C implementation, providing basic file operations and passing
+// actual reading to a filter aquired using the functions in filter-interface.h
+
 // Use latest version.
 #define FUSE_USE_VERSION 26
 
@@ -27,6 +30,8 @@
 #include <sys/time.h>
 #include <limits.h>
 #include <stdlib.h>
+
+#include "filter-interface.h"
 
 // Configuration for fuse convolver filesystem.
 static struct {
@@ -92,30 +97,32 @@ static int fuseconv_readlink(const char *path, char *buf, size_t size) {
 static int fuseconv_open(const char *path, struct fuse_file_info *fi) {
   fprintf(stderr, "HZ ===== open('%s')\n", path);
   char path_buf[PATH_MAX];
-  const int result = open(assemble_orig_path(path_buf, path), fi->flags);
+  const int fd = open(assemble_orig_path(path_buf, path), fi->flags);
 
   // We want to return partial reads. That way, we can separate reading the
   // ID3-tags from the stream.
   // In order to return partical content, we need to set the direct_io.
   fi->direct_io = 1;
 
-  if (result == -1)
+  if (fd == -1)
     return -errno;
-  fi->fh = result;
+
+  // The file-handle has the neat property to be 64 bit - so we can actually
+  // store a pointer in there :) (Yay, someone was thinking while developing
+  // that API).
+  fi->fh = (uint64_t) create_filter(fd, path);
   return 0;
 }
 
 static int fuseconv_read(const char *path, char *buf, size_t size, off_t offset,
                          struct fuse_file_info *fi) {
-  const int result = pread(fi->fh, buf, size, offset);
-  if (result == -1)
-    return -errno;
-  return result;
+  return read_from_filter((struct filter_interface_t*)fi->fh,
+                          buf, size, offset);
 }
 
 static int fuseconv_release(const char *path, struct fuse_file_info *fi) {
   fprintf(stderr, "HZ ===== close('%s')\n", path);
-  return close(fi->fh) == -1 ? -errno : 0;
+  return close_filter((struct filter_interface_t*) fi->fh);
 }
 
 static struct fuse_operations fuseconv_operations = {
