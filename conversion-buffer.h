@@ -15,48 +15,57 @@
 
 #include <sndfile.h>
 
-// A buffer that keeps track
+// A file-backed buffer for a SNDFILE, that is only filled on demand via
+// a SoundSource.
+// If Read() is called beyond the current available data, a callback is
+// called to write more into the SNDFILE.
 class ConversionBuffer {
  public:
-  // Callback called by the conversion buffer requesting write to the
-  // SNDFILE. Returns 'true', if there is more, 'false' when done.
-  class SoundfileFiller {
+  // SoundSource, a instance of which needs to be passed to the
+  // ConversionBuffer.
+  class SoundSource {
   public:
-    virtual ~SoundfileFiller() {}
-    virtual bool WriteToSoundfile() = 0;
+    virtual ~SoundSource() {}
+
+    // The soundfile is set by this conversion buffer and to be filled when
+    // requested. There can be an error in opening the sound-file, in that
+    // case SetOutputSoundfile() will be called with NULL.
+    // Ask sf_strerror() to find out why.
+    virtual void SetOutputSoundfile(SNDFILE *sndfile) = 0;
+
+    // This callback is called by the ConversionBuffer if it needs more data.
+    // Rerturns 'true' if there is more, 'false' if that was the last available
+    // data.
+    virtual bool AddMoreSoundData() = 0;
   };
 
-  // Create a conversion buffer that holds "buffer_size" bytes. The
-  // "callback" will be called if we need more write operations on
-  // the SNDFILE. The user needs to call CreateOutputSoundfile(), otherwise
-  // they don't know where to write to :)
-  ConversionBuffer(int buffer_size, SoundfileFiller *callback);
+  // Create a conversion buffer that holds "buffer_size" bytes.
+  // The "source" will be informed to what SNDFILE to write to and whenever
+  // this ConversionBuffer lusts for more data (it then calls
+  // AddMoreSoundData()).
+  // Ownership is not taken over for source.
+  ConversionBuffer(SoundSource *source, const SF_INFO &info);
   ~ConversionBuffer();
 
-  // Create a SNDFILE the user has to write to in the WriteToSoundfile callback.
-  // Can be NULL on error (call sf_strerror() to find out why).
-  SNDFILE *CreateOutputSoundfile(SF_INFO *info);
-
-  // Read data from internal buffer that has been filled by write operations to
-  // the SNDFILE.
-  // If the internal buffer is exhausted, it will call the WriteToSoundfile
-  // callback to fill more into our buffer.
-  //
-  // Attempts to skip backwards might fail, we only guarantee forward looking.
+  // Read data from buffer. Can block and call the SoundSource first to get
+  // more data if needed.
   ssize_t Read(char *buf, size_t size, off_t offset);
-
-  // Current file position.
-  off_t Tell() const { return buffer_global_offset_ + buffer_pos_; }
 
  private:
   static sf_count_t SndTell(void *userdata);
   static sf_count_t SndWrite(const void *ptr, sf_count_t count, void *userdata);
 
-  size_t RefillBuffer(const void *data, size_t count);
+  // Append data. Called via the SndWrite() virtual file callback.
+  ssize_t Append(const void *data, size_t count);
 
-  const size_t buffer_size_;
-  SoundfileFiller *const fill_data_;
-  char *buffer_;
-  size_t buffer_pos_;
-  off_t buffer_global_offset_;  // since the beginning of writing.
+  // Current max file position.
+  off_t Tell() const { return total_written_; }
+
+  // Create a SNDFILE the user has to write to in the WriteToSoundfile callback.
+  // Can be NULL on error.
+  SNDFILE *CreateOutputSoundfile(const SF_INFO &info);
+
+  SoundSource *const source_;
+  int tmpfile_;
+  off_t total_written_;
 };

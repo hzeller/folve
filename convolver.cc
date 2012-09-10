@@ -55,7 +55,7 @@ private:
 
 class SndFileFilter :
     public FileFilter,
-    public ConversionBuffer::SoundfileFiller {
+    public ConversionBuffer::SoundSource {
 public:
   SndFileFilter(int filedes, const char *path, int chunk_size)
     : filedes_(filedes), conversion_chunk_size_(chunk_size), error_(false),
@@ -72,32 +72,19 @@ public:
       fprintf(stderr, "Opening input: %s\n", sf_strerror(NULL));
       return;
     }
-    
+
+    raw_sample_buffer_ = new float[conversion_chunk_size_ * in_info.channels];
+    input_frames_left_ = in_info.frames;
+
+    // Create a conversion buffer that creates a soundfile of a particular
+    // format that we choose here. Essentially we want to have mostly what
+    // our input is.
     struct SF_INFO out_info = in_info;
     out_info.format = SF_FORMAT_FLAC;
     // same number of bits format as input.
     out_info.format |= in_info.format & SF_FORMAT_SUBMASK;
     out_info.seekable = 0;  // no point in making it seekable.
-    output_buffer_ = new ConversionBuffer(1 << 20 /* 1 MB */, this);
-    snd_out_ = output_buffer_->CreateOutputSoundfile(&out_info);
-    if (snd_out_ == NULL) {
-      error_ = true;
-      fprintf(stderr, "Opening output: %s\n", sf_strerror(NULL));
-      return;
-    }
-
-    // Copy header. Everything else that follows will be stream bytes.
-    for (int i = SF_STR_FIRST; i <= SF_STR_LAST; ++i) {
-      const char *s = sf_get_string(snd_in_, i);
-      if (s != NULL) {
-        sf_set_string(snd_out_, i, s);
-      }
-    }
-    sf_command(snd_out_, SFC_UPDATE_HEADER_NOW, NULL, 0);
-    fprintf(stderr, "Header copy done.\n");
-
-    raw_sample_buffer_ = new float[conversion_chunk_size_ * in_info.channels];
-    input_frames_left_ = in_info.frames;
+    output_buffer_ = new ConversionBuffer(this, out_info);
   }
   
   virtual ~SndFileFilter() {
@@ -119,7 +106,27 @@ public:
   }
     
 private:
-  virtual bool WriteToSoundfile() {
+  virtual void SetOutputSoundfile(SNDFILE *sndfile) {
+    snd_out_ = sndfile;
+    if (snd_out_ == NULL) {
+      error_ = true;
+      fprintf(stderr, "Opening output: %s\n", sf_strerror(NULL));
+      return;
+    }
+    // Copy header. Everything else that follows will be stream bytes.
+    for (int i = SF_STR_FIRST; i <= SF_STR_LAST; ++i) {
+      const char *s = sf_get_string(snd_in_, i);
+      if (s != NULL) {
+        sf_set_string(snd_out_, i, s);
+      }
+    }
+    // Now flush the header: that way if someone only reads the metadata, then
+    // our AddMoreSoundData() is never called.
+    sf_command(snd_out_, SFC_UPDATE_HEADER_NOW, NULL, 0);
+    fprintf(stderr, "Header copy done.\n");
+  }
+
+  virtual bool AddMoreSoundData() {
     fprintf(stderr, "** conversion callback **\n");
     int r = sf_readf_float(snd_in_, raw_sample_buffer_, conversion_chunk_size_);
     // Do convolution here.
@@ -127,6 +134,7 @@ private:
     input_frames_left_ -= r;
     return (input_frames_left_ > 0);
   }
+
   const int filedes_;
   const int conversion_chunk_size_;
   bool error_;
