@@ -24,6 +24,9 @@ extern "C" {
 
 struct filter_object_t {};
 
+// Initialize convolver filters
+void initialize_convolver_filter(const char *zita_config);
+
 // Create a new filter given the open filedescriptor and the path. Returns
 // that filter in an opaque filter_object_t*
 struct filter_object_t *create_filter(int filedes, const char *orig_path);

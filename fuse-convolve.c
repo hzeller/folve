@@ -159,6 +159,7 @@ int main(int argc, char *argv[]) {
   context.orig_dir   = argv[2];
   argc -=2;
   argv += 2;
+  initialize_convolver_filter(context.config_dir);
 
   // Lazy: let the rest handle by fuse provided main.
   return fuse_main(argc, argv, &fuseconv_operations, NULL);

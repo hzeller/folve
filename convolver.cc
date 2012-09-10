@@ -22,6 +22,19 @@
 
 #include "filter-interface.h"
 #include "conversion-buffer.h"
+#include "zita-config.h"
+
+// DRECKSGELOET. Das ist von dem originalen zita dingens, mit globalen
+// variablen. Das knallt sicher hinten und vorne wenn mehr als ein file parallel
+// werkelt.
+Convproc      *convproc = 0;
+unsigned int   latency = 0;
+unsigned int   options = 0;
+unsigned int   fragm = 0;
+unsigned int   fsamp = 44100;
+unsigned int   ninp = 0;
+unsigned int   nout = 0;
+unsigned int   size = 0;
 
 namespace {
 class FileFilter : public filter_object_t {
@@ -60,6 +73,7 @@ public:
   SndFileFilter(int filedes, const char *path, int chunk_size)
     : filedes_(filedes), conversion_chunk_size_(chunk_size), error_(false),
       output_buffer_(NULL), snd_in_(NULL), snd_out_(NULL),
+      conversion_started_(false),
       raw_sample_buffer_(NULL), input_frames_left_(0) {
     fprintf(stderr, "Creating sound-file filter for '%s'\n", path);
 
@@ -73,7 +87,8 @@ public:
       return;
     }
 
-    raw_sample_buffer_ = new float[conversion_chunk_size_ * in_info.channels];
+    channels_ = in_info.channels;
+    raw_sample_buffer_ = new float[conversion_chunk_size_ * channels_];
     input_frames_left_ = in_info.frames;
 
     // Create a conversion buffer that creates a soundfile of a particular
@@ -127,9 +142,36 @@ private:
   }
 
   virtual bool AddMoreSoundData() {
-    fprintf(stderr, "** conversion callback **\n");
+    if (!conversion_started_) {
+      convproc->start_process(0, 0);
+      conversion_started_ = true;
+    }
     int r = sf_readf_float(snd_in_, raw_sample_buffer_, conversion_chunk_size_);
-    // Do convolution here.
+    fprintf(stderr, "** conversion callback; %d new samples **\n", r);
+    if (r < conversion_chunk_size_) {
+      // zero out the rest of the buffer
+      const int missing_bytes = (conversion_chunk_size_ - r) * sizeof(float);
+      memset(raw_sample_buffer_ + conversion_chunk_size_ * sizeof(float)
+             - missing_bytes, 0, missing_bytes);
+    }
+
+    // Separate channels.
+    for (int ch = 0; ch < channels_; ++ch) {
+      float *dest = convproc->inpdata(ch);
+      for (int j = 0; j < r; ++j) {
+        dest[j] = raw_sample_buffer_[j * channels_ + ch];
+      }
+    }
+
+    convproc->process();
+
+    // Join channels again.
+    for (int ch = 0; ch < channels_; ++ch) {
+      float *source = convproc->outdata(ch);
+      for (int j = 0; j < r; ++j) {
+        raw_sample_buffer_[j * channels_ + ch] = source[j];
+      }
+    }
     sf_writef_float(snd_out_, raw_sample_buffer_, r);
     input_frames_left_ -= r;
     return (input_frames_left_ > 0);
@@ -139,10 +181,12 @@ private:
   const int conversion_chunk_size_;
   bool error_;
   ConversionBuffer *output_buffer_;
+  int channels_;
   SNDFILE *snd_in_;
   SNDFILE *snd_out_;
 
   // Used in conversion.
+  bool conversion_started_;
   float *raw_sample_buffer_;
   int input_frames_left_;
 };
@@ -162,7 +206,7 @@ bool HasSuffixString (const char *str, const char *suffix) {
 // Implementation of the C functions in filter-interface.h
 struct filter_object_t *create_filter(int filedes, const char *path) {
   if (HasSuffixString(path, ".flac")) {
-    return new SndFileFilter(filedes, path, 1024);
+    return new SndFileFilter(filedes, path, fragm);
   }
 
   // Every other file-type is just passed through as is.
@@ -179,4 +223,11 @@ int close_filter(struct filter_object_t *filter) {
   int result = file_filter->Close();
   delete file_filter;
   return result;
+}
+
+void initialize_convolver_filter(const char *zita_config_file) {
+  convproc = new Convproc();
+  if (config(zita_config_file) != 0) {
+    fprintf(stderr, "Some trouble initializing zita convolver");
+  }
 }
