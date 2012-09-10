@@ -24,6 +24,10 @@
 #include "conversion-buffer.h"
 #include "zita-config.h"
 
+// Something is fishy with the convproc. It only works if we have
+// one instance we re-use. Otherwise it crashes
+#define REQUIRES_GLOBAL_CONVPROC 1
+
 const char *sGlobal_zita_config;
 
 namespace {
@@ -91,18 +95,14 @@ public:
   }
   
   virtual ~SndFileFilter() {
-#if 0
-    // This crashes if we cleanup/re-create the process. Find out why.
+#ifndef REQUIRES_GLOBAL_CONVPROC
     if (zita_.convproc) {
       // don't destroy. Something fishy is going on.
-      zita_.convproc->stop_process ();
-      zita_.convproc->cleanup ();
+      zita_.convproc->stop_process();
+      zita_.convproc->cleanup();
       delete zita_.convproc;
     }
 #endif
-    if (zita_.convproc) {
-      zita_.convproc->reset();
-    }
     delete output_buffer_;
     delete [] raw_sample_buffer_;
   }
@@ -196,9 +196,15 @@ private:
   // Used in conversion.
   float *raw_sample_buffer_;
   int input_frames_left_;
-  static ZitaConfig zita_;   // for now: only do it once.
+#ifdef REQUIRES_GLOBAL_CONVPROC
+  static ZitaConfig zita_;
+#else
+  ZitaConfig zita_;
+#endif
 };
+#ifdef REQUIRES_GLOBAL_CONVPROC
   ZitaConfig SndFileFilter::zita_;
+#endif
 }  // namespace
 
 // We do a very simple decision which filter to apply by looking at the suffix.
