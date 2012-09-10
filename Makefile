@@ -1,7 +1,7 @@
 CC=gcc
 CXX=g++
-CFLAGS=-D_FILE_OFFSET_BITS=64 -Wall
-CXXFLAGS=-Wall
+CFLAGS=-D_FILE_OFFSET_BITS=64 -Wall -g
+CXXFLAGS=-Wall -g
 LDFLAGS=-lfuse -lsndfile -lzita-convolver
 
 fuse-convolve: fuse-convolve.o convolver.o conversion-buffer.o zita-audiofile.o zita-config.o zita-fconfig.o zita-sstring.o

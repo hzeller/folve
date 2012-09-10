@@ -24,17 +24,7 @@
 #include "conversion-buffer.h"
 #include "zita-config.h"
 
-// DRECKSGELOET. Das ist von dem originalen zita dingens, mit globalen
-// variablen. Das knallt sicher hinten und vorne wenn mehr als ein file parallel
-// werkelt.
-Convproc      *convproc = 0;
-unsigned int   latency = 0;
-unsigned int   options = 0;
-unsigned int   fragm = 0;
-unsigned int   fsamp = 44100;
-unsigned int   ninp = 0;
-unsigned int   nout = 0;
-unsigned int   size = 0;
+const char *sGlobal_zita_config;
 
 namespace {
 class FileFilter : public filter_object_t {
@@ -70,10 +60,9 @@ class SndFileFilter :
     public FileFilter,
     public ConversionBuffer::SoundSource {
 public:
-  SndFileFilter(int filedes, const char *path, int chunk_size)
-    : filedes_(filedes), conversion_chunk_size_(chunk_size), error_(false),
+  SndFileFilter(int filedes, const char *path)
+    : filedes_(filedes), error_(false),
       output_buffer_(NULL), snd_in_(NULL), snd_out_(NULL),
-      conversion_started_(false),
       raw_sample_buffer_(NULL), input_frames_left_(0) {
     fprintf(stderr, "Creating sound-file filter for '%s'\n", path);
 
@@ -88,7 +77,6 @@ public:
     }
 
     channels_ = in_info.channels;
-    raw_sample_buffer_ = new float[conversion_chunk_size_ * channels_];
     input_frames_left_ = in_info.frames;
 
     // Create a conversion buffer that creates a soundfile of a particular
@@ -103,6 +91,18 @@ public:
   }
   
   virtual ~SndFileFilter() {
+#if 0
+    // This crashes if we cleanup/re-create the process. Find out why.
+    if (zita_.convproc) {
+      // don't destroy. Something fishy is going on.
+      zita_.convproc->stop_process ();
+      zita_.convproc->cleanup ();
+      delete zita_.convproc;
+    }
+#endif
+    if (zita_.convproc) {
+      zita_.convproc->reset();
+    }
     delete output_buffer_;
     delete [] raw_sample_buffer_;
   }
@@ -142,43 +142,51 @@ private:
   }
 
   virtual bool AddMoreSoundData() {
-    if (!conversion_started_) {
-      convproc->start_process(0, 0);
-      conversion_started_ = true;
+    if (!input_frames_left_)
+      return false;
+    if (!zita_.convproc) {
+      zita_.convproc = new Convproc();
+      config(&zita_, sGlobal_zita_config);
+      zita_.convproc->start_process(0, 0);
+      fprintf(stderr, "Create conversion processor, chunksize=%d\n",
+              zita_.fragm);
     }
-    int r = sf_readf_float(snd_in_, raw_sample_buffer_, conversion_chunk_size_);
+    if (raw_sample_buffer_ == NULL) {
+      raw_sample_buffer_ = new float[zita_.fragm * channels_];
+    }
+    int r = sf_readf_float(snd_in_, raw_sample_buffer_, zita_.fragm);
     fprintf(stderr, "** conversion callback; %d new samples **\n", r);
-    if (r < conversion_chunk_size_) {
+    if (r < (int) zita_.fragm) {
       // zero out the rest of the buffer
-      const int missing_bytes = (conversion_chunk_size_ - r) * sizeof(float);
-      memset(raw_sample_buffer_ + conversion_chunk_size_ * sizeof(float)
-             - missing_bytes, 0, missing_bytes);
+      const int missing = zita_.fragm - r;
+      memset(raw_sample_buffer_ + r * channels_, 0,
+             missing * channels_ * sizeof(float));
     }
 
     // Separate channels.
     for (int ch = 0; ch < channels_; ++ch) {
-      float *dest = convproc->inpdata(ch);
+      float *dest = zita_.convproc->inpdata(ch);
       for (int j = 0; j < r; ++j) {
         dest[j] = raw_sample_buffer_[j * channels_ + ch];
       }
     }
 
-    convproc->process();
+    zita_.convproc->process();
 
     // Join channels again.
     for (int ch = 0; ch < channels_; ++ch) {
-      float *source = convproc->outdata(ch);
+      float *source = zita_.convproc->outdata(ch);
       for (int j = 0; j < r; ++j) {
         raw_sample_buffer_[j * channels_ + ch] = source[j];
       }
     }
     sf_writef_float(snd_out_, raw_sample_buffer_, r);
     input_frames_left_ -= r;
-    return (input_frames_left_ > 0);
+
+    return input_frames_left_;
   }
 
   const int filedes_;
-  const int conversion_chunk_size_;
   bool error_;
   ConversionBuffer *output_buffer_;
   int channels_;
@@ -186,10 +194,11 @@ private:
   SNDFILE *snd_out_;
 
   // Used in conversion.
-  bool conversion_started_;
   float *raw_sample_buffer_;
   int input_frames_left_;
+  static ZitaConfig zita_;   // for now: only do it once.
 };
+  ZitaConfig SndFileFilter::zita_;
 }  // namespace
 
 // We do a very simple decision which filter to apply by looking at the suffix.
@@ -206,7 +215,7 @@ bool HasSuffixString (const char *str, const char *suffix) {
 // Implementation of the C functions in filter-interface.h
 struct filter_object_t *create_filter(int filedes, const char *path) {
   if (HasSuffixString(path, ".flac")) {
-    return new SndFileFilter(filedes, path, fragm);
+    return new SndFileFilter(filedes, path);
   }
 
   // Every other file-type is just passed through as is.
@@ -226,8 +235,5 @@ int close_filter(struct filter_object_t *filter) {
 }
 
 void initialize_convolver_filter(const char *zita_config_file) {
-  convproc = new Convproc();
-  if (config(zita_config_file) != 0) {
-    fprintf(stderr, "Some trouble initializing zita convolver");
-  }
+  sGlobal_zita_config = zita_config_file;
 }

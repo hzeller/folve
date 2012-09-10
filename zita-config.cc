@@ -34,16 +34,17 @@
 #define BSIZE  0x4000
 
 
-static int check_inout (unsigned int ip, unsigned int op)
+static int check_inout (ZitaConfig *cfg, unsigned int ip, unsigned int op)
 {
-    if (! size) return ERR_NOCONV;
-    if ((ip < 1) || (ip > ninp)) return ERR_IONUM;
-    if ((op < 1) || (op > nout)) return ERR_IONUM;
+    if (!cfg->size) return ERR_NOCONV;
+    if ((ip < 1) || (ip > cfg->ninp)) return ERR_IONUM;
+    if ((op < 1) || (op > cfg->nout)) return ERR_IONUM;
     return 0;
 }
 
 
-static int readfile (const char *line, int lnum, const char *cdir)
+static int readfile (ZitaConfig *cfg,
+                     const char *line, int lnum, const char *cdir)
 {
     unsigned int  ip1, op1, k;
     float         gain;
@@ -62,7 +63,7 @@ static int readfile (const char *line, int lnum, const char *cdir)
     n = sstring (line + n, file, 1024);
     if (!n) return ERR_PARAM;
 
-    k = latency;
+    k = cfg->latency;
     if (k)
     {
 	if (delay >= k)
@@ -77,7 +78,7 @@ static int readfile (const char *line, int lnum, const char *cdir)
 	    fprintf (stderr, "Line %d: First %d frames removed by latency compensation.\n", lnum, k);
 	}
     }		
-    err = check_inout (ip1, op1);
+    err = check_inout (cfg, ip1, op1);
     if (err) return err;
 
     if (*file == '/') strcpy (path, file);
@@ -94,7 +95,7 @@ static int readfile (const char *line, int lnum, const char *cdir)
         return ERR_OTHER;
     } 
 
-    if (audio.rate () != (int) fsamp)
+    if (audio.rate () != (int) cfg->fsamp)
     {
         fprintf (stderr, "Line %d: Sample rate (%d) of '%s' does not match.\n",
                  lnum, audio.rate (), path);
@@ -115,9 +116,9 @@ static int readfile (const char *line, int lnum, const char *cdir)
         return ERR_OTHER;
     } 
     if (! length) length = nfram - offset;
-    if (length > size - delay) 
+    if (length > cfg->size - delay) 
     {
-	length = size - delay;
+	length = cfg->size - delay;
    	fprintf (stderr, "Line %d: Data truncated.\n", lnum);
     }
 
@@ -146,7 +147,7 @@ static int readfile (const char *line, int lnum, const char *cdir)
 	{
 	    p = buff + ichan - 1;
 	    for (ifram = 0; ifram < nfram; ifram++) p [ifram * nchan] *= gain;
-            if (convproc->impdata_create (ip1 - 1, op1 - 1, nchan, p, delay, delay + nfram))
+            if (cfg->convproc->impdata_create (ip1 - 1, op1 - 1, nchan, p, delay, delay + nfram))
             {
 	        audio.close ();
                 delete[] buff;
@@ -163,7 +164,7 @@ static int readfile (const char *line, int lnum, const char *cdir)
 }
 
 
-static int impdirac (const char *line, int lnum)
+static int impdirac (ZitaConfig *cfg, const char *line, int lnum)
 {
     unsigned int  ip1, op1, k;
     unsigned int  delay;
@@ -172,10 +173,10 @@ static int impdirac (const char *line, int lnum)
 
     if (sscanf (line, "%u %u %f %u", &ip1, &op1, &gain, &delay) != 4) return ERR_PARAM;
 
-    stat = check_inout (ip1, op1);
+    stat = check_inout (cfg, ip1, op1);
     if (stat) return stat;
 
-    k = latency;
+    k = cfg->latency;
     if (delay < k)
     {
 	fprintf (stderr, "Line %d: Dirac pulse removed: delay < latency.\n", lnum);
@@ -183,9 +184,9 @@ static int impdirac (const char *line, int lnum)
     }
     delay -= k;
 
-    if (delay < size)
+    if (delay < cfg->size)
     {
-	if (convproc->impdata_create (ip1 - 1, op1 - 1, 1, &gain, delay, delay + 1))
+	if (cfg->convproc->impdata_create (ip1 - 1, op1 - 1, 1, &gain, delay, delay + 1))
 	{
 	    return ERR_ALLOC;
 	}
@@ -194,7 +195,7 @@ static int impdirac (const char *line, int lnum)
 }
 
 
-static int imphilbert (const char *line, int lnum)
+static int imphilbert (ZitaConfig *cfg, const char *line, int lnum)
 {
     unsigned int  ip1, op1;
     unsigned int  delay;
@@ -206,14 +207,14 @@ static int imphilbert (const char *line, int lnum)
 
     if (sscanf (line, "%u %u %f %u %u", &ip1, &op1, &gain, &delay, &length) != 5) return ERR_PARAM;
 
-    stat = check_inout (ip1, op1);
+    stat = check_inout (cfg, ip1, op1);
     if (stat) return stat;
 
     if ((length < 64) || (length > 65536))
     {
 	return ERR_PARAM;
     }
-    k = latency;
+    k = cfg->latency;
     if (delay < k + length / 2)
     {
 	fprintf (stderr, "Line %d: Hilbert impulse removed: delay < latency + lenght / 2.\n", lnum);
@@ -234,7 +235,7 @@ static int imphilbert (const char *line, int lnum)
 	hdata [h - i] =  v;
     }
 
-    if (convproc->impdata_create (ip1 - 1, op1 - 1, 1, hdata, delay, delay + length))
+    if (cfg->convproc->impdata_create (ip1 - 1, op1 - 1, 1, hdata, delay, delay + length))
     {
         return ERR_ALLOC;
     }
@@ -244,19 +245,19 @@ static int imphilbert (const char *line, int lnum)
 }
 
 
-static int impcopy (const char *line, int lnum)
+static int impcopy (ZitaConfig *cfg, const char *line, int lnum)
 {
     unsigned int ip1, op1, ip2, op2;
     int          stat;
 
     if (sscanf (line, "%u %u %u %u", &ip1, &op1, &ip2, &op2) != 4) return ERR_PARAM;
 
-    stat = check_inout (ip1, op1) | check_inout (ip2, op2);
+    stat = check_inout (cfg, ip1, op1) | check_inout (cfg, ip2, op2);
     if (stat) return stat;
 
     if ((ip1 != ip2) || (op1 != op2))
     {
-        if (convproc->impdata_copy (ip2 - 1, op2 - 1, ip1 - 1, op1 - 1)) return ERR_ALLOC;
+        if (cfg->convproc->impdata_copy (ip2 - 1, op2 - 1, ip1 - 1, op1 - 1)) return ERR_ALLOC;
     }
     else return ERR_PARAM;
 
@@ -264,7 +265,7 @@ static int impcopy (const char *line, int lnum)
 }
 
 
-int config (const char *config)
+int config (ZitaConfig *cfg, const char *config)
 {
     FILE          *F;
     int           stat, lnum;
@@ -303,13 +304,13 @@ int config (const char *config)
         {
             if (sstring (q, cdir, 1024) == 0) stat = ERR_PARAM;
         }	
-        else if (! strcmp (p, "/convolver/new"))   stat = convnew (q, lnum);
-        else if (! strcmp (p, "/impulse/read"))    stat = readfile (q, lnum, cdir);
-        else if (! strcmp (p, "/impulse/dirac"))   stat = impdirac (q, lnum); 
-        else if (! strcmp (p, "/impulse/hilbert")) stat = imphilbert (q, lnum); 
-        else if (! strcmp (p, "/impulse/copy"))    stat = impcopy (q, lnum); 
-        else if (! strcmp (p, "/input/name"))      stat = inpname (q); 
-        else if (! strcmp (p, "/output/name"))     stat = outname (q); 
+        else if (! strcmp (p, "/convolver/new"))   stat = convnew (cfg, q, lnum);
+        else if (! strcmp (p, "/impulse/read"))    stat = readfile (cfg, q, lnum, cdir);
+        else if (! strcmp (p, "/impulse/dirac"))   stat = impdirac (cfg, q, lnum); 
+        else if (! strcmp (p, "/impulse/hilbert")) stat = imphilbert (cfg, q, lnum); 
+        else if (! strcmp (p, "/impulse/copy"))    stat = impcopy (cfg, q, lnum); 
+        else if (! strcmp (p, "/input/name"))      stat = inpname (cfg, q); 
+        else if (! strcmp (p, "/output/name"))     stat = outname (cfg, q); 
         else stat = ERR_COMMAND;
     }
 

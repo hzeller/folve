@@ -26,24 +26,24 @@
 #include <zita-convolver.h>
 #include "zita-sstring.h"
 
-
-extern Convproc      *convproc;
-extern unsigned int  latency;
-extern unsigned int  options;
-extern unsigned int  fsamp;
-extern unsigned int  fragm;
-extern unsigned int  ninp;
-extern unsigned int  nout;
-extern unsigned int  size;
-
+struct ZitaConfig {
+  Convproc *convproc;
+  unsigned int  latency;
+  unsigned int  options;
+  unsigned int  fsamp;
+  unsigned int  fragm;
+  unsigned int  ninp;
+  unsigned int  nout;
+  unsigned int  size;
+};
 
 enum { NOERR, ERR_OTHER, ERR_SYNTAX, ERR_PARAM, ERR_ALLOC, ERR_CANTCD, ERR_COMMAND, ERR_NOCONV, ERR_IONUM };
 
 
-extern int  config (const char *config);
-extern int  convnew (const char *line, int lnum);
-extern int  inpname (const char *line);
-extern int  outname (const char *line);
+extern int  config (ZitaConfig *cfg, const char *config);
+extern int  convnew (ZitaConfig *cfg, const char *line, int lnum);
+extern int  inpname (ZitaConfig *cfg, const char *line);
+extern int  outname (ZitaConfig *cfg, const char *line);
 extern void makeports (void);
 
 
