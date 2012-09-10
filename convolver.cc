@@ -18,8 +18,10 @@
 #include <string.h>
 #include <strings.h>
 #include <unistd.h>
+#include <sndfile.h>
 
 #include "filter-interface.h"
+#include "conversion-buffer.h"
 
 namespace {
 class FileFilter : public filter_object_t {
@@ -51,23 +53,90 @@ private:
   const int filedes_;
 };
 
-class WavFilter : public FileFilter {
+class SndFileFilter :
+    public FileFilter,
+    public ConversionBuffer::SoundfileFiller {
 public:
-  WavFilter(int filedes, const char *path) : filedes_(filedes) {
-    fprintf(stderr, "Creating Wav filter for '%s'\n", path);
+  SndFileFilter(int filedes, const char *path, int chunk_size)
+    : filedes_(filedes), conversion_chunk_size_(chunk_size), error_(false),
+      output_buffer_(NULL), snd_in_(NULL), snd_out_(NULL),
+      raw_sample_buffer_(NULL), input_frames_left_(0) {
+    fprintf(stderr, "Creating sound-file filter for '%s'\n", path);
+
+    // Open input file.
+    struct SF_INFO in_info;
+    memset(&in_info, 0, sizeof(in_info));
+    snd_in_ = sf_open_fd(filedes, SFM_READ, &in_info, 0);
+    if (snd_in_ == NULL) {
+      error_ = true;
+      fprintf(stderr, "Opening input: %s\n", sf_strerror(NULL));
+      return;
+    }
+    
+    struct SF_INFO out_info = in_info;
+    out_info.format = SF_FORMAT_FLAC;
+    // same number of bits format as input.
+    out_info.format |= in_info.format & SF_FORMAT_SUBMASK;
+    out_info.seekable = 0;  // no point in making it seekable.
+    output_buffer_ = new ConversionBuffer(1 << 20 /* 1 MB */, this);
+    snd_out_ = output_buffer_->CreateOutputSoundfile(&out_info);
+    if (snd_out_ == NULL) {
+      error_ = true;
+      fprintf(stderr, "Opening output: %s\n", sf_strerror(NULL));
+      return;
+    }
+
+    // Copy header. Everything else that follows will be stream bytes.
+    for (int i = SF_STR_FIRST; i <= SF_STR_LAST; ++i) {
+      const char *s = sf_get_string(snd_in_, i);
+      if (s != NULL) {
+        sf_set_string(snd_out_, i, s);
+      }
+    }
+    sf_command(snd_out_, SFC_UPDATE_HEADER_NOW, NULL, 0);
+    fprintf(stderr, "Header copy done.\n");
+
+    raw_sample_buffer_ = new float[conversion_chunk_size_ * in_info.channels];
+    input_frames_left_ = in_info.frames;
   }
   
+  virtual ~SndFileFilter() {
+    delete output_buffer_;
+    delete [] raw_sample_buffer_;
+  }
+
   virtual int Read(char *buf, size_t size, off_t offset) {
-    const int result = pread(filedes_, buf, size, offset);
-    return result == -1 ? -errno : result;
+    if (error_) return -1;
+    // The following read might block and call WriteToSoundfile() until the
+    // buffer is filled.
+    return output_buffer_->Read(buf, size, offset);
   }
 
   virtual int Close() {
+    if (snd_in_) { sf_close(snd_in_); snd_in_ = NULL; }
+    if (snd_out_) { sf_close(snd_out_); snd_out_ = NULL; }
     return close(filedes_) == -1 ? -errno : 0;
   }
-
+    
 private:
+  virtual bool WriteToSoundfile() {
+    fprintf(stderr, "** conversion callback **\n");
+    int r = sf_readf_float(snd_in_, raw_sample_buffer_, conversion_chunk_size_);
+    // Do convolution here.
+    sf_writef_float(snd_out_, raw_sample_buffer_, r);
+    input_frames_left_ -= r;
+    return (input_frames_left_ > 0);
+  }
   const int filedes_;
+  const int conversion_chunk_size_;
+  bool error_;
+  ConversionBuffer *output_buffer_;
+  SNDFILE *snd_in_;
+  SNDFILE *snd_out_;
+
+  // Used in conversion.
+  float *raw_sample_buffer_;
+  int input_frames_left_;
 };
 }  // namespace
 
@@ -84,8 +153,8 @@ bool HasSuffixString (const char *str, const char *suffix) {
 
 // Implementation of the C functions in filter-interface.h
 struct filter_object_t *create_filter(int filedes, const char *path) {
-  if (HasSuffixString(path, ".wav")) {
-    return new WavFilter(filedes, path);
+  if (HasSuffixString(path, ".flac")) {
+    return new SndFileFilter(filedes, path, 1024);
   }
 
   // Every other file-type is just passed through as is.
