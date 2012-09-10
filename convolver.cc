@@ -97,7 +97,6 @@ public:
   virtual ~SndFileFilter() {
 #ifndef REQUIRES_GLOBAL_CONVPROC
     if (zita_.convproc) {
-      // don't destroy. Something fishy is going on.
       zita_.convproc->stop_process();
       zita_.convproc->cleanup();
       delete zita_.convproc;
