@@ -31,6 +31,8 @@ class ConversionBuffer {
     // requested. There can be an error in opening the sound-file, in that
     // case SetOutputSoundfile() will be called with NULL.
     // Ask sf_strerror() to find out why.
+    // Ownership is passed to the SoundSource, receiver needs to 
+    // sf_close() the file.
     virtual void SetOutputSoundfile(SNDFILE *sndfile) = 0;
 
     // This callback is called by the ConversionBuffer if it needs more data.
