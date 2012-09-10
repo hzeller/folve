@@ -73,7 +73,7 @@ SNDFILE *ConversionBuffer::CreateOutputSoundfile(const SF_INFO &out_info) {
 
 ssize_t ConversionBuffer::Append(const void *data, size_t count) {
   if (tmpfile_ < 0) return -1;
-  fprintf(stderr, "Extend horizon by %ld bytes.\n", count);
+  //fprintf(stderr, "Extend horizon by %ld bytes.\n", count);
   int remaining = count;
   const char *buf = (const char*)data;
   while (remaining > 0) {
@@ -95,8 +95,7 @@ ssize_t ConversionBuffer::Read(char *buf, size_t size, off_t offset) {
       break;
   }
   ssize_t result = pread(tmpfile_, buf, size, offset);
-  fprintf(stderr, "Read(%ld @ %ld) = %ld\n",
-          size, offset, result);
+  //fprintf(stderr, "Read(%ld @ %ld) = %ld\n", size, offset, result);
 
   return result;
 }
