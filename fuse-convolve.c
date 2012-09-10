@@ -13,6 +13,9 @@
 //  You should have received a copy of the GNU General Public License
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+// This fuse filesystem only provides read access to another filesystem that
+// contains *.flac and *.wav files. Accessing these files passes them
+// through a zita-filter transparently.
 // This is a pure C implementation, providing basic file operations and passing
 // actual reading to a filter aquired using the functions in filter-interface.h
 
@@ -99,31 +102,31 @@ static int fuseconv_open(const char *path, struct fuse_file_info *fi) {
   char path_buf[PATH_MAX];
   const char *orig_path = assemble_orig_path(path_buf, path);
   const int fd = open(orig_path, fi->flags);
-
-  // We want to return partial reads. That way, we can separate reading the
-  // ID3-tags from the stream.
-  // In order to return partical content, we need to set the direct_io.
-  fi->direct_io = 1;
-
   if (fd == -1)
     return -errno;
 
+  // We want to be allowed to only return part of the requested data in read().
+  // That way, we can separate reading the ID3-tags from
+  // decoding of the music stream - that way indexing should be fast.
+  // Setting the flag 'direct_io' allows us to return partial results.
+  fi->direct_io = 1;
+
   // The file-handle has the neat property to be 64 bit - so we can actually
-  // store a pointer in there :) (Yay, someone was thinking while developing
-  // that API).
+  // store a pointer to our filter object in there :)
+  // (Yay, someone was thinking while developing that API).
   fi->fh = (uint64_t) create_filter(fd, orig_path);
   return 0;
 }
 
 static int fuseconv_read(const char *path, char *buf, size_t size, off_t offset,
                          struct fuse_file_info *fi) {
-  return read_from_filter((struct filter_interface_t*)fi->fh,
+  return read_from_filter((struct filter_object_t*)fi->fh,
                           buf, size, offset);
 }
 
 static int fuseconv_release(const char *path, struct fuse_file_info *fi) {
   fprintf(stderr, "HZ ===== close('%s')\n", path);
-  return close_filter((struct filter_interface_t*) fi->fh);
+  return close_filter((struct filter_object_t*) fi->fh);
 }
 
 static struct fuse_operations fuseconv_operations = {
@@ -140,15 +143,15 @@ static struct fuse_operations fuseconv_operations = {
   .read		= fuseconv_read,
 };
 
-static void usage(const char *prog) {
-  fprintf(stderr, "usage: %s <config-dir> <original-dir> <mount-point>\n",
+static int usage(const char *prog) {
+  fprintf(stderr, "usage: %s <config-file> <original-dir> <mount-point>\n",
           prog);
-  exit(1);
+  return 1;
 }
 
 int main(int argc, char *argv[]) {
-  if (argc < 2) {
-    usage(argv[0]);
+  if (argc < 4) {
+    return usage(argv[0]);
   }
   
   // First, let's extract our configuration.

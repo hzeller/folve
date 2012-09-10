@@ -22,7 +22,7 @@
 #include "filter-interface.h"
 
 namespace {
-class FileFilter : public filter_interface_t {
+class FileFilter : public filter_object_t {
 public:
   // Returns bytes read or a negative value indicating a negative errno.
   virtual int Read(char *buf, size_t size, off_t offset) = 0;
@@ -83,21 +83,21 @@ bool HasSuffixString (const char *str, const char *suffix) {
 }
 
 // Implementation of the C functions in filter-interface.h
-struct filter_interface_t *create_filter(int filedes, const char *path) {
+struct filter_object_t *create_filter(int filedes, const char *path) {
   if (HasSuffixString(path, ".wav")) {
     return new WavFilter(filedes, path);
   }
 
-  // Everything other file is just passed through as is.
+  // Every other file-type is just passed through as is.
   return new PassThroughFilter(filedes, path);
 }
 
-int read_from_filter(struct filter_interface_t *filter,
+int read_from_filter(struct filter_object_t *filter,
                      char *buf, size_t size, off_t offset) {
   return reinterpret_cast<FileFilter*>(filter)->Read(buf, size, offset);
 }
 
-int close_filter(struct filter_interface_t *filter) {
+int close_filter(struct filter_object_t *filter) {
   FileFilter *file_filter = reinterpret_cast<FileFilter*>(filter);
   int result = file_filter->Close();
   delete file_filter;
