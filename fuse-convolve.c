@@ -42,19 +42,38 @@ static struct {
   const char *orig_dir;
 } context;
 
-// Given a relative path from the root of the mounted file-system, get the
-// original file from the source filesystem.
-static const char *assemble_orig_path(char *buf, const char *path) {
-  strcpy(buf, context.orig_dir);
-  strcat(buf, path);
+static int has_suffix_string (const char *str, const char *suffix) {
+  if (!str || !suffix)
+    return 0;
+  size_t str_len = strlen(str);
+  size_t suffix_len = strlen(suffix);
+  if (suffix_len > str_len)
+    return 0;
+  return strncmp(str + str_len - suffix_len, suffix, suffix_len) == 0;
+}
+
+static char *concat_path(char *buf, const char *a, const char *b) {
+  strcpy(buf, a);
+  strcat(buf, b);
   return buf;
 }
 
-// Essentially stat(). Just forward to the original filesystem (this
+// Given a relative path from the root of the mounted file-system, get the
+// original file from the source filesystem.
+static const char *assemble_orig_path(char *buf, const char *path) {
+  char *result = concat_path(buf, context.orig_dir, path);
+  static const char magic_ogg_rewrite[] = ".ogg.fuse.flac";
+  if (has_suffix_string(result, magic_ogg_rewrite)) {
+    *(result + strlen(result) - strlen(".fuse.flac")) = '\0';
+  }
+  return result;
+}
+
+// Essentially lstat(). Just forward to the original filesystem (this
 // will by lying: our convolved files are of different size...)
 static int fuseconv_getattr(const char *path, struct stat *stbuf) {
   char path_buf[PATH_MAX];
-  const int result = lstat(assemble_orig_path(path_buf, path), stbuf);
+  int result = lstat(assemble_orig_path(path_buf, path), stbuf);
   if (result == -1)
     return -errno;
 
@@ -72,12 +91,20 @@ static int fuseconv_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
   if (dp == NULL)
     return -errno;
 
+  char ogg_rewrite_buffer[PATH_MAX];
+
   while ((de = readdir(dp)) != NULL) {
     struct stat st;
     memset(&st, 0, sizeof(st));
     st.st_ino = de->d_ino;
     st.st_mode = de->d_type << 12;
-    if (filler(buf, de->d_name, &st, 0))
+    const char *entry_name = de->d_name;
+    if (has_suffix_string(entry_name, ".ogg")) {
+      // For ogg files, we pretend they actually end with 'flac', because
+      // we transparently rewrite them.
+      entry_name = concat_path(ogg_rewrite_buffer, entry_name, ".fuse.flac");
+    }
+    if (filler(buf, entry_name, &st, 0))
       break;
   }
 

@@ -14,17 +14,30 @@
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <errno.h>
+#include <sndfile.h>
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
 #include <unistd.h>
-#include <sndfile.h>
+
+#include <string>
 
 #include "filter-interface.h"
 #include "conversion-buffer.h"
 #include "zita-config.h"
 
-const char *sGlobal_zita_config;
+const char *global_zita_config_dir = NULL;
+
+// We do a very simple decision which filter to apply by looking at the suffix.
+static bool HasSuffixString (const char *str, const char *suffix) {
+  if (!str || !suffix)
+    return false;
+  size_t str_len = strlen(str);
+  size_t suffix_len = strlen(suffix);
+  if (suffix_len > str_len)
+    return false;
+  return strncasecmp(str + str_len - suffix_len, suffix, suffix_len) == 0;
+}
 
 namespace {
 class FileFilter : public filter_object_t {
@@ -60,48 +73,34 @@ class SndFileFilter :
     public FileFilter,
     public ConversionBuffer::SoundSource {
 public:
-  SndFileFilter(int filedes, const char *path)
-    : filedes_(filedes), error_(false),
-      output_buffer_(NULL), snd_in_(NULL), snd_out_(NULL),
-      raw_sample_buffer_(NULL), input_frames_left_(0) {
-    // Open input file.
+  // Attempt to create a SndFileFilter from the given file descriptor. This
+  // returns NULL if this is not a sound-file or if there is no available
+  // convolution filter configuration available.
+  static FileFilter *Create(int filedes, const char *path) {
     struct SF_INFO in_info;
     memset(&in_info, 0, sizeof(in_info));
-    snd_in_ = sf_open_fd(filedes, SFM_READ, &in_info, 0);
-    if (snd_in_ == NULL) {
-      error_ = true;
+    SNDFILE *snd = sf_open_fd(filedes, SFM_READ, &in_info, 0);
+    if (snd == NULL) {
       fprintf(stderr, "Opening input: %s\n", sf_strerror(NULL));
-      return;
+      return NULL;
     }
 
-    // TODO(hzeller): with the following information, we can choose the
-    // configuration file to use. We might move this out into a factory: in
-    // case we don't have that configuration file, we might fall back to
-    // PassThroughFilter.
     int bits = 16;
     if ((in_info.format & SF_FORMAT_PCM_24) != 0) bits = 24;
     if ((in_info.format & SF_FORMAT_PCM_32) != 0) bits = 32;
-    fprintf(stderr, "Sound-file %s, %d-bit, %d channels, %dHz\n", path,
-            bits, in_info.channels, in_info.samplerate);
-
-    // Initialize zita config, but don't allocate converter quite yet.
-    memset(&zita_, 0, sizeof(zita_));
-    zita_.fsamp = in_info.samplerate;
-    zita_.ninp = in_info.channels;
-    zita_.nout = in_info.channels;
-
-    channels_ = in_info.channels;
-    input_frames_left_ = in_info.frames;
-
-    // Create a conversion buffer that creates a soundfile of a particular
-    // format that we choose here. Essentially we want to have mostly what
-    // our input is.
-    struct SF_INFO out_info = in_info;
-    out_info.format = SF_FORMAT_FLAC;
-    // same number of bits format as input.
-    out_info.format |= in_info.format & SF_FORMAT_SUBMASK;
-    out_info.seekable = 0;  // no point in making it seekable.
-    output_buffer_ = new ConversionBuffer(this, out_info);
+    char config_path[1024];
+    snprintf(config_path, sizeof(config_path), "%s/filter-%d-%d-%d.conf",
+             global_zita_config_dir, in_info.samplerate,
+             bits, in_info.channels);
+    fprintf(stderr, "Looking for config %s ", config_path);
+    if (access(config_path, R_OK) != 0) {
+      fprintf(stderr, "- cannot access.\n");
+      sf_close(snd);
+      return NULL;
+    } else {
+      fprintf(stderr, "- found.\n");
+    }
+    return new SndFileFilter(path, filedes, snd, in_info, config_path);
   }
   
   virtual ~SndFileFilter() {
@@ -122,12 +121,50 @@ public:
   }
 
   virtual int Close() {
-    if (snd_in_) { sf_close(snd_in_); snd_in_ = NULL; }
-    if (snd_out_) { sf_close(snd_out_); snd_out_ = NULL; }
+    if (snd_in_) sf_close(snd_in_);
+    if (snd_out_) sf_close(snd_out_);
     return close(filedes_) == -1 ? -errno : 0;
   }
     
 private:
+  SndFileFilter(const char *path, int filedes, SNDFILE *snd_in,
+                const SF_INFO &in_info,
+                const char* config_path)
+    : filedes_(filedes), snd_in_(snd_in), config_path_(config_path),
+      error_(false), output_buffer_(NULL), channels_(0), snd_out_(NULL),
+      raw_sample_buffer_(NULL), input_frames_left_(0) {
+
+    // Initialize zita config, but don't allocate converter quite yet.
+    memset(&zita_, 0, sizeof(zita_));
+    zita_.fsamp = in_info.samplerate;
+    zita_.ninp = in_info.channels;
+    zita_.nout = in_info.channels;
+
+    channels_ = in_info.channels;
+    input_frames_left_ = in_info.frames;
+
+    // Create a conversion buffer that creates a soundfile of a particular
+    // format that we choose here. Essentially we want to have mostly what
+    // our input is.
+    struct SF_INFO out_info = in_info;
+    // The input seems to contain several bits indicating all kinds major
+    // types. So look at the filename.
+    if (HasSuffixString(path, ".wav")) {
+      out_info.format = SF_FORMAT_WAV;
+    } else {
+      out_info.format = SF_FORMAT_FLAC;
+    }
+    // same number of bits format as input. If the input was ogg, we're
+    // re-coding this to flac/24.
+    if ((in_info.format & SF_FORMAT_OGG) != 0) {
+      out_info.format |= SF_FORMAT_PCM_24;
+    } else {
+      out_info.format |= in_info.format & SF_FORMAT_SUBMASK;
+    }
+    out_info.seekable = 0;  // no point in making it seekable.
+    output_buffer_ = new ConversionBuffer(this, out_info);
+  }
+
   virtual void SetOutputSoundfile(SNDFILE *sndfile) {
     snd_out_ = sndfile;
     if (snd_out_ == NULL) {
@@ -153,7 +190,7 @@ private:
       return false;
     if (!zita_.convproc) {
       zita_.convproc = new Convproc();
-      config(&zita_, sGlobal_zita_config);
+      config(&zita_, config_path_.c_str());
       zita_.convproc->start_process(0, 0);
       fprintf(stderr, "Convolver initialized; chunksize=%d\n", zita_.fragm);
     }
@@ -198,10 +235,12 @@ private:
   }
 
   const int filedes_;
+  SNDFILE *const snd_in_;
+  const std::string config_path_;
+
   bool error_;
   ConversionBuffer *output_buffer_;
   int channels_;
-  SNDFILE *snd_in_;
   SNDFILE *snd_out_;
 
   // Used in conversion.
@@ -211,23 +250,12 @@ private:
 };
 }  // namespace
 
-// We do a very simple decision which filter to apply by looking at the suffix.
-bool HasSuffixString (const char *str, const char *suffix) {
-  if (!str || !suffix)
-    return false;
-  size_t str_len = strlen(str);
-  size_t suffix_len = strlen(suffix);
-  if (suffix_len > str_len)
-    return false;
-  return strncasecmp(str + str_len - suffix_len, suffix, suffix_len) == 0;
-}
-
 // Implementation of the C functions in filter-interface.h
 struct filter_object_t *create_filter(int filedes, const char *path) {
-  if (HasSuffixString(path, ".flac")) {
-    return new SndFileFilter(filedes, path);
-  }
+  FileFilter *filter = SndFileFilter::Create(filedes, path);
+  if (filter != NULL) return filter;
 
+  fprintf(stderr, "Cound't create filtered output\n");
   // Every other file-type is just passed through as is.
   return new PassThroughFilter(filedes, path);
 }
@@ -244,6 +272,6 @@ int close_filter(struct filter_object_t *filter) {
   return result;
 }
 
-void initialize_convolver_filter(const char *zita_config_file) {
-  sGlobal_zita_config = zita_config_file;
+void initialize_convolver_filter(const char *zita_config_dir) {
+  global_zita_config_dir = zita_config_dir;
 }
