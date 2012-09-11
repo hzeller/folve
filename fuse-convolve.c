@@ -171,7 +171,7 @@ static struct fuse_operations fuseconv_operations = {
 };
 
 static int usage(const char *prog) {
-  fprintf(stderr, "usage: %s <config-file> <original-dir> <mount-point>\n",
+  fprintf(stderr, "usage: %s <config-dir> <original-dir> <mount-point>\n",
           prog);
   return 1;
 }

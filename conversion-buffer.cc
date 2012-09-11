@@ -96,8 +96,5 @@ ssize_t ConversionBuffer::Read(char *buf, size_t size, off_t offset) {
     if (!source_->AddMoreSoundData())
       break;
   }
-  ssize_t result = pread(tmpfile_, buf, size, offset);
-  //fprintf(stderr, "Read(%ld @ %ld) = %ld\n", size, offset, result);
-
-  return result;
+  return pread(tmpfile_, buf, size, offset);
 }

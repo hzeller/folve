@@ -28,17 +28,6 @@
 
 const char *global_zita_config_dir = NULL;
 
-// We do a very simple decision which filter to apply by looking at the suffix.
-static bool HasSuffixString (const char *str, const char *suffix) {
-  if (!str || !suffix)
-    return false;
-  size_t str_len = strlen(str);
-  size_t suffix_len = strlen(suffix);
-  if (suffix_len > str_len)
-    return false;
-  return strncasecmp(str + str_len - suffix_len, suffix, suffix_len) == 0;
-}
-
 namespace {
 class FileFilter : public filter_object_t {
 public:
@@ -86,8 +75,8 @@ public:
     }
 
     int bits = 16;
-    if ((in_info.format & SF_FORMAT_PCM_24) != 0) bits = 24;
-    if ((in_info.format & SF_FORMAT_PCM_32) != 0) bits = 32;
+    if ((in_info.format & SF_FORMAT_SUBMASK) == SF_FORMAT_PCM_24) bits = 24;
+    if ((in_info.format & SF_FORMAT_SUBMASK) == SF_FORMAT_PCM_32) bits = 32;
     char config_path[1024];
     snprintf(config_path, sizeof(config_path), "%s/filter-%d-%d-%d.conf",
              global_zita_config_dir, in_info.samplerate,
@@ -147,21 +136,25 @@ private:
     // format that we choose here. Essentially we want to have mostly what
     // our input is.
     struct SF_INFO out_info = in_info;
-    // The input seems to contain several bits indicating all kinds major
-    // types. So look at the filename.
-    if (HasSuffixString(path, ".wav")) {
-      out_info.format = SF_FORMAT_WAV;
-    } else {
+    out_info.seekable = 0;
+    if ((in_info.format & SF_FORMAT_TYPEMASK) == SF_FORMAT_OGG) {
+      // If the input was ogg, we're re-coding this to flac/24.
       out_info.format = SF_FORMAT_FLAC;
-    }
-    // same number of bits format as input. If the input was ogg, we're
-    // re-coding this to flac/24.
-    if ((in_info.format & SF_FORMAT_OGG) != 0) {
       out_info.format |= SF_FORMAT_PCM_24;
-    } else {
-      out_info.format |= in_info.format & SF_FORMAT_SUBMASK;
     }
-    out_info.seekable = 0;  // no point in making it seekable.
+    else if ((in_info.format & SF_FORMAT_TYPEMASK) == SF_FORMAT_WAV
+             && (in_info.format & SF_FORMAT_SUBMASK) != SF_FORMAT_PCM_16) {
+      // WAV format seems to create garbage when we attempt to output PCM_24
+      // Output float for now; still mplayer seems to trip about length.
+      // Probably the header is incomplete. Investigate.
+      out_info.format = SF_FORMAT_WAV;
+      out_info.format |= SF_FORMAT_FLOAT;
+      out_info.format |= SF_ENDIAN_CPU;
+    }
+    else { // original format.
+      out_info.format = in_info.format;
+    }
+
     output_buffer_ = new ConversionBuffer(this, out_info);
   }
 
@@ -202,7 +195,7 @@ private:
     if (r == (int) zita_.fragm) {
       fprintf(stderr, ".");
     } else {
-      fprintf(stderr, "[%d]\n", r);
+      fprintf(stderr, "[%d]", r);
     }
     if (r < (int) zita_.fragm) {
       // zero out the rest of the buffer
@@ -230,7 +223,9 @@ private:
     }
     sf_writef_float(snd_out_, raw_sample_buffer_, r);
     input_frames_left_ -= r;
-
+    if (input_frames_left_ == 0) {
+      fprintf(stderr, "(fully decoded)\n");
+    }
     return input_frames_left_;
   }
 
