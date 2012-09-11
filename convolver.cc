@@ -64,8 +64,6 @@ public:
     : filedes_(filedes), error_(false),
       output_buffer_(NULL), snd_in_(NULL), snd_out_(NULL),
       raw_sample_buffer_(NULL), input_frames_left_(0) {
-    fprintf(stderr, "Creating sound-file filter for '%s'\n", path);
-
     // Open input file.
     struct SF_INFO in_info;
     memset(&in_info, 0, sizeof(in_info));
@@ -83,7 +81,7 @@ public:
     int bits = 16;
     if ((in_info.format & SF_FORMAT_PCM_24) != 0) bits = 24;
     if ((in_info.format & SF_FORMAT_PCM_32) != 0) bits = 32;
-    fprintf(stderr, "File %s, %d-bit, %d channels, %dHz\n", path,
+    fprintf(stderr, "Convolving %s, %d-bit, %d channels, %dHz\n", path,
             bits, in_info.channels, in_info.samplerate);
 
     // Initialize zita config, but don't allocate converter quite yet.

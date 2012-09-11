@@ -49,9 +49,11 @@ sf_count_t ConversionBuffer::SndWrite(const void *ptr, sf_count_t count,
 
 // These callbacks we don't care about.
 static sf_count_t DummySeek(sf_count_t offset, int whence, void *user_data) {
-  // This seems to be called after we're closing, probably to change
-  // skipping data or something.
-  fprintf(stderr, "DummySeek called %ld\n", offset);
+  // This seems to be called after we're closing, probably to modify the
+  // header. It actually attempts to write that end up at the end of the
+  // file. We don't care, it is not accessed for reading anymore.
+  // TODO(hzeller): Suppress writing after close() and really warn
+  //fprintf(stderr, "DummySeek called %ld\n", offset);
   return 0;
 }
 static sf_count_t DummyRead(void *ptr, sf_count_t count, void *user_data) {

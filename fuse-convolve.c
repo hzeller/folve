@@ -98,7 +98,7 @@ static int fuseconv_readlink(const char *path, char *buf, size_t size) {
 }
 
 static int fuseconv_open(const char *path, struct fuse_file_info *fi) {
-  fprintf(stderr, "HZ ===== open('%s')\n", path);
+  fprintf(stderr, "[===== open('%s')\n", path);
   char path_buf[PATH_MAX];
   const char *orig_path = assemble_orig_path(path_buf, path);
   const int fd = open(orig_path, fi->flags);
@@ -125,7 +125,7 @@ static int fuseconv_read(const char *path, char *buf, size_t size, off_t offset,
 }
 
 static int fuseconv_release(const char *path, struct fuse_file_info *fi) {
-  fprintf(stderr, "HZ ===== close('%s')\n", path);
+  fprintf(stderr, "===== close('%s') ==]\n", path);
   return close_filter((struct filter_object_t*) fi->fh);
 }
 
