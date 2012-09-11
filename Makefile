@@ -1,10 +1,10 @@
 CC=gcc
 CXX=g++
-CFLAGS=-D_FILE_OFFSET_BITS=64 -Wall -g -O3
-CXXFLAGS=-Wall -g -O3
-LDFLAGS=-lfuse -lsndfile -ffast-math -lfftw3f -lpthread
+CFLAGS=-D_FILE_OFFSET_BITS=64 -Wall -g -O2
+CXXFLAGS=-Wall -g -O2
+LDFLAGS=-lfuse -lsndfile -lzita-convolver
 
-fuse-convolve: fuse-convolve.o convolver.o conversion-buffer.o zita-audiofile.o zita-config.o zita-fconfig.o zita-sstring.o zita-convolver.o
+fuse-convolve: fuse-convolve.o convolver.o conversion-buffer.o zita-audiofile.o zita-config.o zita-fconfig.o zita-sstring.o
 	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
 
 copy-music: copy-music.cc

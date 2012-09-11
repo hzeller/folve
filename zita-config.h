@@ -23,7 +23,7 @@
 #define __CONFIG_H
 
 
-#include "zita-convolver.h"
+#include <zita-convolver.h>
 #include "zita-sstring.h"
 
 struct ZitaConfig {
