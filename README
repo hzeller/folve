@@ -4,7 +4,7 @@ and provides these files that are convolved on the fly using the zita convolver
 
 === To compile on Ubuntu ===
 
-  $ sudo aptitude install libsndfile-dev libflac-dev libzita-convolver-dev libfuse-dev
+  $ sudo aptitude install libsndfile-dev libflac-dev libzita-convolver-dev libfuse-dev fftw3-dev
   $ make
 
 === Run ===
