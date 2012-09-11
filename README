@@ -34,6 +34,9 @@ spits out some debugging information.
 Now you can access the fileystem under that mount point, e.g.
   mplayer /mnt/mountpoint/foo.flac
 
-(purely readonly; only reading files is supported).
+The fuse-convolve filesystem will determine the samplerate/bits/channels and
+attempt to find the right filter in the filter directory. If there is a filter,
+the output is filtered on-the-fly, otherwise the original file is returned.
+
 
 
