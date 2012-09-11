@@ -273,13 +273,18 @@ int config (ZitaConfig *cfg, const char *config)
     char          cdir [1024];
     char          *p, *q;
 
+    fprintf(stderr, "config('%s')\n", config);
+
     if (! (F = fopen (config, "r"))) 
     {
 	fprintf (stderr, "Can't open '%s' for reading\n", config);
         return -1;
     } 
+    
+    char *config_name_copy = strdup(config);
+    strcpy (cdir, dirname(config_name_copy));
+    free(config_name_copy);
 
-    strcpy (cdir, dirname ((char *) config));
     stat = 0;
     lnum = 0;
 

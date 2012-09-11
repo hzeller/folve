@@ -24,10 +24,6 @@
 #include "conversion-buffer.h"
 #include "zita-config.h"
 
-// Something is fishy with the convproc. It only works if we have
-// one instance we re-use. Otherwise it crashes
-#define REQUIRES_GLOBAL_CONVPROC 1
-
 const char *sGlobal_zita_config;
 
 namespace {
@@ -80,6 +76,22 @@ public:
       return;
     }
 
+    // TODO(hzeller): with the following information, we can choose the
+    // configuration file to use. We might move this out into a factory: in
+    // case we don't have that configuration file, we might fall back to
+    // PassThroughFilter.
+    int bits = 16;
+    if ((in_info.format & SF_FORMAT_PCM_24) != 0) bits = 24;
+    if ((in_info.format & SF_FORMAT_PCM_32) != 0) bits = 32;
+    fprintf(stderr, "File %s, %d-bit, %d channels, %dHz\n", path,
+            bits, in_info.channels, in_info.samplerate);
+
+    // Initialize zita config, but don't allocate converter quite yet.
+    memset(&zita_, 0, sizeof(zita_));
+    zita_.fsamp = in_info.samplerate;
+    zita_.ninp = in_info.channels;
+    zita_.nout = in_info.channels;
+
     channels_ = in_info.channels;
     input_frames_left_ = in_info.frames;
 
@@ -95,13 +107,11 @@ public:
   }
   
   virtual ~SndFileFilter() {
-#ifndef REQUIRES_GLOBAL_CONVPROC
     if (zita_.convproc) {
       zita_.convproc->stop_process();
       zita_.convproc->cleanup();
       delete zita_.convproc;
     }
-#endif
     delete output_buffer_;
     delete [] raw_sample_buffer_;
   }
@@ -154,7 +164,12 @@ private:
       raw_sample_buffer_ = new float[zita_.fragm * channels_];
     }
     int r = sf_readf_float(snd_in_, raw_sample_buffer_, zita_.fragm);
-    fprintf(stderr, "** conversion callback; %d new samples **\n", r);
+    if (r == 0) { fprintf(stderr, "eeeempty\n"); return false; }
+    if (r == (int) zita_.fragm) {
+      fprintf(stderr, ".");
+    } else {
+      fprintf(stderr, "[%d]\n", r);
+    }
     if (r < (int) zita_.fragm) {
       // zero out the rest of the buffer
       const int missing = zita_.fragm - r;
@@ -195,15 +210,8 @@ private:
   // Used in conversion.
   float *raw_sample_buffer_;
   int input_frames_left_;
-#ifdef REQUIRES_GLOBAL_CONVPROC
-  static ZitaConfig zita_;
-#else
   ZitaConfig zita_;
-#endif
 };
-#ifdef REQUIRES_GLOBAL_CONVPROC
-  ZitaConfig SndFileFilter::zita_;
-#endif
 }  // namespace
 
 // We do a very simple decision which filter to apply by looking at the suffix.
