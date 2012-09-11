@@ -81,7 +81,7 @@ public:
     int bits = 16;
     if ((in_info.format & SF_FORMAT_PCM_24) != 0) bits = 24;
     if ((in_info.format & SF_FORMAT_PCM_32) != 0) bits = 32;
-    fprintf(stderr, "Convolving %s, %d-bit, %d channels, %dHz\n", path,
+    fprintf(stderr, "Sound-file %s, %d-bit, %d channels, %dHz\n", path,
             bits, in_info.channels, in_info.samplerate);
 
     // Initialize zita config, but don't allocate converter quite yet.
@@ -145,7 +145,7 @@ private:
     // Now flush the header: that way if someone only reads the metadata, then
     // our AddMoreSoundData() is never called.
     sf_command(snd_out_, SFC_UPDATE_HEADER_NOW, NULL, 0);
-    fprintf(stderr, "Header copy done.\n");
+    fprintf(stderr, "Header init done.\n");
   }
 
   virtual bool AddMoreSoundData() {
@@ -155,8 +155,7 @@ private:
       zita_.convproc = new Convproc();
       config(&zita_, sGlobal_zita_config);
       zita_.convproc->start_process(0, 0);
-      fprintf(stderr, "Create conversion processor, chunksize=%d\n",
-              zita_.fragm);
+      fprintf(stderr, "Convolver initialized; chunksize=%d\n", zita_.fragm);
     }
     if (raw_sample_buffer_ == NULL) {
       raw_sample_buffer_ = new float[zita_.fragm * channels_];
