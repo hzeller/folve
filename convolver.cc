@@ -19,6 +19,7 @@
 #include <string.h>
 #include <strings.h>
 #include <unistd.h>
+#include <FLAC/metadata.h>
 
 #include <string>
 
@@ -123,6 +124,10 @@ private:
       error_(false), output_buffer_(NULL), channels_(0), snd_out_(NULL),
       raw_sample_buffer_(NULL), input_frames_left_(0) {
 
+    // The flac header we get is more rich than what we can do
+    // with sndfile. In that case, just copy that.
+    copy_flac_header_ = (in_info.format & SF_FORMAT_TYPEMASK) == SF_FORMAT_FLAC;
+
     // Initialize zita config, but don't allocate converter quite yet.
     memset(&zita_, 0, sizeof(zita_));
     zita_.fsamp = in_info.samplerate;
@@ -158,23 +163,31 @@ private:
     output_buffer_ = new ConversionBuffer(this, out_info);
   }
 
-  virtual void SetOutputSoundfile(SNDFILE *sndfile) {
+  virtual void SetOutputSoundfile(ConversionBuffer *parent,
+                                  SNDFILE *sndfile) {
     snd_out_ = sndfile;
     if (snd_out_ == NULL) {
       error_ = true;
       fprintf(stderr, "Opening output: %s\n", sf_strerror(NULL));
       return;
     }
-    // Copy header. Everything else that follows will be stream bytes.
-    for (int i = SF_STR_FIRST; i <= SF_STR_LAST; ++i) {
-      const char *s = sf_get_string(snd_in_, i);
-      if (s != NULL) {
-        sf_set_string(snd_out_, i, s);
+    if (copy_flac_header_) {
+      parent->allow_sndfile_writes(false);
+      CopyFlacHeader(parent);
+    } else {
+      parent->allow_sndfile_writes(true);
+      // Copy strings. Everything else that follows will be stream bytes.
+      for (int i = SF_STR_FIRST; i <= SF_STR_LAST; ++i) {
+        const char *s = sf_get_string(snd_in_, i);
+        if (s != NULL) {
+          sf_set_string(snd_out_, i, s);
+        }
       }
     }
     // Now flush the header: that way if someone only reads the metadata, then
     // our AddMoreSoundData() is never called.
     sf_command(snd_out_, SFC_UPDATE_HEADER_NOW, NULL, 0);
+    parent->allow_sndfile_writes(true);
     fprintf(stderr, "Header init done.\n");
   }
 
@@ -229,11 +242,61 @@ private:
     return input_frames_left_;
   }
 
+  off_t CopyBytes(int fd, off_t pos, ConversionBuffer *out, size_t len) {
+    char buf[256];
+    while (len > 0) {
+      //fprintf(stderr, "read at %ld\n", pos);
+      ssize_t r = pread(fd, buf, std::min(sizeof(buf), len), pos);
+      if (r <= 0) return pos;
+      //fprintf(stderr, "append %ld bytes\n", r);
+      out->Append(buf, r);
+      len -= r;
+      pos += r;
+    }
+    return pos;
+  }
+
+  void CopyFlacHeader(ConversionBuffer *parent) {
+    fprintf(stderr, "Copy raw flac header\n");
+    parent->Append("fLaC", 4);
+    off_t pos = 4;
+    unsigned char header[4];
+    bool need_padding = false;
+    while (pread(filedes_, header, sizeof(header), pos) == sizeof(header)) {
+      pos += sizeof(header);
+      bool is_last = header[0] & 0x80;
+      unsigned int type = header[0] & 0x7F;
+      unsigned int byte_len = (header[1] << 16) + (header[2] << 8) + header[3];
+      fprintf(stderr, " type: %d, len: %u %s ", type,
+              byte_len, is_last ? "(last-header)" : "(cont)");
+      // The SEEKTABLE header we skip, because it is bogus after encoding.
+      if (type == FLAC__METADATA_TYPE_SEEKTABLE) {
+        fprintf(stderr, " (this is the seektable; skipped)\n");
+        pos += byte_len;
+        need_padding = is_last;  // if we were last, force finish block.
+      } else {
+        parent->Append(&header, sizeof(header));
+        pos = CopyBytes(filedes_, pos, parent, byte_len);
+        need_padding = false;
+        fprintf(stderr, " (ok)\n");
+      }
+      if (is_last)
+        break;
+    }
+    if (need_padding) {  // if the last block was not is_last: pad.
+      fprintf(stderr, "write padding\n");
+      memset(&header, 0, sizeof(header));
+      header[0] = 0x80 /* is last */ | FLAC__METADATA_TYPE_PADDING;
+      parent->Append(&header, sizeof(header));
+    }
+  }
+
   const int filedes_;
   SNDFILE *const snd_in_;
   const std::string config_path_;
 
   bool error_;
+  bool copy_flac_header_;
   ConversionBuffer *output_buffer_;
   int channels_;
   SNDFILE *snd_out_;

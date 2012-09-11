@@ -24,7 +24,7 @@
 #include "conversion-buffer.h"
 
 ConversionBuffer::ConversionBuffer(SoundSource *source, const SF_INFO &info)
-  : source_(source), tmpfile_(-1), total_written_(0) {
+  : source_(source), tmpfile_(-1), snd_writing_enabled_(true), total_written_(0) {
   // We need to be able to skip backwards but we don't want to fill our
   // memory. So lets create a temporary file.
   const char *filename = tempnam(NULL, "fuse-");
@@ -32,7 +32,7 @@ ConversionBuffer::ConversionBuffer(SoundSource *source, const SF_INFO &info)
   unlink(filename);
 
   // After file-open: SetOutputSoundfile() already might attempt to write data.
-  source_->SetOutputSoundfile(CreateOutputSoundfile(info));
+  source_->SetOutputSoundfile(this, CreateOutputSoundfile(info));
 }
 
 ConversionBuffer::~ConversionBuffer() {
@@ -44,7 +44,7 @@ sf_count_t ConversionBuffer::SndTell(void *userdata) {
 }
 sf_count_t ConversionBuffer::SndWrite(const void *ptr, sf_count_t count,
                                       void *userdata) {
-  return reinterpret_cast<ConversionBuffer*>(userdata)->Append(ptr, count);
+  return reinterpret_cast<ConversionBuffer*>(userdata)->SndAppend(ptr, count);
 }
 
 // These callbacks we don't care about.
@@ -53,7 +53,7 @@ static sf_count_t DummySeek(sf_count_t offset, int whence, void *user_data) {
   // header. It actually attempts to write that end up at the end of the
   // file. We don't care, it is not accessed for reading anymore.
   // TODO(hzeller): Suppress writing after close() and really warn
-  //fprintf(stderr, "DummySeek called %ld\n", offset);
+  fprintf(stderr, "DummySeek called %ld\n", offset);
   return 0;
 }
 static sf_count_t DummyRead(void *ptr, sf_count_t count, void *user_data) {
@@ -86,6 +86,14 @@ ssize_t ConversionBuffer::Append(const void *data, size_t count) {
   }
   total_written_ += count;
   return count;
+}
+
+ssize_t ConversionBuffer::SndAppend(const void *data, size_t count) {
+  if (!snd_writing_enabled_) {
+    fprintf(stderr, "Skipping %ld\n", count);
+    return count;
+  }
+  return Append(data, count);
 }
 
 ssize_t ConversionBuffer::Read(char *buf, size_t size, off_t offset) {

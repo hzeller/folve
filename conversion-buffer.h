@@ -33,7 +33,7 @@ class ConversionBuffer {
     // Ask sf_strerror() to find out why.
     // Ownership is passed to the SoundSource, receiver needs to 
     // sf_close() the file.
-    virtual void SetOutputSoundfile(SNDFILE *sndfile) = 0;
+    virtual void SetOutputSoundfile(ConversionBuffer *parent, SNDFILE *sndfile) = 0;
 
     // This callback is called by the ConversionBuffer if it needs more data.
     // Rerturns 'true' if there is more, 'false' if that was the last available
@@ -53,15 +53,24 @@ class ConversionBuffer {
   // more data if needed.
   ssize_t Read(char *buf, size_t size, off_t offset);
 
+  // Append data. Usually called via the SndWrite() virtual-SNFFILE callback,
+  // but can be used to write raw data as well.
+  ssize_t Append(const void *data, size_t count);
+
+  // Enable writing. If set to 'false', no writing through the SNDFILE is
+  // making it through. To be used to suppress writing of the header or
+  // footer if we want to handle that on our own.
+  void allow_sndfile_writes(bool b) { snd_writing_enabled_ = b; }
+
  private:
   static sf_count_t SndTell(void *userdata);
   static sf_count_t SndWrite(const void *ptr, sf_count_t count, void *userdata);
 
-  // Append data. Called via the SndWrite() virtual file callback.
-  ssize_t Append(const void *data, size_t count);
-
   // Current max file position.
   off_t Tell() const { return total_written_; }
+
+  // Append for the SndWrite callback.
+  ssize_t SndAppend(const void *data, size_t count);
 
   // Create a SNDFILE the user has to write to in the WriteToSoundfile callback.
   // Can be NULL on error.
@@ -69,5 +78,6 @@ class ConversionBuffer {
 
   SoundSource *const source_;
   int tmpfile_;
+  bool snd_writing_enabled_;
   off_t total_written_;
 };
