@@ -131,8 +131,8 @@ private:
       error_(false), output_buffer_(NULL), channels_(0), snd_out_(NULL),
       raw_sample_buffer_(NULL), input_frames_left_(0) {
 
-    // The flac header we get is more rich than what we can do
-    // with sndfile. In that case, just copy that.
+    // The flac header we get is more rich than what we can create via
+    // sndfile. So if we have one, just copy it.
     copy_flac_header_ = (in_info.format & SF_FORMAT_TYPEMASK) == SF_FORMAT_FLAC;
 
     // Initialize zita config, but don't allocate converter quite yet.
@@ -145,14 +145,15 @@ private:
     input_frames_left_ = in_info.frames;
 
     // Create a conversion buffer that creates a soundfile of a particular
-    // format that we choose here. Essentially we want to have mostly what
+    // format that we choose here. Essentially we want to generate mostly what
     // our input is.
     struct SF_INFO out_info = in_info;
     out_info.seekable = 0;
     if ((in_info.format & SF_FORMAT_TYPEMASK) == SF_FORMAT_OGG) {
-      // If the input was ogg, we're re-coding this to flac/16.
+      // If the input was ogg, we're re-coding this to flac, because it
+      // wouldn't let us stream the output.
       out_info.format = SF_FORMAT_FLAC;
-      out_info.format |= SF_FORMAT_PCM_16;
+      out_info.format |= (in_info.format & SF_FORMAT_SUBMASK);
     }
     else if ((in_info.format & SF_FORMAT_TYPEMASK) == SF_FORMAT_WAV
              && (in_info.format & SF_FORMAT_SUBMASK) != SF_FORMAT_PCM_16) {
@@ -178,22 +179,18 @@ private:
       fprintf(stderr, "Opening output: %s\n", sf_strerror(NULL));
       return;
     }
-    out_buffer->set_sndfile_writes_enabled(false);
     if (copy_flac_header_) {
+      out_buffer->set_sndfile_writes_enabled(false);
       CopyFlacHeader(out_buffer);
     } else {
-      fprintf(stderr, "Generate header from original ID3-tags.\n");
       out_buffer->set_sndfile_writes_enabled(true);
-      // Copy strings. Everything else that follows will be stream bytes.
-      for (int i = SF_STR_FIRST; i <= SF_STR_LAST; ++i) {
-        const char *s = sf_get_string(snd_in_, i);
-        if (s != NULL) {
-          sf_set_string(snd_out_, i, s);
-        }
-      }
+      GenerateHeaderFromInputFile(out_buffer);
     }
     // Now flush the header: that way if someone only reads the metadata, then
     // our AddMoreSoundData() is never called.
+    // We need to do this even if we copied our own header: that way we make
+    // sure that the sndfile-header is flushed into the nirwana before we
+    // re-enable sndfile_writes.
     sf_command(snd_out_, SFC_UPDATE_HEADER_NOW, NULL, 0);
     fprintf(stderr, "Header init done.\n");
 
@@ -205,13 +202,12 @@ private:
     if (!input_frames_left_)
       return false;
     if (!zita_.convproc) {
+      // First time we're called.
       zita_.convproc = new Convproc();
+      raw_sample_buffer_ = new float[zita_.fragm * channels_];
       config(&zita_, config_path_.c_str());
       zita_.convproc->start_process(0, 0);
       fprintf(stderr, "Convolver initialized; chunksize=%d\n", zita_.fragm);
-    }
-    if (raw_sample_buffer_ == NULL) {
-      raw_sample_buffer_ = new float[zita_.fragm * channels_];
     }
     int r = sf_readf_float(snd_in_, raw_sample_buffer_, zita_.fragm);
     if (r == (int) zita_.fragm) {
@@ -220,7 +216,7 @@ private:
       fprintf(stderr, "[%d]", r);
     }
     if (r < (int) zita_.fragm) {
-      // zero out the rest of the buffer
+      // Zero out the rest of the buffer.
       const int missing = zita_.fragm - r;
       memset(raw_sample_buffer_ + r * channels_, 0,
              missing * channels_ * sizeof(float));
@@ -251,18 +247,15 @@ private:
     return input_frames_left_;
   }
 
-  off_t CopyBytes(int fd, off_t pos, ConversionBuffer *out, size_t len) {
+  void CopyBytes(int fd, off_t pos, ConversionBuffer *out, size_t len) {
     char buf[256];
     while (len > 0) {
-      //fprintf(stderr, "read at %ld\n", pos);
       ssize_t r = pread(fd, buf, std::min(sizeof(buf), len), pos);
-      if (r <= 0) return pos;
-      //fprintf(stderr, "append %ld bytes\n", r);
+      if (r <= 0) return;
       out->Append(buf, r);
       len -= r;
       pos += r;
     }
-    return pos;
   }
 
   void CopyFlacHeader(ConversionBuffer *out_buffer) {
@@ -281,6 +274,7 @@ private:
       need_finish_padding = false;
       if (type == FLAC__METADATA_TYPE_STREAMINFO && byte_len == 34) {
         out_buffer->Append(&header, sizeof(header));
+        // Copy everything but the MD5 at the end - which we set to empty.
         CopyBytes(filedes_, pos, out_buffer, byte_len - 16);
         for (int i = 0; i < 16; ++i) out_buffer->Append("\0", 1);
         fprintf(stderr, " (copy streaminfo, but redacted MD5)\n");
@@ -304,6 +298,18 @@ private:
       memset(&header, 0, sizeof(header));
       header[0] = 0x80 /* is last */ | FLAC__METADATA_TYPE_PADDING;
       out_buffer->Append(&header, sizeof(header));
+    }
+  }
+
+  void GenerateHeaderFromInputFile(ConversionBuffer *out_buffer) {
+    fprintf(stderr, "Generate header from original ID3-tags.\n");
+    out_buffer->set_sndfile_writes_enabled(true);
+    // Copy ID tags that are supported by sndfile.
+    for (int i = SF_STR_FIRST; i <= SF_STR_LAST; ++i) {
+      const char *s = sf_get_string(snd_in_, i);
+      if (s != NULL) {
+        sf_set_string(snd_out_, i, s);
+      }
     }
   }
 
