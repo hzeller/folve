@@ -111,7 +111,7 @@ ssize_t ConversionBuffer::Read(char *buf, size_t size, off_t offset) {
   if (callback_count > 10) {
     fprintf(stderr, "Looks like file-skipping: "
             "From %ld -> %ld to read %ld bytes (got %ld)"
-            "(and we filtered all that audio data in-between .. in vain)\n"
+            "(and we filtered all that audio data in-between .. in vain)\n",
             initial_written, total_written_, size, result);
   }
   return result;
