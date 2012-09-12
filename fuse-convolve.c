@@ -77,6 +77,19 @@ static int fuseconv_getattr(const char *path, struct stat *stbuf) {
   if (result == -1)
     return -errno;
 
+  // The resulting flac file will be bigger, but some programs seem to
+  // estimate size from input size. Lets exaggerate here :)
+  //
+  // Interestingly, some programs that rely dynamic size, seem to do stat
+  // all the time. We could probably feed back a
+  //   max(stbuf->st_size, conversion_buffer->Tell()) in here to give them
+  // a more accurate estimate.
+  if (has_suffix_string(path, ".ogg.fuse.flac")) {
+    stbuf->st_size *= 10;
+  } else if (has_suffix_string(path, ".flac")) {
+    stbuf->st_size *= 2;  // Conservative.
+  }
+
   return 0;
 }
 
