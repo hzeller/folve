@@ -124,7 +124,9 @@ ssize_t ConversionBuffer::Read(char *buf, size_t size, off_t offset) {
     if (!source_->AddMoreSoundData())
       break;
   }
+
   const ssize_t result = pread(tmpfile_, buf, size, offset);
+
   if (callback_count > 16) {
     fprintf(stderr, "Looks like file-skipping: "
             "From %ld -> %ld to read %ld bytes (got %ld)"
