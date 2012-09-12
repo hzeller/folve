@@ -78,6 +78,12 @@ public:
     int bits = 16;
     if ((in_info.format & SF_FORMAT_SUBMASK) == SF_FORMAT_PCM_24) bits = 24;
     if ((in_info.format & SF_FORMAT_SUBMASK) == SF_FORMAT_PCM_32) bits = 32;
+
+    long int seconds = in_info.frames / in_info.samplerate;
+    fprintf(stderr, "%ld samples @ %.1fkHz, %d Bit; duration %ld:%02ld\n",
+            in_info.frames, in_info.samplerate / 1000.0,
+            bits, seconds / 60, seconds % 60);
+
     char config_path[1024];
     snprintf(config_path, sizeof(config_path), "%s/filter-%d-%d-%d.conf",
              global_zita_config_dir, in_info.samplerate,
@@ -89,7 +95,7 @@ public:
       return NULL;
     } else {
       fprintf(stderr, "- found.\n");
-    }
+    }            
     return new SndFileFilter(path, filedes, snd, in_info, config_path);
   }
   
@@ -144,9 +150,9 @@ private:
     struct SF_INFO out_info = in_info;
     out_info.seekable = 0;
     if ((in_info.format & SF_FORMAT_TYPEMASK) == SF_FORMAT_OGG) {
-      // If the input was ogg, we're re-coding this to flac/24.
+      // If the input was ogg, we're re-coding this to flac/16.
       out_info.format = SF_FORMAT_FLAC;
-      out_info.format |= SF_FORMAT_PCM_24;
+      out_info.format |= SF_FORMAT_PCM_16;
     }
     else if ((in_info.format & SF_FORMAT_TYPEMASK) == SF_FORMAT_WAV
              && (in_info.format & SF_FORMAT_SUBMASK) != SF_FORMAT_PCM_16) {
@@ -206,7 +212,6 @@ private:
       raw_sample_buffer_ = new float[zita_.fragm * channels_];
     }
     int r = sf_readf_float(snd_in_, raw_sample_buffer_, zita_.fragm);
-    if (r == 0) { fprintf(stderr, "eeeempty\n"); return false; }
     if (r == (int) zita_.fragm) {
       fprintf(stderr, ".");
     } else {

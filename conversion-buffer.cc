@@ -53,7 +53,8 @@ static sf_count_t DummySeek(sf_count_t offset, int whence, void *userdata) {
   // header. It actually attempts to write that end up at the end of the
   // file. We don't care, it is not accessed for reading anymore.
   // TODO(hzeller): Suppress writing after close() and really warn
-  if (reinterpret_cast<ConversionBuffer*>(userdata)->sndfile_writes_enabled()) {
+  if (offset > 0 &&
+      reinterpret_cast<ConversionBuffer*>(userdata)->sndfile_writes_enabled()) {
     fprintf(stderr, "DummySeek called %ld\n", offset);
   }
   return 0;
@@ -99,9 +100,19 @@ ssize_t ConversionBuffer::Read(char *buf, size_t size, off_t offset) {
   const off_t required_min_written = offset + 1;
   // As soon as someone tries to read beyond of what we already have, we call
   // our WriteToSoundfile() callback that fills more of it.
+  const size_t initial_written = total_written_;
+  int callback_count = 0;
   while (total_written_ < required_min_written) {
+    ++callback_count;
     if (!source_->AddMoreSoundData())
       break;
   }
-  return pread(tmpfile_, buf, size, offset);
+  const ssize_t result = pread(tmpfile_, buf, size, offset);
+  if (callback_count > 10) {
+    fprintf(stderr, "Looks like file-skipping: "
+            "From %ld -> %ld to read %ld bytes (got %ld)"
+            "(and we filtered all that audio data in-between .. in vain)\n"
+            initial_written, total_written_, size, result);
+  }
+  return result;
 }
