@@ -169,7 +169,6 @@ static int fuseconv_fgetattr(const char *path, struct stat *result,
 static struct fuse_operations fuseconv_operations = {
   // Basic operations to make navigation work.
   .readdir	= fuseconv_readdir,
-  .getattr	= fuseconv_getattr,
   .readlink	= fuseconv_readlink,
 
   // open() and close() file.
@@ -179,6 +178,7 @@ static struct fuse_operations fuseconv_operations = {
   // Actual workhorse: reading a file and returning predicted file-size
   .read		= fuseconv_read,
   .fgetattr     = fuseconv_fgetattr,
+  .getattr	= fuseconv_getattr,
 };
 
 static int usage(const char *prog) {
