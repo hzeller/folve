@@ -51,9 +51,9 @@ sf_count_t ConversionBuffer::SndWrite(const void *ptr, sf_count_t count,
 // These callbacks we don't care about.
 static sf_count_t DummySeek(sf_count_t offset, int whence, void *userdata) {
   // This seems to be called after we're closing, probably to modify the
-  // header. It actually attempts to write that end up at the end of the
-  // file. We don't care, it is not accessed for reading anymore.
-  // TODO(hzeller): Suppress writing after close() and really warn
+  // header. It then actually attempts to write, but we're already not
+  // sndfile write enabled. So print this as a warning if we're write enabled,
+  // because it would mess up the file.
   if (offset > 0 &&
       reinterpret_cast<ConversionBuffer*>(userdata)->sndfile_writes_enabled()) {
     fprintf(stderr, "DummySeek called %ld\n", offset);
@@ -105,7 +105,7 @@ ssize_t ConversionBuffer::Read(char *buf, size_t size, off_t offset) {
   // size). That means:
   //     required_min_written = offset + 1; // at least one byte.
   // That way, we don't need to start the convolver if someone only reads
-  // the header.
+  // the header: we stop at the header boundary.
   //
   // After beginning to read the sound stream, some programs (e.g. kaffeine)
   // behave finicky if they don't get the full number of bytes they
@@ -115,23 +115,28 @@ ssize_t ConversionBuffer::Read(char *buf, size_t size, off_t offset) {
   //     required_min_written = offset + size;  // all requested bytes.
   const off_t required_min_written = offset + (offset >= header_end_ ? size : 1);
 
+  // Skipping the file looks like reading beyond what the user already
+  // consumed. Right now, we have to fill the buffer up to that point, but
+  // we might need to find a shortcut for that: some programs just skip to the
+  // end of the file apparently - which makes us convolve the while file.
+  const bool looks_like_skipping = total_written_ + 1 < offset;
+  const size_t initial_written = total_written_;
+
   // As soon as someone tries to read beyond of what we already have, we call
   // our WriteToSoundfile() callback that fills more of it.
-  const size_t initial_written = total_written_;
-  int callback_count = 0;
   while (total_written_ < required_min_written) {
-    ++callback_count;
     if (!source_->AddMoreSoundData())
       break;
   }
 
   const ssize_t result = pread(tmpfile_, buf, size, offset);
 
-  if (callback_count > 16) {
-    fprintf(stderr, "Looks like file-skipping: "
+  if (looks_like_skipping) {
+    fprintf(stderr, "File skipping: "
             "From %ld -> %ld to read %ld bytes (got %ld)"
             "(and we filtered all that audio data in-between .. in vain)\n",
-            initial_written, total_written_, size, result);
+            initial_written, offset, size, result);
   }
+
   return result;
 }
