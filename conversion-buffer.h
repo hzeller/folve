@@ -64,6 +64,10 @@ class ConversionBuffer {
   void set_sndfile_writes_enabled(bool b) { snd_writing_enabled_ = b; }
   bool sndfile_writes_enabled() const { return snd_writing_enabled_; }
 
+  // Tell conversion buffer when we're done writing the header. It needs to
+  // know to do some buffer trickery.
+  void HeaderFinished();
+
  private:
   static sf_count_t SndTell(void *userdata);
   static sf_count_t SndWrite(const void *ptr, sf_count_t count, void *userdata);
@@ -82,4 +86,5 @@ class ConversionBuffer {
   int tmpfile_;
   bool snd_writing_enabled_;
   off_t total_written_;
+  off_t header_end_;
 };

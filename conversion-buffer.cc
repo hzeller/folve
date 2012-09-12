@@ -24,7 +24,8 @@
 #include "conversion-buffer.h"
 
 ConversionBuffer::ConversionBuffer(SoundSource *source, const SF_INFO &info)
-  : source_(source), tmpfile_(-1), snd_writing_enabled_(true), total_written_(0) {
+  : source_(source), tmpfile_(-1), snd_writing_enabled_(true),
+    total_written_(0), header_end_(0) {
   // We need to be able to skip backwards but we don't want to fill our
   // memory. So lets create a temporary file.
   const char *filename = tempnam(NULL, "fuse-");
@@ -96,8 +97,24 @@ ssize_t ConversionBuffer::SndAppend(const void *data, size_t count) {
   return Append(data, count);
 }
 
+void ConversionBuffer::HeaderFinished() { header_end_ = Tell(); }
+
 ssize_t ConversionBuffer::Read(char *buf, size_t size, off_t offset) {
-  const off_t required_min_written = offset + 1;
+  // As long as we're reading only within the header area, allow 'short' reads,
+  // i.e. reads that return less bytes than requested (but up to the headers'
+  // size). That means:
+  //     required_min_written = offset + 1; // at least one byte.
+  // That way, we don't need to start the convolver if someone only reads
+  // the header.
+  //
+  // After beginning to read the sound stream, some programs (e.g. kaffeine)
+  // behave finicky if they don't get the full number of bytes they
+  // requested in a read() call (this is a bug in these programs, but we've
+  // to work around it). So that means in that case we make sure that we have
+  // at least the number of bytes available that are requested:
+  //     required_min_written = offset + size;  // all requested bytes.
+  const off_t required_min_written = offset + (offset >= header_end_ ? size : 1);
+
   // As soon as someone tries to read beyond of what we already have, we call
   // our WriteToSoundfile() callback that fills more of it.
   const size_t initial_written = total_written_;
@@ -108,7 +125,7 @@ ssize_t ConversionBuffer::Read(char *buf, size_t size, off_t offset) {
       break;
   }
   const ssize_t result = pread(tmpfile_, buf, size, offset);
-  if (callback_count > 10) {
+  if (callback_count > 16) {
     fprintf(stderr, "Looks like file-skipping: "
             "From %ld -> %ld to read %ld bytes (got %ld)"
             "(and we filtered all that audio data in-between .. in vain)\n",

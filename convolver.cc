@@ -198,6 +198,7 @@ private:
     fprintf(stderr, "Header init done.\n");
 
     out_buffer->set_sndfile_writes_enabled(true);  // ready for sound-stream.
+    out_buffer->HeaderFinished();
   }
 
   virtual bool AddMoreSoundData() {
