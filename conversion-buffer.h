@@ -68,12 +68,13 @@ class ConversionBuffer {
   // know to do some buffer trickery.
   void HeaderFinished();
 
+  // Current max file position.
+  off_t FileSize() const { return total_written_; }
+
  private:
   static sf_count_t SndTell(void *userdata);
   static sf_count_t SndWrite(const void *ptr, sf_count_t count, void *userdata);
 
-  // Current max file position.
-  off_t Tell() const { return total_written_; }
 
   // Append for the SndWrite callback.
   ssize_t SndAppend(const void *data, size_t count);

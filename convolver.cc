@@ -23,6 +23,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <boost/thread/locks.hpp>
+#include <boost/thread/mutex.hpp>
 #include <string>
 #include <map>
 
@@ -124,8 +126,22 @@ public:
   }
 
   virtual int Stat(struct stat *st) {
-    fstat(filedes_, st);
-    // TODO(hzeller): calculate estimated size.
+    if (output_buffer_->FileSize() > start_estimating_size_) {
+      const int frames_done = total_frames_ - input_frames_left_;
+      if (frames_done > 0) {
+        const float estimated_end = 1.0 * total_frames_ / frames_done;
+        off_t new_size = estimated_end * output_buffer_->FileSize();
+        // Report a bit bigger size which is less harmful than programs
+        // reading short.
+        new_size += 16384;
+        if (new_size > file_stat_.st_size) {
+          // Only report new size if strictly larger.
+          //fprintf(stderr, "(est:%ld)", new_size);
+          file_stat_.st_size = new_size;
+        }
+      }
+    }
+    *st = file_stat_;
     return 0;
   }
 
@@ -140,9 +156,17 @@ private:
   SndFileFilter(const char *path, int filedes, SNDFILE *snd_in,
                 const SF_INFO &in_info,
                 const char* config_path)
-    : filedes_(filedes), snd_in_(snd_in), config_path_(config_path),
-      error_(false), output_buffer_(NULL), channels_(0), snd_out_(NULL),
-      raw_sample_buffer_(NULL), input_frames_left_(0) {
+    : filedes_(filedes), snd_in_(snd_in), total_frames_(in_info.frames),
+      config_path_(config_path),
+      error_(false), output_buffer_(NULL), channels_(in_info.channels),
+      snd_out_(NULL),
+      raw_sample_buffer_(NULL), input_frames_left_(in_info.frames) {
+
+    // Initial stat that we're going to report to clients. We'll adapt
+    // the filesize as we see it grow. Some clients continuously monitor
+    // the size of the file to check when to stop.
+    fstat(filedes_, &file_stat_);
+    start_estimating_size_ = 0.5 * file_stat_.st_size;
 
     // The flac header we get is more rich than what we can create via
     // sndfile. So if we have one, just copy it.
@@ -153,9 +177,6 @@ private:
     zita_.fsamp = in_info.samplerate;
     zita_.ninp = in_info.channels;
     zita_.nout = in_info.channels;
-
-    channels_ = in_info.channels;
-    input_frames_left_ = in_info.frames;
 
     // Create a conversion buffer that creates a soundfile of a particular
     // format that we choose here. Essentially we want to generate mostly what
@@ -338,7 +359,11 @@ private:
 
   const int filedes_;
   SNDFILE *const snd_in_;
+  const int total_frames_;
   const std::string config_path_;
+
+  struct stat file_stat_;   // we dynamically report a changing size.
+  off_t start_estimating_size_;  // essentially const.
 
   bool error_;
   bool copy_flac_header_;
@@ -353,9 +378,10 @@ private:
 };
 }  // namespace
 
-// TODO(hzeller): add mutex.
+
 typedef std::map<std::string, FileFilter*> FileFilterMap;
 static FileFilterMap open_files_;
+static boost::mutex open_files_mutex_;
 
 static FileFilter *CreateFilterFromFileType(int filedes,
                                             const char *underlying_file) {
@@ -371,7 +397,9 @@ static FileFilter *CreateFilterFromFileType(int filedes,
 struct filter_object_t *create_filter(int filedes, const char *fs_path,
                                       const char *underlying_path) {
   FileFilter *filter = CreateFilterFromFileType(filedes, underlying_path);
+  open_files_mutex_.lock();
   open_files_[fs_path] = filter;
+  open_files_mutex_.unlock();
   return filter;
 }
 
@@ -381,7 +409,7 @@ int read_from_filter(struct filter_object_t *filter,
 }
 
 int fill_stat_by_filename(const char *fs_path, struct stat *st) {
-  // TODO(hzeller): mutex needed.
+  boost::lock_guard<boost::mutex> l(open_files_mutex_);
   FileFilterMap::const_iterator found = open_files_.find(fs_path);
   if (found == open_files_.end())
     return -1;
@@ -394,10 +422,12 @@ int fill_fstat_file(struct filter_object_t *filter, struct stat *st) {
 int close_filter(const char *fs_path, struct filter_object_t *filter) {
   FileFilter *file_filter = reinterpret_cast<FileFilter*>(filter);
   int result = file_filter->Close();
+  open_files_mutex_.lock();
   FileFilterMap::iterator found = open_files_.find(fs_path);
   if (found != open_files_.end() && found->second == file_filter) {
     open_files_.erase(found);
   }
+  open_files_mutex_.unlock();
   delete file_filter;
   return result;
 }

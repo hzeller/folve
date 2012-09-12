@@ -41,7 +41,7 @@ ConversionBuffer::~ConversionBuffer() {
 }
 
 sf_count_t ConversionBuffer::SndTell(void *userdata) {
-  return reinterpret_cast<ConversionBuffer*>(userdata)->Tell();
+  return reinterpret_cast<ConversionBuffer*>(userdata)->FileSize();
 }
 sf_count_t ConversionBuffer::SndWrite(const void *ptr, sf_count_t count,
                                       void *userdata) {
@@ -97,7 +97,7 @@ ssize_t ConversionBuffer::SndAppend(const void *data, size_t count) {
   return Append(data, count);
 }
 
-void ConversionBuffer::HeaderFinished() { header_end_ = Tell(); }
+void ConversionBuffer::HeaderFinished() { header_end_ = FileSize(); }
 
 ssize_t ConversionBuffer::Read(char *buf, size_t size, off_t offset) {
   // As long as we're reading only within the header area, allow 'short' reads,
