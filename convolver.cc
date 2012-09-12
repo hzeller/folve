@@ -182,6 +182,7 @@ private:
     if (copy_flac_header_) {
       CopyFlacHeader(out_buffer);
     } else {
+      fprintf(stderr, "Generate header from original ID3-tags.\n");
       out_buffer->set_sndfile_writes_enabled(true);
       // Copy strings. Everything else that follows will be stream bytes.
       for (int i = SF_STR_FIRST; i <= SF_STR_LAST; ++i) {
@@ -264,7 +265,7 @@ private:
   }
 
   void CopyFlacHeader(ConversionBuffer *out_buffer) {
-    fprintf(stderr, "Copy raw flac header\n");
+    fprintf(stderr, "Provide FLAC header from original file:\n");
     out_buffer->Append("fLaC", 4);
     off_t pos = 4;
     unsigned char header[4];
