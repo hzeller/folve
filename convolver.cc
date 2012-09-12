@@ -13,15 +13,18 @@
 //  You should have received a copy of the GNU General Public License
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+#include <FLAC/metadata.h>
 #include <errno.h>
 #include <sndfile.h>
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
-#include <FLAC/metadata.h>
 
 #include <string>
+#include <map>
 
 #include "filter-interface.h"
 #include "conversion-buffer.h"
@@ -34,6 +37,7 @@ class FileFilter : public filter_object_t {
 public:
   // Returns bytes read or a negative value indicating a negative errno.
   virtual int Read(char *buf, size_t size, off_t offset) = 0;
+  virtual int Stat(struct stat *st) = 0;
   virtual int Close() = 0;
   virtual ~FileFilter() {}
 };
@@ -50,7 +54,10 @@ public:
     const int result = pread(filedes_, buf, size, offset);
     return result == -1 ? -errno : result;
   }
-  
+
+  virtual int Stat(struct stat *st) {
+    return fstat(filedes_, st);
+  }
   virtual int Close() {
     return close(filedes_) == -1 ? -errno : 0;
   }
@@ -114,6 +121,12 @@ public:
     // The following read might block and call WriteToSoundfile() until the
     // buffer is filled.
     return output_buffer_->Read(buf, size, offset);
+  }
+
+  virtual int Stat(struct stat *st) {
+    fstat(filedes_, st);
+    // TODO(hzeller): calculate estimated size.
+    return 0;
   }
 
   virtual int Close() {
@@ -340,14 +353,26 @@ private:
 };
 }  // namespace
 
-// Implementation of the C functions in filter-interface.h
-struct filter_object_t *create_filter(int filedes, const char *path) {
-  FileFilter *filter = SndFileFilter::Create(filedes, path);
+// TODO(hzeller): add mutex.
+typedef std::map<std::string, FileFilter*> FileFilterMap;
+static FileFilterMap open_files_;
+
+static FileFilter *CreateFilterFromFileType(int filedes,
+                                            const char *underlying_file) {
+  FileFilter *filter = SndFileFilter::Create(filedes, underlying_file);
   if (filter != NULL) return filter;
 
   fprintf(stderr, "Cound't create filtered output\n");
   // Every other file-type is just passed through as is.
-  return new PassThroughFilter(filedes, path);
+  return new PassThroughFilter(filedes, underlying_file);
+}
+
+// Implementation of the C functions in filter-interface.h
+struct filter_object_t *create_filter(int filedes, const char *fs_path,
+                                      const char *underlying_path) {
+  FileFilter *filter = CreateFilterFromFileType(filedes, underlying_path);
+  open_files_[fs_path] = filter;
+  return filter;
 }
 
 int read_from_filter(struct filter_object_t *filter,
@@ -355,9 +380,24 @@ int read_from_filter(struct filter_object_t *filter,
   return reinterpret_cast<FileFilter*>(filter)->Read(buf, size, offset);
 }
 
-int close_filter(struct filter_object_t *filter) {
+int fill_stat_by_filename(const char *fs_path, struct stat *st) {
+  // TODO(hzeller): mutex needed.
+  FileFilterMap::const_iterator found = open_files_.find(fs_path);
+  if (found == open_files_.end())
+    return -1;
+  return found->second->Stat(st);
+}
+int fill_fstat_file(struct filter_object_t *filter, struct stat *st) {
+  return reinterpret_cast<FileFilter*>(filter)->Stat(st);
+}
+
+int close_filter(const char *fs_path, struct filter_object_t *filter) {
   FileFilter *file_filter = reinterpret_cast<FileFilter*>(filter);
   int result = file_filter->Close();
+  FileFilterMap::iterator found = open_files_.find(fs_path);
+  if (found != open_files_.end() && found->second == file_filter) {
+    open_files_.erase(found);
+  }
   delete file_filter;
   return result;
 }

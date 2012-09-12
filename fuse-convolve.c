@@ -72,23 +72,15 @@ static const char *assemble_orig_path(char *buf, const char *path) {
 // Essentially lstat(). Just forward to the original filesystem (this
 // will by lying: our convolved files are of different size...)
 static int fuseconv_getattr(const char *path, struct stat *stbuf) {
+  // If this is a currently open filename, we might be able to output a better
+  // estimate.
+  int result = fill_stat_by_filename(path, stbuf);
+  if (result == 0) return result;
+
   char path_buf[PATH_MAX];
-  int result = lstat(assemble_orig_path(path_buf, path), stbuf);
+  result = lstat(assemble_orig_path(path_buf, path), stbuf);
   if (result == -1)
     return -errno;
-
-  // The resulting flac file will be bigger, but some programs seem to
-  // estimate size from input size. Lets exaggerate here :)
-  //
-  // Interestingly, some programs that rely dynamic size, seem to do stat
-  // all the time. We could probably feed back a
-  //   max(stbuf->st_size, conversion_buffer->Tell()) in here to give them
-  // a more accurate estimate.
-  if (has_suffix_string(path, ".ogg.fuse.flac")) {
-    stbuf->st_size *= 10;
-  } else if (has_suffix_string(path, ".flac")) {
-    stbuf->st_size *= 2;  // Conservative.
-  }
 
   return 0;
 }
@@ -154,7 +146,7 @@ static int fuseconv_open(const char *path, struct fuse_file_info *fi) {
   // The file-handle has the neat property to be 64 bit - so we can actually
   // store a pointer to our filter object in there :)
   // (Yay, someone was thinking while developing that API).
-  fi->fh = (uint64_t) create_filter(fd, orig_path);
+  fi->fh = (uint64_t) create_filter(fd, path, orig_path);
   return 0;
 }
 
@@ -166,7 +158,12 @@ static int fuseconv_read(const char *path, char *buf, size_t size, off_t offset,
 
 static int fuseconv_release(const char *path, struct fuse_file_info *fi) {
   fprintf(stderr, "===== close('%s') ==]\n", path);
-  return close_filter((struct filter_object_t*) fi->fh);
+  return close_filter(path, (struct filter_object_t*) fi->fh);
+}
+
+static int fuseconv_fgetattr(const char *path, struct stat *result,
+                             struct fuse_file_info *fi) {
+  return fill_fstat_file((struct filter_object_t*) fi->fh, result);
 }
 
 static struct fuse_operations fuseconv_operations = {
@@ -179,8 +176,9 @@ static struct fuse_operations fuseconv_operations = {
   .open		= fuseconv_open,
   .release      = fuseconv_release,
 
-  // Actual workhorse: reading a file.
+  // Actual workhorse: reading a file and returning predicted file-size
   .read		= fuseconv_read,
+  .fgetattr     = fuseconv_fgetattr,
 };
 
 static int usage(const char *prog) {
