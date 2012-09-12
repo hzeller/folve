@@ -153,7 +153,7 @@ private:
       // If the input was ogg, we're re-coding this to flac, because it
       // wouldn't let us stream the output.
       out_info.format = SF_FORMAT_FLAC;
-      out_info.format |= (in_info.format & SF_FORMAT_SUBMASK);
+      out_info.format |= SF_FORMAT_PCM_16;
     }
     else if ((in_info.format & SF_FORMAT_TYPEMASK) == SF_FORMAT_WAV
              && (in_info.format & SF_FORMAT_SUBMASK) != SF_FORMAT_PCM_16) {
@@ -198,23 +198,33 @@ private:
     out_buffer->HeaderFinished();
   }
 
-  virtual bool AddMoreSoundData() {
+  virtual bool AddMoreSoundData(bool in_skip_mode) {
     if (!input_frames_left_)
       return false;
     if (!zita_.convproc) {
       // First time we're called.
       zita_.convproc = new Convproc();
-      raw_sample_buffer_ = new float[zita_.fragm * channels_];
       config(&zita_, config_path_.c_str());
+      raw_sample_buffer_ = new float[zita_.fragm * channels_];
       zita_.convproc->start_process(0, 0);
       fprintf(stderr, "Convolver initialized; chunksize=%d\n", zita_.fragm);
     }
     int r = sf_readf_float(snd_in_, raw_sample_buffer_, zita_.fragm);
     if (r == (int) zita_.fragm) {
-      fprintf(stderr, ".");
+      fprintf(stderr, "%s", in_skip_mode ? "x" : ".");
     } else {
       fprintf(stderr, "[%d]", r);
     }
+    if (in_skip_mode) {
+      // If someone skips forward we don't do any encoding. That should
+      // be faster, but skipping back will be dangerous: we haven't actually
+      // encoded that part of the data. So we need to remember that this is
+      // a no-go area. mmh.
+      sf_writef_float(snd_out_, raw_sample_buffer_, r);
+      input_frames_left_ -= r;
+      return input_frames_left_;
+    }
+
     if (r < (int) zita_.fragm) {
       // Zero out the rest of the buffer.
       const int missing = zita_.fragm - r;

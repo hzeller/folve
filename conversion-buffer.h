@@ -38,7 +38,7 @@ class ConversionBuffer {
     // This callback is called by the ConversionBuffer if it needs more data.
     // Rerturns 'true' if there is more, 'false' if that was the last available
     // data.
-    virtual bool AddMoreSoundData() = 0;
+    virtual bool AddMoreSoundData(bool in_skip_mode) = 0;
   };
 
   // Create a conversion buffer that holds "buffer_size" bytes.

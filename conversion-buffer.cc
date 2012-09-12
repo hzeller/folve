@@ -119,24 +119,20 @@ ssize_t ConversionBuffer::Read(char *buf, size_t size, off_t offset) {
   // consumed. Right now, we have to fill the buffer up to that point, but
   // we might need to find a shortcut for that: some programs just skip to the
   // end of the file apparently - which makes us convolve the while file.
-  const bool looks_like_skipping = total_written_ + 1 < offset;
-  const size_t initial_written = total_written_;
+  if (total_written_ + 1 < offset) {
+    fprintf(stderr, "(skip> %ld -> %ld)", total_written_, offset);
+  }
 
   // As soon as someone tries to read beyond of what we already have, we call
   // our WriteToSoundfile() callback that fills more of it.
   while (total_written_ < required_min_written) {
-    if (!source_->AddMoreSoundData())
+    // We skip up until 32k before the requested start-offset.
+    // TODO(hzeller): remember that the skipped parts are actually not convolved
+    // so if someone skips back we know that we need to re-do that.
+    const bool skip_mode = total_written_ + (32 << 10) < offset;
+    if (!source_->AddMoreSoundData(skip_mode))
       break;
   }
 
-  const ssize_t result = pread(tmpfile_, buf, size, offset);
-
-  if (looks_like_skipping) {
-    fprintf(stderr, "File skipping: "
-            "From %ld -> %ld to read %ld bytes (got %ld)"
-            "(and we filtered all that audio data in-between .. in vain)\n",
-            initial_written, offset, size, result);
-  }
-
-  return result;
+  return pread(tmpfile_, buf, size, offset);
 }
