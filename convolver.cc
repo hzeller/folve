@@ -111,6 +111,7 @@ public:
   }
 
   virtual int Close() {
+    output_buffer_->set_sndfile_writes_enabled(false);
     if (snd_in_) sf_close(snd_in_);
     if (snd_out_) sf_close(snd_out_);
     return close(filedes_) == -1 ? -errno : 0;
@@ -163,7 +164,7 @@ private:
     output_buffer_ = new ConversionBuffer(this, out_info);
   }
 
-  virtual void SetOutputSoundfile(ConversionBuffer *parent,
+  virtual void SetOutputSoundfile(ConversionBuffer *out_buffer,
                                   SNDFILE *sndfile) {
     snd_out_ = sndfile;
     if (snd_out_ == NULL) {
@@ -171,11 +172,11 @@ private:
       fprintf(stderr, "Opening output: %s\n", sf_strerror(NULL));
       return;
     }
+    out_buffer->set_sndfile_writes_enabled(false);
     if (copy_flac_header_) {
-      parent->allow_sndfile_writes(false);
-      CopyFlacHeader(parent);
+      CopyFlacHeader(out_buffer);
     } else {
-      parent->allow_sndfile_writes(true);
+      out_buffer->set_sndfile_writes_enabled(true);
       // Copy strings. Everything else that follows will be stream bytes.
       for (int i = SF_STR_FIRST; i <= SF_STR_LAST; ++i) {
         const char *s = sf_get_string(snd_in_, i);
@@ -187,8 +188,9 @@ private:
     // Now flush the header: that way if someone only reads the metadata, then
     // our AddMoreSoundData() is never called.
     sf_command(snd_out_, SFC_UPDATE_HEADER_NOW, NULL, 0);
-    parent->allow_sndfile_writes(true);
     fprintf(stderr, "Header init done.\n");
+
+    out_buffer->set_sndfile_writes_enabled(true);  // ready for sound-stream.
   }
 
   virtual bool AddMoreSoundData() {
@@ -256,38 +258,45 @@ private:
     return pos;
   }
 
-  void CopyFlacHeader(ConversionBuffer *parent) {
+  void CopyFlacHeader(ConversionBuffer *out_buffer) {
     fprintf(stderr, "Copy raw flac header\n");
-    parent->Append("fLaC", 4);
+    out_buffer->Append("fLaC", 4);
     off_t pos = 4;
     unsigned char header[4];
-    bool need_padding = false;
+    bool need_finish_padding = false;
     while (pread(filedes_, header, sizeof(header), pos) == sizeof(header)) {
       pos += sizeof(header);
       bool is_last = header[0] & 0x80;
       unsigned int type = header[0] & 0x7F;
       unsigned int byte_len = (header[1] << 16) + (header[2] << 8) + header[3];
-      fprintf(stderr, " type: %d, len: %u %s ", type,
-              byte_len, is_last ? "(last-header)" : "(cont)");
-      // The SEEKTABLE header we skip, because it is bogus after encoding.
-      if (type == FLAC__METADATA_TYPE_SEEKTABLE) {
-        fprintf(stderr, " (this is the seektable; skipped)\n");
-        pos += byte_len;
-        need_padding = is_last;  // if we were last, force finish block.
-      } else {
-        parent->Append(&header, sizeof(header));
-        pos = CopyBytes(filedes_, pos, parent, byte_len);
-        need_padding = false;
+      fprintf(stderr, " type: %d, len: %6u %s ", type,
+              byte_len, is_last ? "(last)" : "(cont)");
+      need_finish_padding = false;
+      if (type == FLAC__METADATA_TYPE_STREAMINFO && byte_len == 34) {
+        out_buffer->Append(&header, sizeof(header));
+        CopyBytes(filedes_, pos, out_buffer, byte_len - 16);
+        for (int i = 0; i < 16; ++i) out_buffer->Append("\0", 1);
+        fprintf(stderr, " (copy streaminfo, but redacted MD5)\n");
+      }
+      else if (type == FLAC__METADATA_TYPE_SEEKTABLE) {
+        // The SEEKTABLE header we skip, because it is bogus after encoding.
+        fprintf(stderr, " (skip the seektable)\n");
+        need_finish_padding = is_last;  // if we were last, force finish block.
+      }
+      else {
+        out_buffer->Append(&header, sizeof(header));
+        CopyBytes(filedes_, pos, out_buffer, byte_len);
         fprintf(stderr, " (ok)\n");
       }
+      pos += byte_len;
       if (is_last)
         break;
     }
-    if (need_padding) {  // if the last block was not is_last: pad.
+    if (need_finish_padding) {  // if the last block was not is_last: pad.
       fprintf(stderr, "write padding\n");
       memset(&header, 0, sizeof(header));
       header[0] = 0x80 /* is last */ | FLAC__METADATA_TYPE_PADDING;
-      parent->Append(&header, sizeof(header));
+      out_buffer->Append(&header, sizeof(header));
     }
   }
 

@@ -57,10 +57,12 @@ class ConversionBuffer {
   // but can be used to write raw data as well.
   ssize_t Append(const void *data, size_t count);
 
-  // Enable writing. If set to 'false', no writing through the SNDFILE is
-  // making it through. To be used to suppress writing of the header or
+  // Enable writing through the SNDFILE.
+  // If set to 'false', writes via the SNDFILE are ignored.
+  // To be used to suppress writing of the header or
   // footer if we want to handle that on our own.
-  void allow_sndfile_writes(bool b) { snd_writing_enabled_ = b; }
+  void set_sndfile_writes_enabled(bool b) { snd_writing_enabled_ = b; }
+  bool sndfile_writes_enabled() const { return snd_writing_enabled_; }
 
  private:
   static sf_count_t SndTell(void *userdata);
