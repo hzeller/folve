@@ -51,12 +51,10 @@ public:
   PassThroughFilter(int filedes, const char *path) : filedes_(filedes) {
     fprintf(stderr, "Creating PassThrough filter for '%s'\n", path);
   }
-  
   virtual int Read(char *buf, size_t size, off_t offset) {
     const int result = pread(filedes_, buf, size, offset);
     return result == -1 ? -errno : result;
   }
-
   virtual int Stat(struct stat *st) {
     return fstat(filedes_, st);
   }
@@ -134,8 +132,7 @@ public:
         // Report a bit bigger size which is less harmful than programs
         // reading short.
         new_size += 16384;
-        if (new_size > file_stat_.st_size) {
-          // Only report new size if strictly larger.
+        if (new_size > file_stat_.st_size) {  // Only go forward in size.
           //fprintf(stderr, "(est:%ld)", new_size);
           file_stat_.st_size = new_size;
         }
