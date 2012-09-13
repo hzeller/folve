@@ -196,14 +196,9 @@ private:
       out_info.format = SF_FORMAT_FLAC;
       out_info.format |= SF_FORMAT_PCM_16;
     }
-    else if ((in_info.format & SF_FORMAT_TYPEMASK) == SF_FORMAT_WAV
-             && (in_info.format & SF_FORMAT_SUBMASK) != SF_FORMAT_PCM_16) {
-      // WAV format seems to create garbage when we attempt to output PCM_24
-      // Output float for now; still mplayer seems to trip about length.
-      // Probably the header is incomplete. Investigate.
-      out_info.format = SF_FORMAT_WAV;
-      out_info.format |= SF_FORMAT_FLOAT;
-      out_info.format |= SF_ENDIAN_CPU;
+    else if ((in_info.format & SF_FORMAT_TYPEMASK) == SF_FORMAT_WAV) {
+      out_info.format = SF_FORMAT_FLAC;  // recode as flac.
+      out_info.format |= SF_FORMAT_PCM_24;
     }
     else { // original format.
       out_info.format = in_info.format;
@@ -233,9 +228,32 @@ private:
     // sure that the sndfile-header is flushed into the nirwana before we
     // re-enable sndfile_writes.
     sf_command(snd_out_, SFC_UPDATE_HEADER_NOW, NULL, 0);
-    fprintf(stderr, "Header init done.\n");
+
+    // -- time for some hackery ...
+    // If we have copied the header over from the original, we need to
+    // redact the values for min/max blocksize and min/max framesize with
+    // what SNDFILE is going to use, otherwise programs will trip over this.
+    // http://flac.sourceforge.net/format.html
+    if (copy_flac_header_) {
+      out_buffer->WriteCharAt((1152 & 0xFF00) >> 8,  8);
+      out_buffer->WriteCharAt((1152 & 0x00FF)     ,  9);
+      out_buffer->WriteCharAt((1152 & 0xFF00) >> 8, 10);
+      out_buffer->WriteCharAt((1152 & 0x00FF)     , 11);
+      for (int i = 12; i < 18; ++i) out_buffer->WriteCharAt(0, i);
+    } else {
+      // .. and if SNDFILE writes the header, it misses out in writing the
+      // number of samples to be expected. So let's fill that in.
+      // The MD5 sum starts at position strlen("fLaC") + 4 + 18 = 26
+      // The 32 bits before that are the samples (and another 4 bit before that,
+      // ignoring that for now).
+      out_buffer->WriteCharAt((total_frames_ & 0xFF000000) >> 24, 22);
+      out_buffer->WriteCharAt((total_frames_ & 0x00FF0000) >> 16, 23);
+      out_buffer->WriteCharAt((total_frames_ & 0x0000FF00) >>  8, 24);
+      out_buffer->WriteCharAt((total_frames_ & 0x000000FF),       25);
+    }
 
     out_buffer->set_sndfile_writes_enabled(true);  // ready for sound-stream.
+    fprintf(stderr, "Header init done.\n");
     out_buffer->HeaderFinished();
   }
 
@@ -357,7 +375,7 @@ private:
 
   const int filedes_;
   SNDFILE *const snd_in_;
-  const int total_frames_;
+  const unsigned int total_frames_;
   const std::string config_path_;
 
   struct stat file_stat_;   // we dynamically report a changing size.

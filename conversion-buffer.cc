@@ -92,6 +92,11 @@ ssize_t ConversionBuffer::Append(const void *data, size_t count) {
   return count;
 }
 
+void ConversionBuffer::WriteCharAt(unsigned char c, off_t offset) {
+  if (tmpfile_ < 0) return;
+  if (pwrite(tmpfile_, &c, 1, offset) != 1) fprintf(stderr, "mmh");
+}
+
 ssize_t ConversionBuffer::SndAppend(const void *data, size_t count) {
   if (!snd_writing_enabled_) return count;
   return Append(data, count);

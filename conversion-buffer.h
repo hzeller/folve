@@ -58,6 +58,10 @@ class ConversionBuffer {
   // but can be used to write raw data as well.
   ssize_t Append(const void *data, size_t count);
 
+  // Write at a particular position. Writes a single character - this is
+  // used for chirurgical editing...
+  void WriteCharAt(unsigned char c, off_t offset);
+
   // Enable writing through the SNDFILE.
   // If set to 'false', writes via the SNDFILE are ignored.
   // To be used to suppress writing of the header or
