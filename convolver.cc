@@ -118,6 +118,16 @@ public:
 
   virtual int Read(char *buf, size_t size, off_t offset) {
     if (error_) return -1;
+    // If this is a skip suspiciously at the very end of the file as
+    // reported by stat, we don't do any encoding, just return garbage.
+    // Programs sometimes do this apparently.
+    // But of course only if this is really a detected skip.
+    if (output_buffer_->FileSize() < offset
+        && (int) (offset + size) == file_stat_.st_size) {
+      fprintf(stderr, "[Skip to the very end detected. Don't do filtering.]\n");
+      memset(buf, 0x00, size);
+      return size;
+    }
     // The following read might block and call WriteToSoundfile() until the
     // buffer is filled.
     return output_buffer_->Read(buf, size, offset);
@@ -163,7 +173,7 @@ private:
     // the filesize as we see it grow. Some clients continuously monitor
     // the size of the file to check when to stop.
     fstat(filedes_, &file_stat_);
-    start_estimating_size_ = 0.5 * file_stat_.st_size;
+    start_estimating_size_ = 0.4 * file_stat_.st_size;
 
     // The flac header we get is more rich than what we can create via
     // sndfile. So if we have one, just copy it.
@@ -229,7 +239,7 @@ private:
     out_buffer->HeaderFinished();
   }
 
-  virtual bool AddMoreSoundData(bool in_skip_mode) {
+  virtual bool AddMoreSoundData() {
     if (!input_frames_left_)
       return false;
     if (!zita_.convproc) {
@@ -242,18 +252,9 @@ private:
     }
     int r = sf_readf_float(snd_in_, raw_sample_buffer_, zita_.fragm);
     if (r == (int) zita_.fragm) {
-      fprintf(stderr, "%s", in_skip_mode ? "x" : ".");
+      fprintf(stderr, ".");
     } else {
       fprintf(stderr, "[%d]", r);
-    }
-    if (in_skip_mode) {
-      // If someone skips forward we don't do any encoding. That should
-      // be faster, but skipping back will be dangerous: we haven't actually
-      // encoded that part of the data. So we need to remember that this is
-      // a no-go area. mmh.
-      sf_writef_float(snd_out_, raw_sample_buffer_, r);
-      input_frames_left_ -= r;
-      return input_frames_left_;
     }
 
     if (r < (int) zita_.fragm) {

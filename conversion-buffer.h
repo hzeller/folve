@@ -33,12 +33,13 @@ class ConversionBuffer {
     // Ask sf_strerror() to find out why.
     // Ownership is passed to the SoundSource, receiver needs to 
     // sf_close() the file.
-    virtual void SetOutputSoundfile(ConversionBuffer *parent, SNDFILE *sndfile) = 0;
+    virtual void SetOutputSoundfile(ConversionBuffer *parent,
+                                    SNDFILE *sndfile) = 0;
 
     // This callback is called by the ConversionBuffer if it needs more data.
     // Rerturns 'true' if there is more, 'false' if that was the last available
     // data.
-    virtual bool AddMoreSoundData(bool in_skip_mode) = 0;
+    virtual bool AddMoreSoundData() = 0;
   };
 
   // Create a conversion buffer that holds "buffer_size" bytes.

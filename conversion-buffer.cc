@@ -116,9 +116,7 @@ ssize_t ConversionBuffer::Read(char *buf, size_t size, off_t offset) {
   const off_t required_min_written = offset + (offset >= header_end_ ? size : 1);
 
   // Skipping the file looks like reading beyond what the user already
-  // consumed. Right now, we have to fill the buffer up to that point, but
-  // we might need to find a shortcut for that: some programs just skip to the
-  // end of the file apparently - which makes us convolve the while file.
+  // consumed. Print this as diagnostic message.
   if (total_written_ + 1 < offset) {
     fprintf(stderr, "(skip> %ld -> %ld)", total_written_, offset);
   }
@@ -126,11 +124,7 @@ ssize_t ConversionBuffer::Read(char *buf, size_t size, off_t offset) {
   // As soon as someone tries to read beyond of what we already have, we call
   // our WriteToSoundfile() callback that fills more of it.
   while (total_written_ < required_min_written) {
-    // We skip up until 32k before the requested start-offset.
-    // TODO(hzeller): remember that the skipped parts are actually not convolved
-    // so if someone skips back we know that we need to re-do that.
-    const bool skip_mode = total_written_ + (32 << 10) < offset;
-    if (!source_->AddMoreSoundData(skip_mode))
+    if (!source_->AddMoreSoundData())
       break;
   }
 
