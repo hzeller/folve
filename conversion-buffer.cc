@@ -30,6 +30,9 @@ ConversionBuffer::ConversionBuffer(SoundSource *source, const SF_INFO &info)
   // memory. So lets create a temporary file.
   const char *filename = tempnam(NULL, "fuse-");
   tmpfile_ = open(filename, O_RDWR|O_CREAT|O_NOATIME, S_IRUSR|S_IWUSR);
+  if (tmpfile_ < 0) {
+    perror("Problem opening buffer file");
+  }
   unlink(filename);
 
   // After file-open: SetOutputSoundfile() already might attempt to write data.

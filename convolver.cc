@@ -124,7 +124,7 @@ public:
     // But of course only if this is really a detected skip.
     if (output_buffer_->FileSize() < offset
         && (int) (offset + size) == file_stat_.st_size) {
-      fprintf(stderr, "[Skip to the very end detected. Don't do filtering.]\n");
+      fprintf(stderr, "[>> Skip to the very end detected. Avoid convolving.]\n");
       memset(buf, 0x00, size);
       return size;
     }
@@ -263,7 +263,12 @@ private:
     if (!zita_.convproc) {
       // First time we're called.
       zita_.convproc = new Convproc();
-      config(&zita_, config_path_.c_str());
+      if (config(&zita_, config_path_.c_str()) != 0) {
+        fprintf(stderr, "** filter-config %s is broken. Please fix. "
+                "Won't play this stream **\n", config_path_.c_str());
+        input_frames_left_ = 0;
+        return false;
+      }
       raw_sample_buffer_ = new float[zita_.fragm * channels_];
       zita_.convproc->start_process(0, 0);
       fprintf(stderr, "Convolver initialized; chunksize=%d\n", zita_.fragm);
