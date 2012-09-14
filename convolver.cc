@@ -36,7 +36,8 @@
 static bool global_debug = false;
 const char *global_zita_config_dir = NULL;
 
-#define LOGF  if (!global_debug) {} else fprintf
+#define LOGF if (!global_debug) {} else fprintf
+#define LOG_ERROR fprintf
 
 namespace {
 
@@ -73,7 +74,7 @@ public:
     memset(&in_info, 0, sizeof(in_info));
     SNDFILE *snd = sf_open_fd(filedes, SFM_READ, &in_info, 0);
     if (snd == NULL) {
-      LOGF(stderr, "Opening input: %s\n", sf_strerror(NULL));
+      LOG_ERROR(stderr, "File %s: %s\n", path, sf_strerror(NULL));
       return NULL;
     }
 
@@ -85,13 +86,14 @@ public:
     snprintf(config_path, sizeof(config_path), "%s/filter-%d-%d-%d.conf",
              global_zita_config_dir, in_info.samplerate,
              bits, in_info.channels);
-    LOGF(stderr, "Looking for config %s ", config_path);
-    if (access(config_path, R_OK) != 0) {
-      LOGF(stderr, "- cannot access.\n");
+    const bool found_config = (access(config_path, R_OK) == 0);
+    if (found_config) {
+      LOGF(stderr, "File %s: filter config %s\n", path, config_path);
+    } else {
+      LOG_ERROR(stderr, "File %s: couldn't find filter config %s\n",
+                path, config_path);
       sf_close(snd);
       return NULL;
-    } else {
-      LOGF(stderr, "- found.\n");
     }
     char file_info[256];
     snprintf(file_info, sizeof(file_info), "%.1fkHz, %d Bit",
@@ -213,7 +215,7 @@ private:
     snd_out_ = sndfile;
     if (snd_out_ == NULL) {
       error_ = true;
-      LOGF(stderr, "Opening output: %s\n", sf_strerror(NULL));
+      LOG_ERROR(stderr, "Opening output: %s\n", sf_strerror(NULL));
       return;
     }
     if (copy_flac_header_) {
@@ -265,9 +267,10 @@ private:
       // First time we're called.
       zita_.convproc = new Convproc();
       if (config(&zita_, config_path_.c_str()) != 0) {
-        LOGF(stderr, "** filter-config %s is broken. Please fix. "
-             "Won't play this stream **\n", config_path_.c_str());
+        LOG_ERROR(stderr, "** filter-config %s is broken. Please fix. "
+                  "Won't play this stream **\n", config_path_.c_str());
         input_frames_left_ = 0;
+        Close();
         return false;
       }
       raw_sample_buffer_ = new float[zita_.fragm * channels_];
@@ -410,7 +413,6 @@ static FileHandler *CreateFilterFromFileType(int filedes,
   FileHandler *filter = SndFileHandler::Create(filedes, underlying_file);
   if (filter != NULL) return filter;
 
-  LOGF(stderr, "Cound't create filtered output\n");
   // Every other file-type is just passed through as is.
   return new PassThroughFilter(filedes, underlying_file);
 }

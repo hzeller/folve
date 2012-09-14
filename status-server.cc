@@ -82,7 +82,9 @@ static void AppendFileInfo(std::string *result, const std::string &filename,
   const char *access_level = (refs == 1) ? "idle" : "open";
   if (progress <= 0) {
     snprintf(row, sizeof(row), sMessageRowHtml, access_level,
-             (progress < 0) ? "(not a sound file)" : "Only Header accessed.");
+             (progress < 0)
+             ? "Not a sound file or no filter found. Pass through."
+             : "Only Header accessed.");
   } else {
     const int secs = handler->Duration();
     const int fract_sec = progress * secs;
@@ -106,6 +108,10 @@ void StatusServer::CreatePage(const char **buffer, size_t *size) {
   current_page_.append("<h3>Recent Files</h3>\n");
   FileHandlerCache::EntryList entries;
   filesystem_->handler_cache()->GetStats(&entries);
+  char current_open[128];
+  snprintf(current_open, sizeof(current_open), "%ld in recency cache.\n",
+           entries.size());
+  current_page_.append(current_open);
   current_page_.append("<table>\n");
   for (size_t i = 0; i < entries.size(); ++i) {
     const FileHandlerCache::Entry *entry = entries[i];
