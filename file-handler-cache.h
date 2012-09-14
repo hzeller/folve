@@ -38,9 +38,10 @@ public:
     const std::string key;
     FileHandler *const handler;
     int references;
-    time_t last_used;
   };
-  FileHandlerCache(int max_size) : max_size_(max_size) {}
+
+  FileHandlerCache(int low_watermark, int high_watermark)
+    : low_watermark_(low_watermark), high_watermark_(high_watermark) {}
 
   // Insert a new object under the given key.
   // Ownership is handed over to this map.
@@ -64,9 +65,10 @@ public:
  private:
   typedef std::map<std::string, Entry*> CacheMap;
 
-  void CleanupUnreferenced();
+  void CleanupUnreferencedLocked();
 
-  const size_t max_size_;
+  const size_t low_watermark_;
+  const size_t high_watermark_;
   boost::mutex mutex_;
   CacheMap cache_;
 };

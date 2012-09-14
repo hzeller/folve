@@ -16,14 +16,14 @@
 
 #include <string>
 
-class FileHandlerCache;
+class ConvolverFilesystem;
 struct MHD_Daemon;
 struct MHD_Connection;
 
 class StatusServer {
 public:
-  // Does not take over ownership of cache.
-  StatusServer(FileHandlerCache *cache);
+  // Does not take over ownership of the filesystem.
+  StatusServer(ConvolverFilesystem *fs);
   bool Start(int port);
 
   ~StatusServer();
@@ -36,7 +36,7 @@ private:
 
   void CreatePage(const char **buffer, size_t *size);
 
-  FileHandlerCache *const cache_;
+  ConvolverFilesystem *filesystem_;
   struct MHD_Daemon *daemon_;
   std::string current_page_;
 };

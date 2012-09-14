@@ -17,12 +17,20 @@
 #ifndef _FUSE_CONVOLVER_FILE_HANDLER_H
 #define _FUSE_CONVOLVER_FILE_HANDLER_H
 
+#include <string>
+
 class FileHandler {
 public:
+  virtual ~FileHandler() {}
+
   // Returns bytes read or a negative value indicating a negative errno.
   virtual int Read(char *buf, size_t size, off_t offset) = 0;
   virtual int Stat(struct stat *st) = 0;
-  virtual ~FileHandler() {}
+
+  // Some status information.
+  virtual float Progress() const { return -1; }
+  virtual std::string FileInfo() const { return ""; }
+  virtual int Duration() const { return -1; }
 };
 
 #endif // _FUSE_CONVOLVER_FILE_HANDLER_H

@@ -33,7 +33,10 @@
 #include "conversion-buffer.h"
 #include "zita-config.h"
 
+static bool global_debug = false;
 const char *global_zita_config_dir = NULL;
+
+#define LOGF  if (!global_debug) {} else fprintf
 
 namespace {
 
@@ -42,7 +45,7 @@ namespace {
 class PassThroughFilter : public FileHandler {
 public:
   PassThroughFilter(int filedes, const char *path) : filedes_(filedes) {
-    fprintf(stderr, "Creating PassThrough filter for '%s'\n", path);
+    LOGF(stderr, "Creating PassThrough filter for '%s'\n", path);
   }
   ~PassThroughFilter() { close(filedes_); }
 
@@ -70,7 +73,7 @@ public:
     memset(&in_info, 0, sizeof(in_info));
     SNDFILE *snd = sf_open_fd(filedes, SFM_READ, &in_info, 0);
     if (snd == NULL) {
-      fprintf(stderr, "Opening input: %s\n", sf_strerror(NULL));
+      LOGF(stderr, "Opening input: %s\n", sf_strerror(NULL));
       return NULL;
     }
 
@@ -78,24 +81,23 @@ public:
     if ((in_info.format & SF_FORMAT_SUBMASK) == SF_FORMAT_PCM_24) bits = 24;
     if ((in_info.format & SF_FORMAT_SUBMASK) == SF_FORMAT_PCM_32) bits = 32;
 
-    long int seconds = in_info.frames / in_info.samplerate;
-    fprintf(stderr, "%ld samples @ %.1fkHz, %d Bit; duration %ld:%02ld\n",
-            in_info.frames, in_info.samplerate / 1000.0,
-            bits, seconds / 60, seconds % 60);
-
     char config_path[1024];
     snprintf(config_path, sizeof(config_path), "%s/filter-%d-%d-%d.conf",
              global_zita_config_dir, in_info.samplerate,
              bits, in_info.channels);
-    fprintf(stderr, "Looking for config %s ", config_path);
+    LOGF(stderr, "Looking for config %s ", config_path);
     if (access(config_path, R_OK) != 0) {
-      fprintf(stderr, "- cannot access.\n");
+      LOGF(stderr, "- cannot access.\n");
       sf_close(snd);
       return NULL;
     } else {
-      fprintf(stderr, "- found.\n");
-    }            
-    return new SndFileHandler(path, filedes, snd, in_info, config_path);
+      LOGF(stderr, "- found.\n");
+    }
+    char file_info[256];
+    snprintf(file_info, sizeof(file_info), "%.1fkHz, %d Bit",
+             in_info.samplerate / 1000.0, bits);
+    return new SndFileHandler(path, filedes, snd, in_info,
+                              file_info, config_path);
   }
   
   virtual ~SndFileHandler() {
@@ -117,7 +119,6 @@ public:
     // But of course only if this is really a detected skip.
     if (output_buffer_->FileSize() < offset
         && (int) (offset + size) >= file_stat_.st_size) {
-      fprintf(stderr, "[>> Skip to the very end detected. Avoid convolving.]\n");
       const int pretended_available_bytes = file_stat_.st_size - offset;
       if (pretended_available_bytes > 0) {
         memset(buf, 0x00, pretended_available_bytes);
@@ -131,6 +132,14 @@ public:
     return output_buffer_->Read(buf, size, offset);
   }
 
+  virtual float Progress() const {
+    const int frames_done = total_frames_ - input_frames_left_;
+    if (frames_done == 0 || total_frames_ == 0) return 0.0;
+    return 1.0 * frames_done / total_frames_;
+  }
+  virtual std::string FileInfo() const { return file_description_; }
+  virtual int Duration() const { return duration_seconds_; }
+
   virtual int Stat(struct stat *st) {
     if (output_buffer_->FileSize() > start_estimating_size_) {
       const int frames_done = total_frames_ - input_frames_left_;
@@ -141,7 +150,6 @@ public:
         // reading short.
         new_size += 16384;
         if (new_size > file_stat_.st_size) {  // Only go forward in size.
-          //fprintf(stderr, "(est:%ld)", new_size);
           file_stat_.st_size = new_size;
         }
       }
@@ -152,11 +160,13 @@ public:
     
 private:
   SndFileHandler(const char *path, int filedes, SNDFILE *snd_in,
-                const SF_INFO &in_info,
-                const char* config_path)
+                 const SF_INFO &in_info, const std::string &file_description,
+                 const char* config_path)
     : filedes_(filedes), snd_in_(snd_in), total_frames_(in_info.frames),
-      config_path_(config_path),
-      error_(false), output_buffer_(NULL), channels_(in_info.channels),
+      channels_(in_info.channels),
+      duration_seconds_(in_info.frames / in_info.samplerate),
+      file_description_(file_description), config_path_(config_path),
+      error_(false), output_buffer_(NULL),
       snd_out_(NULL),
       raw_sample_buffer_(NULL), input_frames_left_(in_info.frames) {
 
@@ -203,7 +213,7 @@ private:
     snd_out_ = sndfile;
     if (snd_out_ == NULL) {
       error_ = true;
-      fprintf(stderr, "Opening output: %s\n", sf_strerror(NULL));
+      LOGF(stderr, "Opening output: %s\n", sf_strerror(NULL));
       return;
     }
     if (copy_flac_header_) {
@@ -244,7 +254,7 @@ private:
     }
 
     out_buffer->set_sndfile_writes_enabled(true);  // ready for sound-stream.
-    fprintf(stderr, "Header init done.\n");
+    LOGF(stderr, "Header init done.\n");
     out_buffer->HeaderFinished();
   }
 
@@ -255,22 +265,15 @@ private:
       // First time we're called.
       zita_.convproc = new Convproc();
       if (config(&zita_, config_path_.c_str()) != 0) {
-        fprintf(stderr, "** filter-config %s is broken. Please fix. "
-                "Won't play this stream **\n", config_path_.c_str());
+        LOGF(stderr, "** filter-config %s is broken. Please fix. "
+             "Won't play this stream **\n", config_path_.c_str());
         input_frames_left_ = 0;
         return false;
       }
       raw_sample_buffer_ = new float[zita_.fragm * channels_];
       zita_.convproc->start_process(0, 0);
-      fprintf(stderr, "Convolver initialized; chunksize=%d\n", zita_.fragm);
     }
     int r = sf_readf_float(snd_in_, raw_sample_buffer_, zita_.fragm);
-    if (r == (int) zita_.fragm) {
-      fprintf(stderr, ".");
-    } else {
-      fprintf(stderr, "[%d]", r);
-    }
-
     if (r < (int) zita_.fragm) {
       // Zero out the rest of the buffer.
       const int missing = zita_.fragm - r;
@@ -299,7 +302,6 @@ private:
     input_frames_left_ -= r;
     if (input_frames_left_ == 0) {
       Close();
-      fprintf(stderr, "(fully decoded)\n");
     }
     return input_frames_left_;
   }
@@ -316,7 +318,7 @@ private:
   }
 
   void CopyFlacHeader(ConversionBuffer *out_buffer) {
-    fprintf(stderr, "Provide FLAC header from original file:\n");
+    LOGF(stderr, "Provide FLAC header from original file:\n");
     out_buffer->Append("fLaC", 4);
     off_t pos = 4;
     unsigned char header[4];
@@ -326,32 +328,32 @@ private:
       bool is_last = header[0] & 0x80;
       unsigned int type = header[0] & 0x7F;
       unsigned int byte_len = (header[1] << 16) + (header[2] << 8) + header[3];
-      fprintf(stderr, " type: %d, len: %6u %s ", type,
-              byte_len, is_last ? "(last)" : "(cont)");
+      LOGF(stderr, " type: %d, len: %6u %s ", type,
+           byte_len, is_last ? "(last)" : "(cont)");
       need_finish_padding = false;
       if (type == FLAC__METADATA_TYPE_STREAMINFO && byte_len == 34) {
         out_buffer->Append(&header, sizeof(header));
         // Copy everything but the MD5 at the end - which we set to empty.
         CopyBytes(filedes_, pos, out_buffer, byte_len - 16);
         for (int i = 0; i < 16; ++i) out_buffer->Append("\0", 1);
-        fprintf(stderr, " (copy streaminfo, but redacted MD5)\n");
+        LOGF(stderr, " (copy streaminfo, but redacted MD5)\n");
       }
       else if (type == FLAC__METADATA_TYPE_SEEKTABLE) {
         // The SEEKTABLE header we skip, because it is bogus after encoding.
-        fprintf(stderr, " (skip the seektable)\n");
+        LOGF(stderr, " (skip the seektable)\n");
         need_finish_padding = is_last;  // if we were last, force finish block.
       }
       else {
         out_buffer->Append(&header, sizeof(header));
         CopyBytes(filedes_, pos, out_buffer, byte_len);
-        fprintf(stderr, " (ok)\n");
+        LOGF(stderr, " (ok)\n");
       }
       pos += byte_len;
       if (is_last)
         break;
     }
     if (need_finish_padding) {  // if the last block was not is_last: pad.
-      fprintf(stderr, "write padding\n");
+      LOGF(stderr, "write padding\n");
       memset(&header, 0, sizeof(header));
       header[0] = 0x80 /* is last */ | FLAC__METADATA_TYPE_PADDING;
       out_buffer->Append(&header, sizeof(header));
@@ -359,7 +361,7 @@ private:
   }
 
   void GenerateHeaderFromInputFile(ConversionBuffer *out_buffer) {
-    fprintf(stderr, "Generate header from original ID3-tags.\n");
+    LOGF(stderr, "Generate header from original ID3-tags.\n");
     out_buffer->set_sndfile_writes_enabled(true);
     // Copy ID tags that are supported by sndfile.
     for (int i = SF_STR_FIRST; i <= SF_STR_LAST; ++i) {
@@ -382,6 +384,9 @@ private:
   const int filedes_;
   SNDFILE *const snd_in_;
   const unsigned int total_frames_;
+  const int channels_;
+  const int duration_seconds_;
+  const std::string file_description_;
   const std::string config_path_;
 
   struct stat file_stat_;   // we dynamically report a changing size.
@@ -390,7 +395,6 @@ private:
   bool error_;
   bool copy_flac_header_;
   ConversionBuffer *output_buffer_;
-  int channels_;
   SNDFILE *snd_out_;
 
   // Used in conversion.
@@ -401,14 +405,12 @@ private:
 }  // namespace
 
 
-static FileHandlerCache open_files_(1);
-
 static FileHandler *CreateFilterFromFileType(int filedes,
                                              const char *underlying_file) {
   FileHandler *filter = SndFileHandler::Create(filedes, underlying_file);
   if (filter != NULL) return filter;
 
-  fprintf(stderr, "Cound't create filtered output\n");
+  LOGF(stderr, "Cound't create filtered output\n");
   // Every other file-type is just passed through as is.
   return new PassThroughFilter(filedes, underlying_file);
 }
@@ -416,32 +418,37 @@ static FileHandler *CreateFilterFromFileType(int filedes,
 // Implementation of the C functions in filter-interface.h
 FileHandler *ConvolverFilesystem::CreateHandler(const char *fs_path,
                                                 const char *underlying_path) {
-  FileHandler *handler = open_files_.FindAndPin(fs_path);
+  FileHandler *handler = open_file_cache_.FindAndPin(fs_path);
   if (handler == NULL) {
     int filedes = open(underlying_path, O_RDONLY);
     if (filedes < 0)
       return NULL;
+    ++total_file_openings_;
     handler = CreateFilterFromFileType(filedes, underlying_path);
-    handler = open_files_.InsertPinned(fs_path, handler);
+    handler = open_file_cache_.InsertPinned(fs_path, handler);
+  } else {
+    ++total_file_reopen_;
   }
   return handler;
 }
 
 int ConvolverFilesystem::StatByFilename(const char *fs_path, struct stat *st) {
-  FileHandler *handler = open_files_.FindAndPin(fs_path);
+  FileHandler *handler = open_file_cache_.FindAndPin(fs_path);
   if (handler == 0)
     return -1;
   ssize_t result = handler->Stat(st);
-  open_files_.Unpin(fs_path);
+  open_file_cache_.Unpin(fs_path);
   return result;
 }
 
 void ConvolverFilesystem::Close(const char *fs_path) {
-  open_files_.Unpin(fs_path);
+  open_file_cache_.Unpin(fs_path);
 }
 
-ConvolverFilesystem::ConvolverFilesystem(const char *zita_config_dir,
+ConvolverFilesystem::ConvolverFilesystem(const char *version_info,
+                                         const char *zita_config_dir,
                                          int cache_size)
-  : open_files_(cache_size) {
+  : version_info_(version_info), open_file_cache_(cache_size, cache_size),
+    total_file_openings_(0), total_file_reopen_(0) {
   global_zita_config_dir = zita_config_dir;
 }

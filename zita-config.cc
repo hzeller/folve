@@ -273,8 +273,6 @@ int config (ZitaConfig *cfg, const char *config)
     char          cdir [1024];
     char          *p, *q;
 
-    fprintf(stderr, "Initialize convolver; config('%s')\n", config);
-
     if (! (F = fopen (config, "r"))) 
     {
 	fprintf (stderr, "Can't open '%s' for reading\n", config);

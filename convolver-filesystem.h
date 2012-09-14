@@ -24,10 +24,9 @@
 
 class ConvolverFilesystem {
 public:
-  ConvolverFilesystem(const char *zita_config_dir,
+  ConvolverFilesystem(const char *version_info,
+                      const char *zita_config_dir,
                       int cache_size);
-
-  FileHandlerCache *handler_cache() { return &open_files_; }
 
   // Create a new filter given the open filedescriptor and the path.
   // Returns NULL, if it cannot be created.
@@ -41,8 +40,16 @@ public:
   // errno value on failure.
   void Close(const char *fs_path);
 
+  const std::string &version() { return version_info_; }
+  FileHandlerCache *handler_cache() { return &open_file_cache_; }
+  int total_file_openings() { return total_file_openings_; }
+  int total_file_reopen() { return total_file_reopen_; }
+
 private:
-  FileHandlerCache open_files_;
+  const std::string version_info_;
+  FileHandlerCache open_file_cache_;
+  int total_file_openings_;
+  int total_file_reopen_;
 };
 
 #endif // _FUSE_CONVOLVER_FILESYSTEM_H

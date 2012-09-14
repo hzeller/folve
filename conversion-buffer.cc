@@ -125,9 +125,11 @@ ssize_t ConversionBuffer::Read(char *buf, size_t size, off_t offset) {
 
   // Skipping the file looks like reading beyond what the user already
   // consumed. Print this as diagnostic message.
+#if 0
   if (total_written_ + 1 < offset) {
     fprintf(stderr, "(skip> %ld -> %ld)", total_written_, offset);
   }
+#endif
 
   // As soon as someone tries to read beyond of what we already have, we call
   // our WriteToSoundfile() callback that fills more of it.

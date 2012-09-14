@@ -24,7 +24,7 @@
 #include "file-handler-cache.h"
 
 FileHandlerCache::Entry::Entry(const std::string &k, FileHandler *h)
-  : key(k), handler(h) {}
+  : key(k), handler(h), references(0) {}
 
 FileHandler *FileHandlerCache::InsertPinned(const std::string &key,
                                             FileHandler *handler) {
@@ -37,8 +37,8 @@ FileHandler *FileHandlerCache::InsertPinned(const std::string &key,
     delete handler;
   }
   ++ins->second->references;
-  if (cache_.size() > max_size_) {
-    CleanupUnreferenced();
+  if (cache_.size() > high_watermark_) {
+    CleanupUnreferencedLocked();
   }
   return ins->second->handler;
 }
@@ -67,13 +67,15 @@ void FileHandlerCache::GetStats(std::vector<const Entry *> *entries) {
   }
 }
 
-void FileHandlerCache::CleanupUnreferenced() {
+void FileHandlerCache::CleanupUnreferencedLocked() {
   for (CacheMap::iterator it = cache_.begin(); it != cache_.end(); ++it) {
     if (it->second->references == 0) {
-      fprintf(stderr, "cleanup %s\n", it->first.c_str());
+      //fprintf(stderr, "cleanup %s\n", it->first.c_str());
       delete it->second->handler;
       delete it->second;
       cache_.erase(it);
     }
+    if (cache_.size() <= low_watermark_)
+      break;
   }
 }

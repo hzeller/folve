@@ -22,6 +22,8 @@
 // Use latest version.
 #define FUSE_USE_VERSION 26
 
+#define FUSE_CONVOLVE_VERSION_INFO "2012-09-13 v 0.75"
+
 #include <fuse.h>
 #include <stdio.h>
 #include <string.h>
@@ -128,7 +130,6 @@ static int fuseconv_readlink(const char *path, char *buf, size_t size) {
 }
 
 static int fuseconv_open(const char *path, struct fuse_file_info *fi) {
-  fprintf(stderr, "[===== open('%s')\n", path);
   // We want to be allowed to only return part of the requested data in read().
   // That way, we can separate reading the ID3-tags from
   // decoding of the music stream - that way indexing should be fast.
@@ -153,7 +154,6 @@ static int fuseconv_read(const char *path, char *buf, size_t size, off_t offset,
 }
 
 static int fuseconv_release(const char *path, struct fuse_file_info *fi) {
-  fprintf(stderr, "===== close('%s') ==]\n", path);
   convolver_fs->Close(path);
   return 0;
 }
@@ -180,10 +180,12 @@ int main(int argc, char *argv[]) {
   orig_dir   = argv[2];
   argc -=2;
   argv += 2;
-  convolver_fs = new ConvolverFilesystem(config_dir, 5);
+  convolver_fs = new ConvolverFilesystem(FUSE_CONVOLVE_VERSION_INFO,
+                                         config_dir, 5);
   
-  StatusServer *statusz = new StatusServer(convolver_fs->handler_cache());
-  statusz->Start(9999);
+  // TODO(hzeller): make this configurable
+  StatusServer *statusz = new StatusServer(convolver_fs);
+  statusz->Start(17322);
 
   struct fuse_operations fuseconv_operations;
   memset(&fuseconv_operations, 0, sizeof(fuseconv_operations));
