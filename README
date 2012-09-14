@@ -38,5 +38,6 @@ The fuse-convolve filesystem will determine the samplerate/bits/channels and
 attempt to find the right filter in the filter directory. If there is a filter,
 the output is filtered on-the-fly, otherwise the original file is returned.
 
-
-
+For an overview of what music servers do, there is a status server running
+on port 17322
+  http://localhost:17322/
