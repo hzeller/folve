@@ -22,7 +22,7 @@
 // Use latest version.
 #define FUSE_USE_VERSION 26
 
-#define FUSE_CONVOLVE_VERSION_INFO "2012-09-13 v 0.75"
+#define FUSE_CONVOLVE_VERSION_INFO "v. 0.75 &mdash; 2012-09-13"
 
 #include <fuse.h>
 #include <stdio.h>

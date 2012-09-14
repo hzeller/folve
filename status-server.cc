@@ -93,7 +93,7 @@ static void AppendFileInfo(std::string *result, const std::string &filename,
   result->append(row);
   result->append("<td bgcolor='#c0c0c0'>&nbsp;")
     .append(handler->FileInfo()).append("&nbsp;</td>")
-    .append("<td>").append(filename).append("</td>");
+    .append("<td style='font-size:small;'>").append(filename).append("</td>");
   result->append("</tr>\n");
 }
 
