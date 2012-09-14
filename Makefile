@@ -1,6 +1,6 @@
 CC=gcc
 CXX=g++
-CFLAGS=-D_FILE_OFFSET_BITS=64 -Wall -g -O2
+CFLAGS=-D_FILE_OFFSET_BITS=64 -Wall -O2
 CXXFLAGS=$(CFLAGS)
 LDFLAGS=-lfuse -lsndfile -lzita-convolver -lmicrohttpd
 

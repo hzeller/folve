@@ -100,6 +100,7 @@ static void AppendFileInfo(std::string *result, const std::string &filename,
 
 void StatusServer::CreatePage(const char **buffer, size_t *size) {
   current_page_.clear();
+  current_page_.append("<body style='font-family:Helvetica;'>");
   current_page_.append("<center>Welcome to fuse convolve ")
     .append(filesystem_->version()).append("</center>");
   current_page_.append("<h3>Recent Files</h3>\n");
@@ -119,6 +120,7 @@ void StatusServer::CreatePage(const char **buffer, size_t *size) {
            filesystem_->total_file_openings(),
            filesystem_->total_file_reopen());
   current_page_.append(file_openings);
+  current_page_.append("<div align='right'>HZ</div></body>");
   *buffer = current_page_.data();
   *size = current_page_.size();
 }
