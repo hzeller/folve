@@ -15,6 +15,7 @@
 
 #include <FLAC/metadata.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <sndfile.h>
 #include <stdio.h>
 #include <string.h>
@@ -23,11 +24,11 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include <boost/thread/locks.hpp>
-#include <boost/thread/mutex.hpp>
 #include <string>
 #include <map>
 
+#include "file-handler.h"
+#include "file-handler-cache.h"
 #include "filter-interface.h"
 #include "conversion-buffer.h"
 #include "zita-config.h"
@@ -35,18 +36,10 @@
 const char *global_zita_config_dir = NULL;
 
 namespace {
-class FileFilter : public filter_object_t {
-public:
-  // Returns bytes read or a negative value indicating a negative errno.
-  virtual int Read(char *buf, size_t size, off_t offset) = 0;
-  virtual int Stat(struct stat *st) = 0;
-  virtual int Close() = 0;
-  virtual ~FileFilter() {}
-};
 
 // Very simple filter that just passes the original file through. Used for
 // everything that is not a sound-file.
-class PassThroughFilter : public FileFilter {
+class PassThroughFilter : public FileHandler {
 public:
   PassThroughFilter(int filedes, const char *path) : filedes_(filedes) {
     fprintf(stderr, "Creating PassThrough filter for '%s'\n", path);
@@ -66,14 +59,14 @@ private:
   const int filedes_;
 };
 
-class SndFileFilter :
-    public FileFilter,
+class SndFileHandler :
+    public FileHandler,
     public ConversionBuffer::SoundSource {
 public:
-  // Attempt to create a SndFileFilter from the given file descriptor. This
+  // Attempt to create a SndFileHandler from the given file descriptor. This
   // returns NULL if this is not a sound-file or if there is no available
   // convolution filter configuration available.
-  static FileFilter *Create(int filedes, const char *path) {
+  static FileHandler *Create(int filedes, const char *path) {
     struct SF_INFO in_info;
     memset(&in_info, 0, sizeof(in_info));
     SNDFILE *snd = sf_open_fd(filedes, SFM_READ, &in_info, 0);
@@ -103,10 +96,10 @@ public:
     } else {
       fprintf(stderr, "- found.\n");
     }            
-    return new SndFileFilter(path, filedes, snd, in_info, config_path);
+    return new SndFileHandler(path, filedes, snd, in_info, config_path);
   }
   
-  virtual ~SndFileFilter() {
+  virtual ~SndFileHandler() {
     if (zita_.convproc) {
       zita_.convproc->stop_process();
       zita_.convproc->cleanup();
@@ -160,7 +153,7 @@ public:
   }
     
 private:
-  SndFileFilter(const char *path, int filedes, SNDFILE *snd_in,
+  SndFileHandler(const char *path, int filedes, SNDFILE *snd_in,
                 const SF_INFO &in_info,
                 const char* config_path)
     : filedes_(filedes), snd_in_(snd_in), total_frames_(in_info.frames),
@@ -400,13 +393,11 @@ private:
 }  // namespace
 
 
-typedef std::map<std::string, FileFilter*> FileFilterMap;
-static FileFilterMap open_files_;
-static boost::mutex open_files_mutex_;
+static FileHandlerCache open_files_(10);
 
-static FileFilter *CreateFilterFromFileType(int filedes,
+static FileHandler *CreateFilterFromFileType(int filedes,
                                             const char *underlying_file) {
-  FileFilter *filter = SndFileFilter::Create(filedes, underlying_file);
+  FileHandler *filter = SndFileHandler::Create(filedes, underlying_file);
   if (filter != NULL) return filter;
 
   fprintf(stderr, "Cound't create filtered output\n");
@@ -415,42 +406,38 @@ static FileFilter *CreateFilterFromFileType(int filedes,
 }
 
 // Implementation of the C functions in filter-interface.h
-struct filter_object_t *create_filter(int filedes, const char *fs_path,
+struct filter_object_t *create_filter(const char *fs_path,
                                       const char *underlying_path) {
-  FileFilter *filter = CreateFilterFromFileType(filedes, underlying_path);
-  open_files_mutex_.lock();
-  open_files_[fs_path] = filter;
-  open_files_mutex_.unlock();
-  return filter;
+  FileHandler *handler = open_files_.FindAndPin(fs_path);
+  if (handler == NULL) {
+    int filedes = open(underlying_path, O_RDONLY);
+    handler = CreateFilterFromFileType(filedes, underlying_path);
+    handler = open_files_.InsertPinned(fs_path, handler);
+  }
+  return handler;
 }
 
 int read_from_filter(struct filter_object_t *filter,
                      char *buf, size_t size, off_t offset) {
-  return reinterpret_cast<FileFilter*>(filter)->Read(buf, size, offset);
+  return reinterpret_cast<FileHandler*>(filter)->Read(buf, size, offset);
 }
 
 int fill_stat_by_filename(const char *fs_path, struct stat *st) {
-  boost::lock_guard<boost::mutex> l(open_files_mutex_);
-  FileFilterMap::const_iterator found = open_files_.find(fs_path);
-  if (found == open_files_.end())
+  FileHandler *handler = open_files_.FindAndPin(fs_path);
+  if (handler == 0)
     return -1;
-  return found->second->Stat(st);
+  ssize_t result = handler->Stat(st);
+  open_files_.Unpin(fs_path);
+  return result;
 }
 int fill_fstat_file(struct filter_object_t *filter, struct stat *st) {
-  return reinterpret_cast<FileFilter*>(filter)->Stat(st);
+  return reinterpret_cast<FileHandler*>(filter)->Stat(st);
 }
 
 int close_filter(const char *fs_path, struct filter_object_t *filter) {
-  FileFilter *file_filter = reinterpret_cast<FileFilter*>(filter);
-  int result = file_filter->Close();
-  open_files_mutex_.lock();
-  FileFilterMap::iterator found = open_files_.find(fs_path);
-  if (found != open_files_.end() && found->second == file_filter) {
-    open_files_.erase(found);
-  }
-  open_files_mutex_.unlock();
-  delete file_filter;
-  return result;
+  open_files_.Unpin(fs_path);
+  // TODO close file.
+  return 0;
 }
 
 void initialize_convolver_filter(const char *zita_config_dir) {

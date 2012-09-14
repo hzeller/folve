@@ -131,12 +131,6 @@ static int fuseconv_readlink(const char *path, char *buf, size_t size) {
 
 static int fuseconv_open(const char *path, struct fuse_file_info *fi) {
   fprintf(stderr, "[===== open('%s')\n", path);
-  char path_buf[PATH_MAX];
-  const char *orig_path = assemble_orig_path(path_buf, path);
-  const int fd = open(orig_path, fi->flags);
-  if (fd == -1)
-    return -errno;
-
   // We want to be allowed to only return part of the requested data in read().
   // That way, we can separate reading the ID3-tags from
   // decoding of the music stream - that way indexing should be fast.
@@ -146,8 +140,10 @@ static int fuseconv_open(const char *path, struct fuse_file_info *fi) {
   // The file-handle has the neat property to be 64 bit - so we can actually
   // store a pointer to our filter object in there :)
   // (Yay, someone was thinking while developing that API).
-  fi->fh = (uint64_t) create_filter(fd, path, orig_path);
-  return 0;
+  char path_buf[PATH_MAX];
+  const char *orig_path = assemble_orig_path(path_buf, path);
+  fi->fh = (uint64_t) create_filter(path, orig_path);
+  return fi->fh == 0 ? -1 : 0;
 }
 
 static int fuseconv_read(const char *path, char *buf, size_t size, off_t offset,

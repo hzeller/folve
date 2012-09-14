@@ -1,3 +1,4 @@
+//  -*- c++ -*-
 //  Copyright (C) 2012 Henner Zeller <h.zeller@acm.org>
 //    
 //  This program is free software; you can redistribute it and/or modify
@@ -16,6 +17,8 @@
 // Simple interface to hook the (pure C) fuse-convolve code into some
 // implementation of the filter (which we choose to do with C++).
 
+#ifndef _FUSE_CONVOLVER_FILTER_INTERFACE_H
+#define _FUSE_CONVOLVER_FILTER_INTERFACE_H
 #include <unistd.h>
 
 #ifdef __cplusplus
@@ -29,7 +32,7 @@ void initialize_convolver_filter(const char *zita_config);
 
 // Create a new filter given the open filedescriptor and the path. Returns
 // that filter in an opaque filter_object_t*
-struct filter_object_t *create_filter(int filedes, const char *fs_path,
+struct filter_object_t *create_filter(const char *fs_path,
                                       const char *underlying_path);
 
 // Read from the given filter at the file-offset "offset, up to "size" bytes
@@ -49,3 +52,4 @@ int close_filter(const char *path, struct filter_object_t *filter);
 }  // extern "C"
 #endif  /* __cplusplus */
 
+#endif // _FUSE_CONVOLVER_FILTER_INTERFACE_H
