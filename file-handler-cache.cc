@@ -74,8 +74,8 @@ void FileHandlerCache::CleanupUnreferencedLocked() {
       delete it->second->handler;
       delete it->second;
       cache_.erase(it);
+      if (cache_.size() <= low_watermark_)
+        break;
     }
-    if (cache_.size() <= low_watermark_)
-      break;
   }
 }
