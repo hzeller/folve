@@ -14,15 +14,29 @@
 //  You should have received a copy of the GNU General Public License
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#ifndef _FUSE_CONVOLVER_FILE_HANDLER_H
-#define _FUSE_CONVOLVER_FILE_HANDLER_H
+#include <string>
 
-class FileHandler {
+class FileHandlerCache;
+struct MHD_Daemon;
+struct MHD_Connection;
+
+class StatusServer {
 public:
-  // Returns bytes read or a negative value indicating a negative errno.
-  virtual int Read(char *buf, size_t size, off_t offset) = 0;
-  virtual int Stat(struct stat *st) = 0;
-  virtual ~FileHandler() {}
-};
+  // Does not take over ownership of cache.
+  StatusServer(FileHandlerCache *cache);
+  bool Start(int port);
 
-#endif // _FUSE_CONVOLVER_FILE_HANDLER_H
+  ~StatusServer();
+
+private:
+  static int HandleHttp(void* user_argument,
+                        struct MHD_Connection *,
+                        const char *, const char *, const char *,
+                        const char *, size_t *, void **);
+
+  void CreatePage(const char **buffer, size_t *size);
+
+  FileHandlerCache *const cache_;
+  struct MHD_Daemon *daemon_;
+  std::string current_page_;
+};

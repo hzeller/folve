@@ -34,13 +34,11 @@
 #include <limits.h>
 #include <stdlib.h>
 
-#include "filter-interface.h"
+#include "convolver-filesystem.h"
+#include "status-server.h"
 
-// Configuration for fuse convolver filesystem.
-static struct {
-  const char *config_dir;
-  const char *orig_dir;
-} context;
+ConvolverFilesystem *convolver_fs = NULL;
+const char *orig_dir;
 
 static int has_suffix_string (const char *str, const char *suffix) {
   if (!str || !suffix)
@@ -61,7 +59,7 @@ static char *concat_path(char *buf, const char *a, const char *b) {
 // Given a relative path from the root of the mounted file-system, get the
 // original file from the source filesystem.
 static const char *assemble_orig_path(char *buf, const char *path) {
-  char *result = concat_path(buf, context.orig_dir, path);
+  char *result = concat_path(buf, orig_dir, path);
   static const char magic_ogg_rewrite[] = ".ogg.fuse.flac";
   if (has_suffix_string(result, magic_ogg_rewrite)) {
     *(result + strlen(result) - strlen(".fuse.flac")) = '\0';
@@ -74,7 +72,7 @@ static const char *assemble_orig_path(char *buf, const char *path) {
 static int fuseconv_getattr(const char *path, struct stat *stbuf) {
   // If this is a currently open filename, we might be able to output a better
   // estimate.
-  int result = fill_stat_by_filename(path, stbuf);
+  int result = convolver_fs->StatByFilename(path, stbuf);
   if (result == 0) return result;
 
   char path_buf[PATH_MAX];
@@ -138,11 +136,11 @@ static int fuseconv_open(const char *path, struct fuse_file_info *fi) {
   fi->direct_io = 1;
 
   // The file-handle has the neat property to be 64 bit - so we can actually
-  // store a pointer to our filter object in there :)
+  // store a pointer to our filte robject in there :)
   // (Yay, someone was thinking while developing that API).
   char path_buf[PATH_MAX];
   const char *orig_path = assemble_orig_path(path_buf, path);
-  struct filter_object_t* handler = create_filter(path, orig_path);
+  FileHandler * handler = convolver_fs->CreateHandler(path, orig_path);
   if (handler == NULL)
     return -errno;
   fi->fh = (uint64_t) handler;
@@ -151,34 +149,20 @@ static int fuseconv_open(const char *path, struct fuse_file_info *fi) {
 
 static int fuseconv_read(const char *path, char *buf, size_t size, off_t offset,
                          struct fuse_file_info *fi) {
-  return read_from_filter((struct filter_object_t*)fi->fh,
-                          buf, size, offset);
+  return reinterpret_cast<FileHandler *>(fi->fh)->Read(buf, size, offset);
 }
 
 static int fuseconv_release(const char *path, struct fuse_file_info *fi) {
   fprintf(stderr, "===== close('%s') ==]\n", path);
-  return close_filter(path, (struct filter_object_t*) fi->fh);
+  convolver_fs->Close(path);
+  return 0;
 }
 
 static int fuseconv_fgetattr(const char *path, struct stat *result,
                              struct fuse_file_info *fi) {
-  return fill_fstat_file((struct filter_object_t*) fi->fh, result);
+  return reinterpret_cast<FileHandler *>(fi->fh)->Stat(result);
 }
 
-static struct fuse_operations fuseconv_operations = {
-  // Basic operations to make navigation work.
-  .readdir	= fuseconv_readdir,
-  .readlink	= fuseconv_readlink,
-
-  // open() and close() file.
-  .open		= fuseconv_open,
-  .release      = fuseconv_release,
-
-  // Actual workhorse: reading a file and returning predicted file-size
-  .read		= fuseconv_read,
-  .fgetattr     = fuseconv_fgetattr,
-  .getattr	= fuseconv_getattr,
-};
 
 static int usage(const char *prog) {
   fprintf(stderr, "usage: %s <config-dir> <original-dir> <mount-point>\n",
@@ -192,11 +176,30 @@ int main(int argc, char *argv[]) {
   }
   
   // First, let's extract our configuration.
-  context.config_dir = argv[1];
-  context.orig_dir   = argv[2];
+  const char *config_dir = argv[1];
+  orig_dir   = argv[2];
   argc -=2;
   argv += 2;
-  initialize_convolver_filter(context.config_dir);
+  convolver_fs = new ConvolverFilesystem(config_dir, 5);
+  
+  StatusServer *statusz = new StatusServer(convolver_fs->handler_cache());
+  statusz->Start(9999);
+
+  struct fuse_operations fuseconv_operations;
+  memset(&fuseconv_operations, 0, sizeof(fuseconv_operations));
+
+  // Basic operations to make navigation work.
+  fuseconv_operations.readdir	= fuseconv_readdir;
+  fuseconv_operations.readlink	= fuseconv_readlink;
+
+  // open() and close() file.
+  fuseconv_operations.open	= fuseconv_open;
+  fuseconv_operations.release   = fuseconv_release;
+
+  // Actual workhorse: reading a file and returning predicted file-size
+  fuseconv_operations.read	= fuseconv_read;
+  fuseconv_operations.fgetattr  = fuseconv_fgetattr;
+  fuseconv_operations.getattr	= fuseconv_getattr;
 
   // Lazy: let the rest handle by fuse provided main.
   return fuse_main(argc, argv, &fuseconv_operations, NULL);

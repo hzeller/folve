@@ -18,6 +18,7 @@
 #define _FUSE_CONVOLVER_FILE_HANDLER_CACHE_
 
 #include <map>
+#include <vector>
 #include <string>
 #include <boost/thread/mutex.hpp>
 
@@ -31,6 +32,14 @@ class FileHandler;
 // This container is thread-safe.
 class FileHandlerCache {
 public:
+  // Cache entry.
+  struct Entry {
+    Entry(const std::string &, FileHandler *);
+    const std::string key;
+    FileHandler *const handler;
+    int references;
+    time_t last_used;
+  };
   FileHandlerCache(int max_size) : max_size_(max_size) {}
 
   // Insert a new object under the given key.
@@ -46,9 +55,13 @@ public:
   // Unpin object. If the last object is unpinned, the PinnedMap may decide
   // to delete it later (though typically will keep it around for a while).
   void Unpin(const std::string &key);
-  
+
+  // Get a vector of the current entries in this cache. All entries are
+  // pinned and need to be Unpin()-ed by the user.
+  typedef std::vector<const Entry *> EntryList;
+  void GetStats(EntryList *entries);
+
  private:
-  struct Entry;
   typedef std::map<std::string, Entry*> CacheMap;
 
   void CleanupUnreferenced();

@@ -1,10 +1,10 @@
 CC=gcc
 CXX=g++
-CFLAGS=-D_FILE_OFFSET_BITS=64 -Wall -g -O2
+CFLAGS=-D_FILE_OFFSET_BITS=64 -Wall -g -O0
 CXXFLAGS=$(CFLAGS)
-LDFLAGS=-lfuse -lsndfile -lzita-convolver
+LDFLAGS=-lfuse -lsndfile -lzita-convolver -lmicrohttpd
 
-fuse-convolve: fuse-convolve.o convolver.o conversion-buffer.o zita-audiofile.o zita-config.o zita-fconfig.o zita-sstring.o file-handler-cache.o
+fuse-convolve: fuse-convolve.o convolver.o conversion-buffer.o zita-audiofile.o zita-config.o zita-fconfig.o zita-sstring.o file-handler-cache.o status-server.o
 	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
 
 clean:

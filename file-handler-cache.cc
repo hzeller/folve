@@ -23,13 +23,8 @@
 #include "file-handler.h"
 #include "file-handler-cache.h"
 
-struct FileHandlerCache::Entry {
-  Entry(FileHandler *h) : handler(h), references(0) {}
-  ~Entry() { delete handler; }
-
-  FileHandler *const handler;
-  int references;
-};
+FileHandlerCache::Entry::Entry(const std::string &k, FileHandler *h)
+  : key(k), handler(h) {}
 
 FileHandler *FileHandlerCache::InsertPinned(const std::string &key,
                                             FileHandler *handler) {
@@ -37,7 +32,7 @@ FileHandler *FileHandlerCache::InsertPinned(const std::string &key,
   CacheMap::iterator ins
     = cache_.insert(std::make_pair(key, (Entry*)NULL)).first;
   if (ins->second == NULL) {  // new entry
-    ins->second = new Entry(handler);
+    ins->second = new Entry(key, handler);
   } else {
     delete handler;
   }
@@ -64,10 +59,19 @@ void FileHandlerCache::Unpin(const std::string &key) {
   --found->second->references;
 }
 
+void FileHandlerCache::GetStats(std::vector<const Entry *> *entries) {
+  boost::lock_guard<boost::mutex> l(mutex_);
+  for (CacheMap::iterator it = cache_.begin(); it != cache_.end(); ++it) {
+    ++it->second->references;
+    entries->push_back(it->second);
+  }
+}
+
 void FileHandlerCache::CleanupUnreferenced() {
   for (CacheMap::iterator it = cache_.begin(); it != cache_.end(); ++it) {
     if (it->second->references == 0) {
       fprintf(stderr, "cleanup %s\n", it->first.c_str());
+      delete it->second->handler;
       delete it->second;
       cache_.erase(it);
     }

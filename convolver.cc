@@ -29,7 +29,7 @@
 
 #include "file-handler.h"
 #include "file-handler-cache.h"
-#include "filter-interface.h"
+#include "convolver-filesystem.h"
 #include "conversion-buffer.h"
 #include "zita-config.h"
 
@@ -404,7 +404,7 @@ private:
 static FileHandlerCache open_files_(1);
 
 static FileHandler *CreateFilterFromFileType(int filedes,
-                                            const char *underlying_file) {
+                                             const char *underlying_file) {
   FileHandler *filter = SndFileHandler::Create(filedes, underlying_file);
   if (filter != NULL) return filter;
 
@@ -414,8 +414,8 @@ static FileHandler *CreateFilterFromFileType(int filedes,
 }
 
 // Implementation of the C functions in filter-interface.h
-struct filter_object_t *create_filter(const char *fs_path,
-                                      const char *underlying_path) {
+FileHandler *ConvolverFilesystem::CreateHandler(const char *fs_path,
+                                                const char *underlying_path) {
   FileHandler *handler = open_files_.FindAndPin(fs_path);
   if (handler == NULL) {
     int filedes = open(underlying_path, O_RDONLY);
@@ -427,12 +427,7 @@ struct filter_object_t *create_filter(const char *fs_path,
   return handler;
 }
 
-int read_from_filter(struct filter_object_t *filter,
-                     char *buf, size_t size, off_t offset) {
-  return reinterpret_cast<FileHandler*>(filter)->Read(buf, size, offset);
-}
-
-int fill_stat_by_filename(const char *fs_path, struct stat *st) {
+int ConvolverFilesystem::StatByFilename(const char *fs_path, struct stat *st) {
   FileHandler *handler = open_files_.FindAndPin(fs_path);
   if (handler == 0)
     return -1;
@@ -440,16 +435,13 @@ int fill_stat_by_filename(const char *fs_path, struct stat *st) {
   open_files_.Unpin(fs_path);
   return result;
 }
-int fill_fstat_file(struct filter_object_t *filter, struct stat *st) {
-  return reinterpret_cast<FileHandler*>(filter)->Stat(st);
-}
 
-int close_filter(const char *fs_path, struct filter_object_t *filter) {
+void ConvolverFilesystem::Close(const char *fs_path) {
   open_files_.Unpin(fs_path);
-  // TODO close file.
-  return 0;
 }
 
-void initialize_convolver_filter(const char *zita_config_dir) {
+ConvolverFilesystem::ConvolverFilesystem(const char *zita_config_dir,
+                                         int cache_size)
+  : open_files_(cache_size) {
   global_zita_config_dir = zita_config_dir;
 }
