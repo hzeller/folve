@@ -142,8 +142,11 @@ static int fuseconv_open(const char *path, struct fuse_file_info *fi) {
   // (Yay, someone was thinking while developing that API).
   char path_buf[PATH_MAX];
   const char *orig_path = assemble_orig_path(path_buf, path);
-  fi->fh = (uint64_t) create_filter(path, orig_path);
-  return fi->fh == 0 ? -1 : 0;
+  struct filter_object_t* handler = create_filter(path, orig_path);
+  if (handler == NULL)
+    return -errno;
+  fi->fh = (uint64_t) handler;
+  return 0;
 }
 
 static int fuseconv_read(const char *path, char *buf, size_t size, off_t offset,

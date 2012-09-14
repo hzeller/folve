@@ -1,3 +1,4 @@
+// -*- c++ -*-
 //  Copyright (C) 2012 Henner Zeller <h.zeller@acm.org>
 //    
 //  This program is free software; you can redistribute it and/or modify
@@ -20,6 +21,5 @@ public:
   // Returns bytes read or a negative value indicating a negative errno.
   virtual int Read(char *buf, size_t size, off_t offset) = 0;
   virtual int Stat(struct stat *st) = 0;
-  virtual int Close() = 0;
   virtual ~FileHandler() {}
 };

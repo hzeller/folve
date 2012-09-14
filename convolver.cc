@@ -44,15 +44,14 @@ public:
   PassThroughFilter(int filedes, const char *path) : filedes_(filedes) {
     fprintf(stderr, "Creating PassThrough filter for '%s'\n", path);
   }
+  ~PassThroughFilter() { close(filedes_); }
+
   virtual int Read(char *buf, size_t size, off_t offset) {
     const int result = pread(filedes_, buf, size, offset);
     return result == -1 ? -errno : result;
   }
   virtual int Stat(struct stat *st) {
     return fstat(filedes_, st);
-  }
-  virtual int Close() {
-    return close(filedes_) == -1 ? -errno : 0;
   }
   
 private:
@@ -100,6 +99,7 @@ public:
   }
   
   virtual ~SndFileHandler() {
+    Close();
     if (zita_.convproc) {
       zita_.convproc->stop_process();
       zita_.convproc->cleanup();
@@ -116,10 +116,15 @@ public:
     // Programs sometimes do this apparently.
     // But of course only if this is really a detected skip.
     if (output_buffer_->FileSize() < offset
-        && (int) (offset + size) == file_stat_.st_size) {
+        && (int) (offset + size) >= file_stat_.st_size) {
       fprintf(stderr, "[>> Skip to the very end detected. Avoid convolving.]\n");
-      memset(buf, 0x00, size);
-      return size;
+      const int pretended_available_bytes = file_stat_.st_size - offset;
+      if (pretended_available_bytes > 0) {
+        memset(buf, 0x00, pretended_available_bytes);
+        return pretended_available_bytes;
+      } else {
+        return 0;
+      }
     }
     // The following read might block and call WriteToSoundfile() until the
     // buffer is filled.
@@ -143,13 +148,6 @@ public:
     }
     *st = file_stat_;
     return 0;
-  }
-
-  virtual int Close() {
-    output_buffer_->set_sndfile_writes_enabled(false);
-    if (snd_in_) sf_close(snd_in_);
-    if (snd_out_) sf_close(snd_out_);
-    return close(filedes_) == -1 ? -errno : 0;
   }
     
 private:
@@ -300,6 +298,7 @@ private:
     sf_writef_float(snd_out_, raw_sample_buffer_, r);
     input_frames_left_ -= r;
     if (input_frames_left_ == 0) {
+      Close();
       fprintf(stderr, "(fully decoded)\n");
     }
     return input_frames_left_;
@@ -371,6 +370,15 @@ private:
     }
   }
 
+  void Close() {
+    if (snd_out_ == NULL) return;  // done.
+    output_buffer_->set_sndfile_writes_enabled(false);
+    if (snd_in_) sf_close(snd_in_);
+    if (snd_out_) sf_close(snd_out_);
+    snd_out_ = NULL;
+    close(filedes_);
+  }
+
   const int filedes_;
   SNDFILE *const snd_in_;
   const unsigned int total_frames_;
@@ -393,7 +401,7 @@ private:
 }  // namespace
 
 
-static FileHandlerCache open_files_(10);
+static FileHandlerCache open_files_(1);
 
 static FileHandler *CreateFilterFromFileType(int filedes,
                                             const char *underlying_file) {
@@ -411,6 +419,8 @@ struct filter_object_t *create_filter(const char *fs_path,
   FileHandler *handler = open_files_.FindAndPin(fs_path);
   if (handler == NULL) {
     int filedes = open(underlying_path, O_RDONLY);
+    if (filedes < 0)
+      return NULL;
     handler = CreateFilterFromFileType(filedes, underlying_path);
     handler = open_files_.InsertPinned(fs_path, handler);
   }
