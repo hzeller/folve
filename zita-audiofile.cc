@@ -55,6 +55,7 @@ int Audiofile::open_read (const char *name)
     if (_mode) return ERR_MODE;
     reset ();
 
+    memset(&I, 0, sizeof(I));  // shut up valgrind.
     if ((_sndfile = sf_open (name, SFM_READ, &I)) == 0) return ERR_OPEN;
 
     _mode = MODE_READ;
