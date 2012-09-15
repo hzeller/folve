@@ -38,11 +38,13 @@ static const char kRetiredProgress[] = "#d0d0d0";
 // Sneak in a favicon without another resource access.
 // TODO: make a nice icon, recognizable as something that has to do with "
 // files and music ...
-static const char kHtmlHeader[] = "<header><link rel='icon' type='image/png'"
+static const char kHtmlHeader[] = "<header>"
+  "<title>Fuse Convolver</title>\n"
+  "<link rel='icon' type='image/png'"
   "href='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2"
   "AAAAAXNSR0IArs4c6QAAAAlwSFlzAAALEwAACxMBAJqcGAAAAAd0SU1FB9wJDwUlEA/UBrsA"
   "AABSSURBVCjPrZIxDgAgDAKh8f9froOTirU1ssKFYqS7Q4mktAxFRQDJcsPORMDYsDCXhn331"
-  "9GPwHJVuaFl3l4D1+h0UjIdbTh9SpP2KQ2AgSfVAdEQGx23tOopAAAAAElFTkSuQmCC'/>"
+  "9GPwHJVuaFl3l4D1+h0UjIdbTh9SpP2KQ2AgSfVAdEQGx23tOopAAAAAElFTkSuQmCC'/>\n"
   "</header>";
 
 int StatusServer::HandleHttp(void* user_argument,
