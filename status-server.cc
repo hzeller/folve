@@ -48,14 +48,15 @@ int StatusServer::HandleHttp(void* user_argument,
   server->CreatePage(&buffer, &size);
   response = MHD_create_response_from_data(size, (void*) buffer,
                                            MHD_NO, MHD_NO);
-  MHD_add_response_header(response, "Content-Type", "text/html");
+  MHD_add_response_header(response, "Content-Type", "text/html; charset=utf-8");
   ret = MHD_queue_response(connection, MHD_HTTP_OK, response);
   MHD_destroy_response(response);
   return ret;
 }
 
 StatusServer::StatusServer(ConvolverFilesystem *fs)
-  : filesystem_(fs), daemon_(NULL) {
+  : total_seconds_filtered_(0), total_seconds_music_seen_(0),
+    filesystem_(fs), daemon_(NULL) {
   fs->handler_cache()->SetObserver(this);
 }
 
@@ -86,7 +87,8 @@ void StatusServer::RetireHandlerEvent(FileHandler *handler) {
     retired_.pop_back();
 }
 
-static const char sMessageRowHtml[] = "<td>%s</td><td>%s</td>"
+static const char sMessageRowHtml[] =
+  "<td>%s</td><td>%s</td>"
   "<td colspan='3'>-</td>";
 
 static const char sProgressRowHtml[] =
@@ -97,13 +99,13 @@ static const char sProgressRowHtml[] =
 
 static void AppendFileInfo(std::string *result, const char *progress_style,
                            const HandlerStats &stats) {
-  result->append("<tr>");
+  result->append("<tr style='text-wrap:none;white-space:nowrap;'>");
   char row[1024];
   const char *status = "";
   switch (stats.status) {
   case HandlerStats::OPEN:    status = "open"; break;
   case HandlerStats::IDLE:    status = "idle"; break;
-  case HandlerStats::RETIRED: status = "----"; break;
+  case HandlerStats::RETIRED: status = "&nbsp;----&nbsp;"; break;
     // no default to let the compiler detect new values.
   }
   if (stats.progress <= 0) {
@@ -121,7 +123,8 @@ static void AppendFileInfo(std::string *result, const char *progress_style,
   result->append(row);
   result->append("<td bgcolor='#c0c0c0'>&nbsp;")
     .append(stats.format).append("&nbsp;</td>")
-    .append("<td style='font-size:small;'>").append(stats.filename)
+    .append("<td style='font-size:small;text-wrap:none;white-space:nowrap'>")
+    .append(stats.filename)
     .append("</td>");
   result->append("</tr>\n");
 }
@@ -137,7 +140,7 @@ struct CompareStats {
 void StatusServer::CreatePage(const char **buffer, size_t *size) {
   const double start = fuse_convolve::CurrentTime();
   current_page_.clear();
-  current_page_.append("<body style='font-family:Helvetica;'>");
+  current_page_.append("<body style='font-family:Helvetica;'>\n");
   current_page_.append("<center>Welcome to fuse convolve ")
     .append(filesystem_->version()).append("</center>");
 
@@ -160,12 +163,14 @@ void StatusServer::CreatePage(const char **buffer, size_t *size) {
   snprintf(total_stats, sizeof(total_stats),
            "Total opening files <b>%d</b> | "
            ".. and re-opened from recency cache <b>%d</b><br/>"
-           "Total music seen <b>%d:%02d:%02d</b> | "
-           ".. and convolved <b>%d:%02d:%02d</b><br/>",
+           "Total music seen <b>%dd %d:%02d:%02d</b> | "
+           ".. and convolved <b>%dd %d:%02d:%02d</b><br/>",
            filesystem_->total_file_openings(),
            filesystem_->total_file_reopen(),
-           t_seen / 3600, (t_seen % 3600) / 60, t_seen % 60,
-           t_filtered / 3600, (t_filtered % 3600) / 60, t_filtered % 60);
+           t_seen / 86400, (t_seen % 86400) / 3600,
+           (t_seen % 3600) / 60, t_seen % 60,
+           t_filtered / 86400, (t_filtered % 86400) / 3600,
+           (t_filtered % 3600) / 60, t_filtered % 60);
   current_page_.append(total_stats);
 
   current_page_.append("<h3>Recent Files</h3>\n");
@@ -177,8 +182,8 @@ void StatusServer::CreatePage(const char **buffer, size_t *size) {
   current_page_.append("<table>\n");
   current_page_.append("<tr><th>Stat</th>"
                        "<th width='400px'>Progress</th>"
-                       "<th>Pos</th><td></td><th>Tot</th><th>Format</th>"
-                       "<th>File</th></tr>\n");
+                       "<th>Pos</th><td></td><th>Len</th><th>Format</th>"
+                       "<th align='left'>File</th></tr>\n");
   CompareStats comparator;
   std::sort(stat_list.begin(), stat_list.end(), comparator);
   for (size_t i = 0; i < stat_list.size(); ++i) {
@@ -187,8 +192,8 @@ void StatusServer::CreatePage(const char **buffer, size_t *size) {
   current_page_.append("</table><hr/>\n");
 
   if (retired_.size() > 0) {
-    current_page_.append("<table>\n");
     current_page_.append("<h3>Retired</h3>\n");
+    current_page_.append("<table>\n");
     for (RetiredList::const_iterator it = retired_.begin();
          it != retired_.end(); ++it) {
       AppendFileInfo(&current_page_, kRetiredProgress, *it);
@@ -200,7 +205,8 @@ void StatusServer::CreatePage(const char **buffer, size_t *size) {
   char time_buffer[128];
   snprintf(time_buffer, sizeof(time_buffer), "page-gen %.2fms",
            duration * 1000.0);
-  current_page_.append(time_buffer).append("<div align='right'>HZ</div></body>");
+  current_page_.append(time_buffer).append("<div align='right'>HZ</div>\n"
+                                           "</body>");
   *buffer = current_page_.data();
   *size = current_page_.size();
 }

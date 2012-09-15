@@ -22,7 +22,7 @@
 // Use latest version.
 #define FUSE_USE_VERSION 26
 
-#define FUSE_CONVOLVE_VERSION_INFO "v. 0.76 &mdash; 2012-09-14"
+#define FUSE_CONVOLVE_VERSION_INFO "v. 0.77 &mdash; 2012-09-14"
 
 #include <fuse.h>
 #include <stdio.h>
@@ -181,7 +181,7 @@ int main(int argc, char *argv[]) {
   argc -=2;
   argv += 2;
   convolver_fs = new ConvolverFilesystem(FUSE_CONVOLVE_VERSION_INFO,
-                                         config_dir, 5);
+                                         config_dir, 3);
   
   // TODO(hzeller): make this configurable
   StatusServer *statusz = new StatusServer(convolver_fs);

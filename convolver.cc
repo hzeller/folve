@@ -127,14 +127,24 @@ public:
     if (error_) return -1;
     // If this is a skip suspiciously at the very end of the file as
     // reported by stat, we don't do any encoding, just return garbage.
-    // Programs sometimes do this apparently.
+    // Programs sometimes do this apparently. And sometimes not even to the
+    // very end but 'almost' at the end. So add some FudeOverhang
+    static const int kFudgeOverhang = 512;
     // But of course only if this is really a detected skip.
     if (output_buffer_->FileSize() < offset
-        && (int) (offset + size) >= file_stat_.st_size) {
-      const int pretended_available_bytes = file_stat_.st_size - offset;
-      if (pretended_available_bytes > 0) {
-        memset(buf, 0x00, pretended_available_bytes);
-        return pretended_available_bytes;
+        && (int) (offset + size + kFudgeOverhang) < file_stat_.st_size) {
+      LOGF(stderr,
+           "Skip attempt: file=%ld, offset=%ld, size=%ld; file_size=%ld; diff=%ld\n",
+           output_buffer_->FileSize(), offset, size, file_stat_.st_size,
+           file_stat_.st_size - offset);
+    }
+    if (output_buffer_->FileSize() < offset
+        && (int) (offset + size + kFudgeOverhang) >= file_stat_.st_size) {
+      const int pretended_bytes = std::min((off_t)size,
+                                           file_stat_.st_size - offset);
+      if (pretended_bytes > 0) {
+        memset(buf, 0x00, pretended_bytes);
+        return pretended_bytes;
       } else {
         return 0;
       }
