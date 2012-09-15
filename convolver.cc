@@ -130,14 +130,8 @@ public:
     // Programs sometimes do this apparently. And sometimes not even to the
     // very end but 'almost' at the end. So add some FudeOverhang
     static const int kFudgeOverhang = 512;
-    // But of course only if this is really a detected skip.
-    if (output_buffer_->FileSize() < offset
-        && (int) (offset + size + kFudgeOverhang) < file_stat_.st_size) {
-      LOGF(stderr,
-           "Skip attempt: file=%ld, offset=%ld, size=%ld; file_size=%ld; diff=%ld\n",
-           output_buffer_->FileSize(), offset, size, file_stat_.st_size,
-           file_stat_.st_size - offset);
-    }
+    // But of course only if this is really a skip, not a regular approaching
+    // end-of-file.
     if (output_buffer_->FileSize() < offset
         && (int) (offset + size + kFudgeOverhang) >= file_stat_.st_size) {
       const int pretended_bytes = std::min((off_t)size,
