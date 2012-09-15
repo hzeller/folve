@@ -295,6 +295,14 @@ private:
       zita_.convproc->start_process(0, 0);
     }
     int r = sf_readf_float(snd_in_, raw_sample_buffer_, zita_.fragm);
+    if (r == 0) {
+      LOG_ERROR(stderr, "Expected %d frames left, gave buffer sized %d, "
+                "but got EOF; corrupt file '%s' ?\n",
+                input_frames_left_, zita_.fragm, file_name_.c_str());
+      input_frames_left_ = 0;
+      Close();
+      return false;
+    }
     if (r < (int) zita_.fragm) {
       // Zero out the rest of the buffer.
       const int missing = zita_.fragm - r;
