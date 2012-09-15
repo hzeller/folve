@@ -60,6 +60,7 @@ static char *concat_path(char *buf, const char *a, const char *b) {
 
 // Given a relative path from the root of the mounted file-system, get the
 // original file from the source filesystem.
+// TODO(hzeller): move the ogg.fuse.flac logic into convolver-filesystem.
 static const char *assemble_orig_path(char *buf, const char *path) {
   char *result = concat_path(buf, orig_dir, path);
   static const char magic_ogg_rewrite[] = ".ogg.fuse.flac";
@@ -181,7 +182,7 @@ int main(int argc, char *argv[]) {
   argc -=2;
   argv += 2;
   convolver_fs = new ConvolverFilesystem(FUSE_CONVOLVE_VERSION_INFO,
-                                         config_dir, 3);
+                                         orig_dir, config_dir);
   
   // TODO(hzeller): make this configurable
   StatusServer *statusz = new StatusServer(convolver_fs);

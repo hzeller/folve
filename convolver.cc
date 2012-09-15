@@ -34,6 +34,8 @@
 #include "zita-config.h"
 
 static bool global_debug = false;
+
+// TODO(hzeller): don't make this global.
 const char *global_zita_config_dir = NULL;
 
 #define LOGF if (!global_debug) {} else fprintf
@@ -492,9 +494,10 @@ void ConvolverFilesystem::Close(const char *fs_path) {
 }
 
 ConvolverFilesystem::ConvolverFilesystem(const char *version_info,
-                                         const char *zita_config_dir,
-                                         int cache_size)
-  : version_info_(version_info), open_file_cache_(cache_size),
+                                         const char *unerlying_dir,
+                                         const char *zita_config_dir)
+  : version_info_(version_info), underlying_dir_(unerlying_dir),
+    open_file_cache_(3),
     total_file_openings_(0), total_file_reopen_(0) {
   global_zita_config_dir = zita_config_dir;
 }

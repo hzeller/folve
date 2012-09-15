@@ -163,8 +163,9 @@ void StatusServer::CreatePage(const char **buffer, size_t *size) {
   current_page_.clear();
   current_page_.append(kHtmlHeader);
   current_page_.append("<body style='font-family:Helvetica;'>\n");
-  current_page_.append("<center>Welcome to fuse convolve ")
-    .append(filesystem_->version()).append("</center>");
+  Appendf(&current_page_, "<center>Welcome to Fuse Convolve %s</center>"
+          "Convolving files from <code>%s</code><br/>\n",
+          filesystem_->version().c_str(), filesystem_->underlying_dir().c_str());
 
   std::vector<HandlerStats> stat_list;
   filesystem_->handler_cache()->GetStats(&stat_list);
