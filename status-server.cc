@@ -161,7 +161,7 @@ void StatusServer::CreatePage(const char **buffer, size_t *size) {
   std::vector<HandlerStats> stat_list;
   filesystem_->handler_cache()->GetStats(&stat_list);
 
-  // Get statistics of active files.
+  // Get statistics of active files to add to the existing ones.
   double active_music_seen = 0.0;
   double active_filtered = 0.0;
   for (size_t i = 0; i < stat_list.size(); ++i) {

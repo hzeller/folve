@@ -35,12 +35,13 @@ struct ZitaConfig {
   unsigned int  ninp;
   unsigned int  nout;
   unsigned int  size;
+  const char *config_file;
 };
 
 enum { NOERR, ERR_OTHER, ERR_SYNTAX, ERR_PARAM, ERR_ALLOC, ERR_CANTCD, ERR_COMMAND, ERR_NOCONV, ERR_IONUM };
 
 
-extern int  config (ZitaConfig *cfg, const char *config);
+extern int  config (ZitaConfig *cfg, const char *config_file);
 extern int  convnew (ZitaConfig *cfg, const char *line, int lnum);
 extern int  inpname (ZitaConfig *cfg, const char *line);
 extern int  outname (ZitaConfig *cfg, const char *line);

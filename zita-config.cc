@@ -75,7 +75,7 @@ static int readfile (ZitaConfig *cfg,
 	    k -= delay;
 	    delay = 0;
 	    offset += k;
-	    fprintf (stderr, "Line %d: First %d frames removed by latency compensation.\n", lnum, k);
+	    fprintf (stderr, "%s:%d: First %d frames removed by latency compensation.\n", cfg->config_file, lnum, k);
 	}
     }		
     err = check_inout (cfg, ip1, op1);
@@ -91,27 +91,30 @@ static int readfile (ZitaConfig *cfg,
 
     if (audio.open_read (path))
     {
-        fprintf (stderr, "Line %d: Unable to open '%s'.\n", lnum, path);
+        fprintf (stderr, "%s:%d: Unable to open '%s'.\n", cfg->config_file,
+                 lnum, path);
         return ERR_OTHER;
     } 
 
     if (audio.rate () != (int) cfg->fsamp)
     {
-        fprintf (stderr, "Line %d: Sample rate (%d) of '%s' does not match.\n",
-                 lnum, audio.rate (), path);
+        fprintf (stderr, "%s:%d: Sample rate (%d) of '%s' does not match.\n",
+                 cfg->config_file, lnum, audio.rate (), path);
     }
 
     nchan = audio.chan ();
     nfram = audio.size ();
     if ((ichan < 1) || (ichan > nchan))
     {
-	fprintf (stderr, "Line %d: Channel not available.\n", lnum);
+        fprintf (stderr, "%s:%d: Channel not available.\n",
+                 cfg->config_file, lnum);
         audio.close ();
         return ERR_OTHER;
     } 
     if (offset && audio.seek (offset))
     {
-	fprintf (stderr, "Line %d: Can't seek to offset.\n", lnum);
+        fprintf (stderr, "%s:%d: Can't seek to offset.\n",
+                 cfg->config_file, lnum);
         audio.close ();
         return ERR_OTHER;
     } 
@@ -119,7 +122,7 @@ static int readfile (ZitaConfig *cfg,
     if (length > cfg->size - delay) 
     {
 	length = cfg->size - delay;
-   	fprintf (stderr, "Line %d: Data truncated.\n", lnum);
+   	fprintf (stderr, "%s:%d: Data truncated.\n", cfg->config_file, lnum);
     }
 
     try 
@@ -138,7 +141,8 @@ static int readfile (ZitaConfig *cfg,
 	nfram = audio.read (buff, nfram);
 	if (nfram < 0)
 	{
-	    fprintf (stderr, "Line %d: Error reading file.\n", lnum);
+            fprintf (stderr, "%s:%d: Error reading file.\n",
+                     cfg->config_file, lnum);
 	    audio.close ();
 	    delete[] buff;
 	    return ERR_OTHER;
@@ -179,7 +183,8 @@ static int impdirac (ZitaConfig *cfg, const char *line, int lnum)
     k = cfg->latency;
     if (delay < k)
     {
-	fprintf (stderr, "Line %d: Dirac pulse removed: delay < latency.\n", lnum);
+	fprintf (stderr, "%s:%d: Dirac pulse removed: delay < latency.\n",
+                 cfg->config_file, lnum);
 	return 0;
     }
     delay -= k;
@@ -217,7 +222,7 @@ static int imphilbert (ZitaConfig *cfg, const char *line, int lnum)
     k = cfg->latency;
     if (delay < k + length / 2)
     {
-	fprintf (stderr, "Line %d: Hilbert impulse removed: delay < latency + lenght / 2.\n", lnum);
+        fprintf (stderr, "%s:%d: Hilbert impulse removed: delay < latency + lenght / 2.\n", cfg->config_file, lnum);
 	return 0;
     }
     delay -= k + length / 2;
@@ -265,7 +270,7 @@ static int impcopy (ZitaConfig *cfg, const char *line, int lnum)
 }
 
 
-int config (ZitaConfig *cfg, const char *config)
+int config (ZitaConfig *cfg, const char *config_file)
 {
     FILE          *F;
     int           stat, lnum;
@@ -273,16 +278,19 @@ int config (ZitaConfig *cfg, const char *config)
     char          cdir [1024];
     char          *p, *q;
 
-    if (! (F = fopen (config, "r"))) 
+    if (! (F = fopen (config_file, "r"))) 
     {
-	fprintf (stderr, "Can't open '%s' for reading\n", config);
+	fprintf (stderr, "Can't open '%s' for reading\n", config_file);
         return -1;
     } 
     
-    char *config_name_copy = strdup(config);
+    // dirname() modifies the input
+    char *config_name_copy = strdup(config_file);
     strcpy (cdir, dirname(config_name_copy));
     free(config_name_copy);
 
+    // Remember this for error output.
+    cfg->config_file = config_file;
     stat = 0;
     lnum = 0;
 
@@ -321,29 +329,29 @@ int config (ZitaConfig *cfg, const char *config)
     if (stat == ERR_OTHER) stat = 0;
     if (stat)
     {
-	fprintf (stderr, "Line %d: ", lnum);
+        fprintf (stderr, "%s:%d: ", config_file, lnum);
 	switch (stat)
 	{
 	case ERR_SYNTAX:
-	    fprintf (stderr, "Syntax error.\n");
-	    break;
+            fprintf (stderr, "Syntax error.\n");
+            break;
 	case ERR_PARAM:
-	    fprintf (stderr, "Bad or missing parameters.\n");
+            fprintf (stderr, "Bad or missing parameters.\n");
 	    break;
 	case ERR_ALLOC:
-	    fprintf (stderr, "Out of memory.\n");
+            fprintf (stderr, "Out of memory.\n");
 	    break;
 	case ERR_CANTCD:
-	    fprintf (stderr, "Can't change directory to '%s'.\n", cdir);
+            fprintf (stderr, "Can't change directory to '%s'.\n", cdir);
 	    break;
 	case ERR_COMMAND:
-	    fprintf (stderr, "Unknown command.\n");
+            fprintf (stderr, "Unknown command.\n");
 	    break;
 	case ERR_NOCONV:
-	    fprintf (stderr, "No convolver yet defined.\n");
+            fprintf (stderr, "No convolver yet defined.\n");
 	    break;
 	case ERR_IONUM:
-	    fprintf (stderr, "Bad input or output number.\n");
+            fprintf (stderr, "Bad input or output number.\n");
 	    break;
 	default:
 	    fprintf (stderr, "Unknown error.\n");		     

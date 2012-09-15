@@ -38,22 +38,26 @@ int convnew (ZitaConfig *cfg, const char *line, int lnum)
 
     if ((cfg->ninp == 0) || (cfg->ninp > Convproc::MAXINP))
     {
-        fprintf (stderr, "Line %d: Number of inputs (%d) is out of range.\n", lnum, cfg->ninp);
+        fprintf (stderr, "%s:%d: Number of inputs (%d) is out of range.\n",
+                 cfg->config_file, lnum, cfg->ninp);
         return ERR_OTHER;
     }
     if ((cfg->nout == 0) || (cfg->nout > Convproc::MAXOUT))
     {
-        fprintf (stderr, "Line %d: Number of outputs (%d) is out of range.\n", lnum, cfg->nout);
+        fprintf (stderr, "%s:%d: Number of outputs (%d) is out of range.\n",
+                 cfg->config_file, lnum, cfg->nout);
         return ERR_OTHER;
     }
     if (cfg->size > MAXSIZE)
     {
-        fprintf (stderr, "Line %d: Convolver size (%d) is out of range.\n", lnum, cfg->size);
+        fprintf (stderr, "%s:%d: Convolver size (%d) is out of range.\n",
+                 cfg->config_file, lnum, cfg->size);
         return ERR_OTHER;
     }
     if ((dens < 0.0f) || (dens > 1.0f))
     {
-        fprintf (stderr, "Line %d: Density parameter is out of range.\n", lnum);
+        fprintf (stderr, "%s:%d: Density parameter is out of range.\n",
+                 cfg->config_file, lnum);
         return ERR_OTHER;
     }
 
