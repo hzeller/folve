@@ -45,8 +45,9 @@ namespace {
 // everything that is not a sound-file.
 class PassThroughFilter : public FileHandler {
 public:
-  PassThroughFilter(int filedes, const char *path) : filedes_(filedes) {
-    LOGF(stderr, "Creating PassThrough filter for '%s'\n", path);
+  PassThroughFilter(int filedes, const char *fs_path)
+  : filedes_(filedes), file_name_(fs_path) {
+    LOGF(stderr, "Creating PassThrough filter for '%s'\n", fs_path);
   }
   ~PassThroughFilter() { close(filedes_); }
 
@@ -57,9 +58,17 @@ public:
   virtual int Stat(struct stat *st) {
     return fstat(filedes_, st);
   }
+
+  virtual void GetHandlerStatus(struct HandlerStats *stats) {
+    stats->progress = -1;  // fraction max-read-pos vs. stat ?
+    stats->total_duration_seconds = -1;
+    stats->format = "-";
+    stats->filename = file_name_;
+  }
   
 private:
   const int filedes_;
+  const std::string file_name_;
 };
 
 class SndFileHandler :
@@ -69,12 +78,13 @@ public:
   // Attempt to create a SndFileHandler from the given file descriptor. This
   // returns NULL if this is not a sound-file or if there is no available
   // convolution filter configuration available.
-  static FileHandler *Create(int filedes, const char *path) {
+  static FileHandler *Create(int filedes, const char *fs_path,
+                             const char *underlying_file) {
     struct SF_INFO in_info;
     memset(&in_info, 0, sizeof(in_info));
     SNDFILE *snd = sf_open_fd(filedes, SFM_READ, &in_info, 0);
     if (snd == NULL) {
-      LOG_ERROR(stderr, "File %s: %s\n", path, sf_strerror(NULL));
+      LOG_ERROR(stderr, "File %s: %s\n", underlying_file, sf_strerror(NULL));
       return NULL;
     }
 
@@ -88,17 +98,17 @@ public:
              bits, in_info.channels);
     const bool found_config = (access(config_path, R_OK) == 0);
     if (found_config) {
-      LOGF(stderr, "File %s: filter config %s\n", path, config_path);
+      LOGF(stderr, "File %s: filter config %s\n", underlying_file, config_path);
     } else {
       LOG_ERROR(stderr, "File %s: couldn't find filter config %s\n",
-                path, config_path);
+                underlying_file, config_path);
       sf_close(snd);
       return NULL;
     }
     char file_info[256];
     snprintf(file_info, sizeof(file_info), "%.1fkHz, %d Bit",
              in_info.samplerate / 1000.0, bits);
-    return new SndFileHandler(path, filedes, snd, in_info,
+    return new SndFileHandler(fs_path, underlying_file, filedes, snd, in_info,
                               file_info, config_path);
   }
   
@@ -134,13 +144,16 @@ public:
     return output_buffer_->Read(buf, size, offset);
   }
 
-  virtual float Progress() const {
+  virtual void GetHandlerStatus(struct HandlerStats *stats) {
     const int frames_done = total_frames_ - input_frames_left_;
-    if (frames_done == 0 || total_frames_ == 0) return 0.0;
-    return 1.0 * frames_done / total_frames_;
+    if (frames_done == 0 || total_frames_ == 0)
+      stats->progress = 0.0;
+    else
+      stats->progress = 1.0 * frames_done / total_frames_;
+    stats->total_duration_seconds = duration_seconds_;
+    stats->format = file_format_;
+    stats->filename = file_name_;
   }
-  virtual std::string FileInfo() const { return file_description_; }
-  virtual int Duration() const { return duration_seconds_; }
 
   virtual int Stat(struct stat *st) {
     if (output_buffer_->FileSize() > start_estimating_size_) {
@@ -161,13 +174,14 @@ public:
   }
     
 private:
-  SndFileHandler(const char *path, int filedes, SNDFILE *snd_in,
-                 const SF_INFO &in_info, const std::string &file_description,
+  SndFileHandler(const char *fs_path,
+                 const char *underlying_file, int filedes, SNDFILE *snd_in,
+                 const SF_INFO &in_info, const std::string &file_format,
                  const char* config_path)
     : filedes_(filedes), snd_in_(snd_in), total_frames_(in_info.frames),
       channels_(in_info.channels),
       duration_seconds_(in_info.frames / in_info.samplerate),
-      file_description_(file_description), config_path_(config_path),
+      file_name_(fs_path), file_format_(file_format), config_path_(config_path),
       error_(false), output_buffer_(NULL),
       snd_out_(NULL),
       raw_sample_buffer_(NULL), input_frames_left_(in_info.frames) {
@@ -389,7 +403,8 @@ private:
   const unsigned int total_frames_;
   const int channels_;
   const int duration_seconds_;
-  const std::string file_description_;
+  const std::string file_name_;
+  const std::string file_format_;
   const std::string config_path_;
 
   struct stat file_stat_;   // we dynamically report a changing size.
@@ -409,12 +424,14 @@ private:
 
 
 static FileHandler *CreateFilterFromFileType(int filedes,
+                                             const char *fs_path,
                                              const char *underlying_file) {
-  FileHandler *filter = SndFileHandler::Create(filedes, underlying_file);
+  FileHandler *filter = SndFileHandler::Create(filedes, fs_path,
+                                               underlying_file);
   if (filter != NULL) return filter;
 
   // Every other file-type is just passed through as is.
-  return new PassThroughFilter(filedes, underlying_file);
+  return new PassThroughFilter(filedes, fs_path);
 }
 
 // Implementation of the C functions in filter-interface.h
@@ -426,7 +443,7 @@ FileHandler *ConvolverFilesystem::CreateHandler(const char *fs_path,
     if (filedes < 0)
       return NULL;
     ++total_file_openings_;
-    handler = CreateFilterFromFileType(filedes, underlying_path);
+    handler = CreateFilterFromFileType(filedes, fs_path, underlying_path);
     handler = open_file_cache_.InsertPinned(fs_path, handler);
   } else {
     ++total_file_reopen_;

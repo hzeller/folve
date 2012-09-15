@@ -19,6 +19,19 @@
 
 #include <string>
 
+// Status about some handler, filled in by various subsystem.
+struct HandlerStats {
+  HandlerStats() {}
+  std::string filename;
+  std::string format;
+  int total_duration_seconds;
+  float progress;
+
+  enum Status { OPEN, IDLE, RETIRED };
+  Status status;
+  double last_access;
+};
+
 class FileHandler {
 public:
   virtual ~FileHandler() {}
@@ -27,10 +40,8 @@ public:
   virtual int Read(char *buf, size_t size, off_t offset) = 0;
   virtual int Stat(struct stat *st) = 0;
 
-  // Some status information.
-  virtual float Progress() const { return -1; }
-  virtual std::string FileInfo() const { return ""; }
-  virtual int Duration() const { return -1; }
+  // Get handler status.
+  virtual void GetHandlerStatus(struct HandlerStats *s) = 0;
 };
 
 #endif // _FUSE_CONVOLVER_FILE_HANDLER_H

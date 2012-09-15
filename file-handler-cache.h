@@ -14,8 +14,8 @@
 //  You should have received a copy of the GNU General Public License
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#ifndef _FUSE_CONVOLVER_FILE_HANDLER_CACHE_
-#define _FUSE_CONVOLVER_FILE_HANDLER_CACHE_
+#ifndef _FUSE_CONVOLVER_FILE_HANDLER_CACHE_H
+#define _FUSE_CONVOLVER_FILE_HANDLER_CACHE_H
 
 #include <time.h>
 
@@ -34,17 +34,19 @@ class FileHandler;
 // This container is thread-safe.
 class FileHandlerCache {
 public:
-  // Cache entry.
-  struct Entry {
-    Entry(const std::string &, FileHandler *);
-    const std::string key;
-    FileHandler *const handler;
-    int references;
-    double last_access;  // seconds since epoch, sub-second resolution.
+  class Observer {
+  public:
+    virtual ~Observer() {}
+    virtual void InsertHandlerEvent(FileHandler *handler) = 0;
+    virtual void RetireHandlerEvent(FileHandler *handler) = 0;
   };
 
   FileHandlerCache(int low_watermark, int high_watermark)
-    : low_watermark_(low_watermark), high_watermark_(high_watermark) {}
+    : low_watermark_(low_watermark), high_watermark_(high_watermark),
+      observer_(NULL) {}
+
+  // Set an observer.
+  void SetObserver(Observer *observer);
 
   // Insert a new object under the given key.
   // Ownership is handed over to this map.
@@ -60,20 +62,20 @@ public:
   // to delete it later (though typically will keep it around for a while).
   void Unpin(const std::string &key);
 
-  // Get a vector of the current entries in this cache. All entries are
-  // pinned and need to be Unpin()-ed by the user.
-  typedef std::vector<const Entry *> EntryList;
-  void GetStats(EntryList *entries);
+  // Get a vector of the current status of handlers kept in this cache.
+  void GetStats(std::vector<HandlerStats> *stats);
 
  private:
+  class Entry;
   typedef std::map<std::string, Entry*> CacheMap;
 
   void CleanupUnreferencedLocked();
 
   const size_t low_watermark_;
   const size_t high_watermark_;
+  Observer *observer_;
   boost::mutex mutex_;
   CacheMap cache_;
 };
 
-#endif  // _FUSE_CONVOLVER_FILE_HANDLER_CACHE_
+#endif  // _FUSE_CONVOLVER_FILE_HANDLER_CACHE_H

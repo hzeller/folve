@@ -24,16 +24,20 @@
 #include "file-handler-cache.h"
 #include "util.h"
 
-FileHandlerCache::Entry::Entry(const std::string &k, FileHandler *h)
-  : key(k), handler(h), references(0), last_access(0) {}
+struct FileHandlerCache::Entry {
+  Entry(FileHandler *h) : handler(h), references(0), last_access(0) {}
+  FileHandler *const handler;
+  int references;
+  double last_access;  // seconds since epoch, sub-second resolution.
+};
 
 FileHandler *FileHandlerCache::InsertPinned(const std::string &key,
                                             FileHandler *handler) {
   boost::lock_guard<boost::mutex> l(mutex_);
   CacheMap::iterator ins
     = cache_.insert(std::make_pair(key, (Entry*)NULL)).first;
-  if (ins->second == NULL) {  // new entry
-    ins->second = new Entry(key, handler);
+  if (ins->second == NULL) {
+    ins->second = new Entry(handler);
   } else {
     delete handler;
   }
@@ -42,6 +46,7 @@ FileHandler *FileHandlerCache::InsertPinned(const std::string &key,
     CleanupUnreferencedLocked();
   }
   ins->second->last_access = fuse_convolve::CurrentTime();
+  if (observer_) observer_->InsertHandlerEvent(ins->second->handler);
   return ins->second->handler;
 }
 
@@ -62,18 +67,31 @@ void FileHandlerCache::Unpin(const std::string &key) {
   --found->second->references;
 }
 
-void FileHandlerCache::GetStats(std::vector<const Entry *> *entries) {
-  boost::lock_guard<boost::mutex> l(mutex_);
+void FileHandlerCache::SetObserver(Observer *observer) {
+  assert(observer_ == NULL);
+  observer_ = observer;
+}
+
+void FileHandlerCache::GetStats(std::vector<HandlerStats> *stats) {
+  HandlerStats s;
+  mutex_.lock();
   for (CacheMap::iterator it = cache_.begin(); it != cache_.end(); ++it) {
-    ++it->second->references;
-    entries->push_back(it->second);
+    it->second->handler->GetHandlerStatus(&s);
+    s.status = ((it->second->references == 0)
+                ? HandlerStats::IDLE
+                : HandlerStats::OPEN);
+    s.last_access = it->second->last_access;
+    stats->push_back(s);
   }
+  mutex_.unlock();
 }
 
 void FileHandlerCache::CleanupUnreferencedLocked() {
+  // TODO(hzeller): make this more LRU semantics, i.e. look at access time.
   for (CacheMap::iterator it = cache_.begin(); it != cache_.end(); ++it) {
     if (it->second->references == 0) {
       //fprintf(stderr, "cleanup %s\n", it->first.c_str());
+      if (observer_) observer_->RetireHandlerEvent(it->second->handler);
       delete it->second->handler;
       delete it->second;
       cache_.erase(it);

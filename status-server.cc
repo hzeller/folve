@@ -29,6 +29,11 @@
 #include "status-server.h"
 #include "util.h"
 
+static const size_t kMaxRetired = 200;
+static const int kProgressWidth = 400;
+static const char kActiveProgress[]  = "#7070ff";
+static const char kRetiredProgress[] = "#d0d0d0";
+
 int StatusServer::HandleHttp(void* user_argument,
                              struct MHD_Connection *connection,
                              const char *url, const char *method,
@@ -51,6 +56,7 @@ int StatusServer::HandleHttp(void* user_argument,
 
 StatusServer::StatusServer(ConvolverFilesystem *fs)
   : filesystem_(fs), daemon_(NULL) {
+  fs->handler_cache()->SetObserver(this);
 }
 
 bool StatusServer::Start(int port) {
@@ -65,47 +71,68 @@ StatusServer::~StatusServer() {
     MHD_stop_daemon(daemon_);
 }
 
-static const char sMessageRowHtml[] = "<td>%s</td><td>%s</td><td>%s</td>"
+// FileHandlerCache::Observer interface.
+void StatusServer::RetireHandlerEvent(FileHandler *handler) {
+  HandlerStats stats;
+  handler->GetHandlerStatus(&stats);  // Get last available stats.
+  if (stats.progress >= 0) {
+    total_seconds_music_seen_ += stats.total_duration_seconds;
+    total_seconds_filtered_ += stats.total_duration_seconds * stats.progress;
+  }
+  stats.last_access = fuse_convolve::CurrentTime();
+  stats.status = HandlerStats::RETIRED;
+  retired_.push_front(stats);
+  while (retired_.size() > kMaxRetired)
+    retired_.pop_back();
+}
+
+static const char sMessageRowHtml[] = "<td>%s</td><td>%s</td>"
   "<td colspan='3'>-</td>";
 
 static const char sProgressRowHtml[] =
-  "<td>%s</td><td>%s</td><td>"
+  "<td>%s</td><td>"
   "<div style='width:%dpx; border:1px solid black;'>\n"
-  "  <div style='width:%d%%;background:#7070ff;'>&nbsp;</div>\n</div></td>"
+  "  <div style='width:%d%%;background:%s;'>&nbsp;</div>\n</div></td>"
   "<td align='right'>%2d:%02d</td><td>/</td><td align='right'>%2d:%02d</td>";
 
-static void FmtTime(char *buf, size_t size, int duration) {
-  snprintf(buf, size, "%d:%02d", duration / 60, duration % 60);
-}
-
-static void AppendFileInfo(std::string *result, const std::string &filename,
-                           const FileHandler *handler, int refs,
-                           double last_access) {
+static void AppendFileInfo(std::string *result, const char *progress_style,
+                           const HandlerStats &stats) {
   result->append("<tr>");
   char row[1024];
-  const int kMaxWidth = 400;
-  const float progress = handler->Progress();
-  const char *access_level = (refs == 1) ? "idle" : "open";
-  char last[128];
-  FmtTime(last, sizeof(last), last_access);
-  if (progress <= 0) {
-    snprintf(row, sizeof(row), sMessageRowHtml, access_level, last,
-             (progress < 0)
+  const char *status = "";
+  switch (stats.status) {
+  case HandlerStats::OPEN:    status = "open"; break;
+  case HandlerStats::IDLE:    status = "idle"; break;
+  case HandlerStats::RETIRED: status = "----"; break;
+    // no default to let the compiler detect new values.
+  }
+  if (stats.progress <= 0) {
+    snprintf(row, sizeof(row), sMessageRowHtml, status,
+             (stats.progress < 0)
              ? "Not a sound file or no filter found. Pass through."
              : "Only Header accessed.");
   } else {
-    const int secs = handler->Duration();
-    const int fract_sec = progress * secs;
-    snprintf(row, sizeof(row), sProgressRowHtml, access_level, last,
-             kMaxWidth, (int) (100 * progress),
+    const int secs = stats.total_duration_seconds;
+    const int fract_sec = stats.progress * secs;
+    snprintf(row, sizeof(row), sProgressRowHtml, status,
+             kProgressWidth, (int) (100 * stats.progress), progress_style,
              fract_sec / 60, fract_sec % 60, secs / 60, secs % 60);
   }
   result->append(row);
   result->append("<td bgcolor='#c0c0c0'>&nbsp;")
-    .append(handler->FileInfo()).append("&nbsp;</td>")
-    .append("<td style='font-size:small;'>").append(filename).append("</td>");
+    .append(stats.format).append("&nbsp;</td>")
+    .append("<td style='font-size:small;'>").append(stats.filename)
+    .append("</td>");
   result->append("</tr>\n");
 }
+
+struct CompareStats {
+  bool operator() (const HandlerStats &a, const HandlerStats &b) {
+    if (a.status < b.status) return true;   // open before idle.
+    else if (a.status > b.status) return false;
+    return b.last_access < a.last_access;   // reverse time.
+  }
+};
 
 void StatusServer::CreatePage(const char **buffer, size_t *size) {
   const double start = fuse_convolve::CurrentTime();
@@ -113,35 +140,65 @@ void StatusServer::CreatePage(const char **buffer, size_t *size) {
   current_page_.append("<body style='font-family:Helvetica;'>");
   current_page_.append("<center>Welcome to fuse convolve ")
     .append(filesystem_->version()).append("</center>");
+
+  std::vector<HandlerStats> stat_list;
+  filesystem_->handler_cache()->GetStats(&stat_list);
+
+  // Get statistics of active files.
+  double active_music_seen = 0.0;
+  double active_filtered = 0.0;
+  for (size_t i = 0; i < stat_list.size(); ++i) {
+    const HandlerStats &stats = stat_list[i];
+    if (stats.progress >= 0) {
+      active_music_seen += stats.total_duration_seconds;
+      active_filtered += stats.total_duration_seconds * stats.progress;
+    }
+  }
+  const int t_seen = total_seconds_music_seen_ + active_music_seen;
+  const int t_filtered = total_seconds_filtered_ + active_filtered;
+  char total_stats[1024];
+  snprintf(total_stats, sizeof(total_stats),
+           "Total opening files <b>%d</b> | "
+           ".. and re-opened from recency cache <b>%d</b><br/>"
+           "Total music seen <b>%d:%02d:%02d</b> | "
+           ".. and convolved <b>%d:%02d:%02d</b><br/>",
+           filesystem_->total_file_openings(),
+           filesystem_->total_file_reopen(),
+           t_seen / 3600, (t_seen % 3600) / 60, t_seen % 60,
+           t_filtered / 3600, (t_filtered % 3600) / 60, t_filtered % 60);
+  current_page_.append(total_stats);
+
   current_page_.append("<h3>Recent Files</h3>\n");
-  FileHandlerCache::EntryList entries;
-  filesystem_->handler_cache()->GetStats(&entries);
   char current_open[128];
   snprintf(current_open, sizeof(current_open), "%ld in recency cache.\n",
-           entries.size());
+           stat_list.size());
+
   current_page_.append(current_open);
   current_page_.append("<table>\n");
-  current_page_.append("<tr><th>Stat</th><th>Last</th>"
+  current_page_.append("<tr><th>Stat</th>"
                        "<th width='400px'>Progress</th>"
                        "<th>Pos</th><td></td><th>Tot</th><th>Format</th>"
                        "<th>File</th></tr>\n");
-  const double now = fuse_convolve::CurrentTime();
-  for (size_t i = 0; i < entries.size(); ++i) {
-    const FileHandlerCache::Entry *entry = entries[i];
-    AppendFileInfo(&current_page_, entry->key, entry->handler,
-                   entry->references, now - entry->last_access);
-    filesystem_->handler_cache()->Unpin(entry->key);
+  CompareStats comparator;
+  std::sort(stat_list.begin(), stat_list.end(), comparator);
+  for (size_t i = 0; i < stat_list.size(); ++i) {
+    AppendFileInfo(&current_page_, kActiveProgress, stat_list[i]);
   }
   current_page_.append("</table><hr/>\n");
-  char file_openings[128];
-  snprintf(file_openings, sizeof(file_openings),
-           "Total inactive open %d | total re-open while active %d",
-           filesystem_->total_file_openings(),
-           filesystem_->total_file_reopen());
-  current_page_.append(file_openings);
+
+  if (retired_.size() > 0) {
+    current_page_.append("<table>\n");
+    current_page_.append("<h3>Retired</h3>\n");
+    for (RetiredList::const_iterator it = retired_.begin();
+         it != retired_.end(); ++it) {
+      AppendFileInfo(&current_page_, kRetiredProgress, *it);
+    }
+    current_page_.append("</table><hr/>\n");
+  }
+
   const double duration = fuse_convolve::CurrentTime() - start;
   char time_buffer[128];
-  snprintf(time_buffer, sizeof(time_buffer), " | page-gen %.2fms",
+  snprintf(time_buffer, sizeof(time_buffer), "page-gen %.2fms",
            duration * 1000.0);
   current_page_.append(time_buffer).append("<div align='right'>HZ</div></body>");
   *buffer = current_page_.data();
