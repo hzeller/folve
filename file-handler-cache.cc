@@ -17,6 +17,7 @@
 #include <stdio.h>
 
 #include <map>
+#include <vector>
 #include <boost/thread/locks.hpp>
 #include <boost/thread/mutex.hpp>
 
@@ -42,8 +43,8 @@ FileHandler *FileHandlerCache::InsertPinned(const std::string &key,
     delete handler;
   }
   ++ins->second->references;
-  if (cache_.size() > high_watermark_) {
-    CleanupUnreferencedLocked();
+  if (cache_.size() > max_size_) {
+    CleanupOldestUnreferenced_Locked();
   }
   ins->second->last_access = fuse_convolve::CurrentTime();
   if (observer_) observer_->InsertHandlerEvent(ins->second->handler);
@@ -86,17 +87,33 @@ void FileHandlerCache::GetStats(std::vector<HandlerStats> *stats) {
   mutex_.unlock();
 }
 
-void FileHandlerCache::CleanupUnreferencedLocked() {
-  // TODO(hzeller): make this more LRU semantics, i.e. look at access time.
+struct FileHandlerCache::CompareAge {
+  bool operator() (const CacheMap::iterator &a, const CacheMap::iterator &b) {
+    return a->second->last_access < b->second->last_access;
+  }
+};
+
+void FileHandlerCache::CleanupOldestUnreferenced_Locked() {
+  assert(cache_.size() > max_size_);  // otherwise we shouldn't have been called
+  // While this iterating through the whole cache might look expensive,
+  // in practice we're talking about 3 elements here.
+  // If we had significantly more, e.g. broken clients that don't close files,
+  // we need to keep better track of age.
+  std::vector<CacheMap::iterator> for_removal;
   for (CacheMap::iterator it = cache_.begin(); it != cache_.end(); ++it) {
-    if (it->second->references == 0) {
-      //fprintf(stderr, "cleanup %s\n", it->first.c_str());
-      if (observer_) observer_->RetireHandlerEvent(it->second->handler);
-      delete it->second->handler;
-      delete it->second;
-      cache_.erase(it);
-      if (cache_.size() <= low_watermark_)
-        break;
-    }
+    if (it->second->references > 0) continue;
+    for_removal.push_back(it);
+  }
+
+  const size_t to_erase_count = std::min(cache_.size() - max_size_,
+                                         for_removal.size());
+  CompareAge comparator;
+  std::sort(for_removal.begin(), for_removal.end(), comparator);
+  for (size_t i = 0; i < to_erase_count; ++i) {
+    CacheMap::iterator &cache_it = for_removal[i];
+    if (observer_) observer_->RetireHandlerEvent(cache_it->second->handler);
+    delete cache_it->second->handler;  // FileHandler
+    delete cache_it->second;           // Entry
+    cache_.erase(cache_it);
   }
 }

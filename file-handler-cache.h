@@ -41,9 +41,7 @@ public:
     virtual void RetireHandlerEvent(FileHandler *handler) = 0;
   };
 
-  FileHandlerCache(int low_watermark, int high_watermark)
-    : low_watermark_(low_watermark), high_watermark_(high_watermark),
-      observer_(NULL) {}
+  FileHandlerCache(int size) : max_size_(size), observer_(NULL) {}
 
   // Set an observer.
   void SetObserver(Observer *observer);
@@ -67,12 +65,12 @@ public:
 
  private:
   class Entry;
+  struct CompareAge;
   typedef std::map<std::string, Entry*> CacheMap;
 
-  void CleanupUnreferencedLocked();
+  void CleanupOldestUnreferenced_Locked();
 
-  const size_t low_watermark_;
-  const size_t high_watermark_;
+  const size_t max_size_;
   Observer *observer_;
   boost::mutex mutex_;
   CacheMap cache_;

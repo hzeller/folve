@@ -479,7 +479,7 @@ void ConvolverFilesystem::Close(const char *fs_path) {
 ConvolverFilesystem::ConvolverFilesystem(const char *version_info,
                                          const char *zita_config_dir,
                                          int cache_size)
-  : version_info_(version_info), open_file_cache_(cache_size, cache_size),
+  : version_info_(version_info), open_file_cache_(cache_size),
     total_file_openings_(0), total_file_reopen_(0) {
   global_zita_config_dir = zita_config_dir;
 }
