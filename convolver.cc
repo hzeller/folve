@@ -80,7 +80,7 @@ public:
   // convolution filter configuration available.
   static FileHandler *Create(int filedes, const char *fs_path,
                              const char *underlying_file) {
-    struct SF_INFO in_info;
+    SF_INFO in_info;
     memset(&in_info, 0, sizeof(in_info));
     SNDFILE *snd = sf_open_fd(filedes, SFM_READ, &in_info, 0);
     if (snd == NULL) {
@@ -201,7 +201,7 @@ private:
 
     // The flac header we get is more rich than what we can create via
     // sndfile. So if we have one, just copy it.
-    copy_flac_header_ = (in_info.format & SF_FORMAT_TYPEMASK) == SF_FORMAT_FLAC;
+    copy_flac_header_verbatim_ = LooksLikeInputIsFlac(in_info, filedes);
 
     // Initialize zita config, but don't allocate converter quite yet.
     memset(&zita_, 0, sizeof(zita_));
@@ -212,7 +212,7 @@ private:
     // Create a conversion buffer that creates a soundfile of a particular
     // format that we choose here. Essentially we want to generate mostly what
     // our input is.
-    struct SF_INFO out_info = in_info;
+    SF_INFO out_info = in_info;
     out_info.seekable = 0;
     if ((in_info.format & SF_FORMAT_TYPEMASK) == SF_FORMAT_OGG) {
       // If the input was ogg, we're re-coding this to flac, because it
@@ -239,7 +239,7 @@ private:
       LOG_ERROR(stderr, "Opening output: %s\n", sf_strerror(NULL));
       return;
     }
-    if (copy_flac_header_) {
+    if (copy_flac_header_verbatim_) {
       out_buffer->set_sndfile_writes_enabled(false);
       CopyFlacHeader(out_buffer);
     } else {
@@ -258,7 +258,7 @@ private:
     // redact the values for min/max blocksize and min/max framesize with
     // what SNDFILE is going to use, otherwise programs will trip over this.
     // http://flac.sourceforge.net/format.html
-    if (copy_flac_header_) {
+    if (copy_flac_header_verbatim_) {
       out_buffer->WriteCharAt((1152 & 0xFF00) >> 8,  8);
       out_buffer->WriteCharAt((1152 & 0x00FF)     ,  9);
       out_buffer->WriteCharAt((1152 & 0xFF00) >> 8, 10);
@@ -360,8 +360,9 @@ private:
       bool is_last = header[0] & 0x80;
       unsigned int type = header[0] & 0x7F;
       unsigned int byte_len = (header[1] << 16) + (header[2] << 8) + header[3];
-      LOGF(stderr, " type: %d, len: %6u %s ", type,
-           byte_len, is_last ? "(last)" : "(cont)");
+      LOGF(stderr, " %02x %02x %02x %02x type: %d, len: %6u %s ",
+           header[0], header[1], header[2], header[3],
+           type, byte_len, is_last ? "(last)" : "(cont)");
       need_finish_padding = false;
       if (type == FLAC__METADATA_TYPE_STREAMINFO && byte_len == 34) {
         out_buffer->Append(&header, sizeof(header));
@@ -413,6 +414,17 @@ private:
     close(filedes_);
   }
 
+  bool LooksLikeInputIsFlac(const SF_INFO &sndinfo, int filedes) {
+    if ((sndinfo.format & SF_FORMAT_TYPEMASK) != SF_FORMAT_FLAC)
+      return false;
+    // However some files contain flac encoded stuff, but are not flac files
+    // by themselve. So we can't copy headers verbatim. Sanity check header.
+    char flac_magic[4];
+    if (pread(filedes, flac_magic, sizeof(flac_magic), 0) != sizeof(flac_magic))
+      return false;
+    return memcmp(flac_magic, "fLaC", sizeof(flac_magic)) == 0;
+  }
+
   const int filedes_;
   SNDFILE *const snd_in_;
   const unsigned int total_frames_;
@@ -426,7 +438,7 @@ private:
   off_t start_estimating_size_;  // essentially const.
 
   bool error_;
-  bool copy_flac_header_;
+  bool copy_flac_header_verbatim_;
   ConversionBuffer *output_buffer_;
   SNDFILE *snd_out_;
 

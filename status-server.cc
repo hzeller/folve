@@ -100,8 +100,18 @@ void StatusServer::RetireHandlerEvent(FileHandler *handler) {
     retired_.pop_back();
 }
 
-static const char sMessageRowHtml[] =
-  "<td>%s</td><td>%s</td>"
+static void Appendf(std::string *str, const char *format, ...) {
+  va_list ap;
+  const size_t orig_len = str->length();
+  const size_t space = 1024;
+  str->resize(orig_len + space);
+  va_start(ap, format);
+  int written = vsnprintf((char*)str->data() + orig_len, space, format, ap);
+  va_end(ap);
+  str->resize(orig_len + written);
+}
+               
+static const char sMessageRowHtml[] = "<td>%s</td><td>%s</td>"
   "<td colspan='3'>-</td>";
 
 static const char sProgressRowHtml[] =
@@ -113,7 +123,6 @@ static const char sProgressRowHtml[] =
 static void AppendFileInfo(std::string *result, const char *progress_style,
                            const HandlerStats &stats) {
   result->append("<tr style='text-wrap:none;white-space:nowrap;'>");
-  char row[1024];
   const char *status = "";
   switch (stats.status) {
   case HandlerStats::OPEN:    status = "open"; break;
@@ -122,23 +131,22 @@ static void AppendFileInfo(std::string *result, const char *progress_style,
     // no default to let the compiler detect new values.
   }
   if (stats.progress <= 0) {
-    snprintf(row, sizeof(row), sMessageRowHtml, status,
-             (stats.progress < 0)
-             ? "Not a sound file or no filter found. Pass through."
-             : "Only Header accessed.");
+    Appendf(result, sMessageRowHtml, status,
+            (stats.progress < 0)
+            ? "Not a sound file or no filter found. Pass through."
+            : "Only Header accessed.");
   } else {
     const int secs = stats.total_duration_seconds;
     const int fract_sec = stats.progress * secs;
-    snprintf(row, sizeof(row), sProgressRowHtml, status,
-             kProgressWidth, (int) (100 * stats.progress), progress_style,
-             fract_sec / 60, fract_sec % 60, secs / 60, secs % 60);
+    Appendf(result, sProgressRowHtml, status,
+            kProgressWidth, (int) (100 * stats.progress), progress_style,
+            fract_sec / 60, fract_sec % 60, secs / 60, secs % 60);
   }
-  result->append(row);
-  result->append("<td bgcolor='#c0c0c0'>&nbsp;")
-    .append(stats.format).append("&nbsp;</td>")
-    .append("<td style='font-size:small;text-wrap:none;white-space:nowrap'>")
-    .append(stats.filename)
-    .append("</td>");
+  Appendf(result, "<td bgcolor='#c0c0c0'>&nbsp;%s&nbsp;</td>",
+          stats.format.c_str());
+  Appendf(result,"<td "
+          "style='font-size:small;text-wrap:none;white-space:nowrap'>%s</td>",
+          stats.filename.c_str());
   result->append("</tr>\n");
 }
 
@@ -173,27 +181,22 @@ void StatusServer::CreatePage(const char **buffer, size_t *size) {
   }
   const int t_seen = total_seconds_music_seen_ + active_music_seen;
   const int t_filtered = total_seconds_filtered_ + active_filtered;
-  char total_stats[1024];
-  snprintf(total_stats, sizeof(total_stats),
-           "Total opening files <b>%d</b> "
-           ".. and re-opened from recency cache <b>%d</b><br/>"
-           "Total music seen <b>%dd %d:%02d:%02d</b> "
-           ".. and convolved <b>%dd %d:%02d:%02d</b> (%.1f%%)<br/>",
-           filesystem_->total_file_openings(),
-           filesystem_->total_file_reopen(),
-           t_seen / 86400, (t_seen % 86400) / 3600,
-           (t_seen % 3600) / 60, t_seen % 60,
-           t_filtered / 86400, (t_filtered % 86400) / 3600,
-           (t_filtered % 3600) / 60, t_filtered % 60,
-           (t_seen == 0) ? 0.0 : (100.0 * t_filtered / t_seen));
-  current_page_.append(total_stats);
+  Appendf(&current_page_, "Total opening files <b>%d</b> "
+          ".. and re-opened from recency cache <b>%d</b><br/>",
+          filesystem_->total_file_openings(),
+          filesystem_->total_file_reopen());
+  Appendf(&current_page_, "Total music seen <b>%dd %d:%02d:%02d</b> ",
+          t_seen / 86400, (t_seen % 86400) / 3600,
+          (t_seen % 3600) / 60, t_seen % 60);
+  Appendf(&current_page_, ".. and convolved <b>%dd %d:%02d:%02d</b> ",
+          t_filtered / 86400, (t_filtered % 86400) / 3600,
+          (t_filtered % 3600) / 60, t_filtered % 60);
+  Appendf(&current_page_, "(%.1f%%)<br/>", 
+          (t_seen == 0) ? 0.0 : (100.0 * t_filtered / t_seen));
 
-  current_page_.append("<h3>Recent Files</h3>\n");
-  char current_open[128];
-  snprintf(current_open, sizeof(current_open), "%ld in recency cache.\n",
-           stat_list.size());
+  Appendf(&current_page_, "<h3>Recent Files</h3>\n%ld in recency cache\n",
+          stat_list.size());
 
-  current_page_.append(current_open);
   current_page_.append("<table>\n");
   current_page_.append("<tr><th>Stat</th>"
                        "<th width='400px'>Progress</th>"
@@ -217,11 +220,8 @@ void StatusServer::CreatePage(const char **buffer, size_t *size) {
   }
 
   const double duration = fuse_convolve::CurrentTime() - start;
-  char time_buffer[128];
-  snprintf(time_buffer, sizeof(time_buffer), "page-gen %.2fms",
-           duration * 1000.0);
-  current_page_.append(time_buffer).append("<div align='right'>HZ</div>\n"
-                                           "</body>");
+  Appendf(&current_page_, "page-gen %.2fms <div align='right'>HZ</div></body>",
+          duration * 1000.0);
   *buffer = current_page_.data();
   *size = current_page_.size();
 }
