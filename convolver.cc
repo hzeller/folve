@@ -127,8 +127,11 @@ public:
     if (error_) return -1;
     // If this is a skip suspiciously at the very end of the file as
     // reported by stat, we don't do any encoding, just return garbage.
-    // Programs sometimes do this apparently. And sometimes not even to the
-    // very end but 'almost' at the end. So add some FudeOverhang
+    // (otherwise we'd to convolve up to that point).
+    //
+    // While indexing, media players do this sometimes apparently.
+    // And sometimes not even to the very end but 'almost' at the end.
+    // So add some FudeOverhang
     static const int kFudgeOverhang = 512;
     // But of course only if this is really a skip, not a regular approaching
     // end-of-file.
