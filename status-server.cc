@@ -34,6 +34,17 @@ static const int kProgressWidth = 400;
 static const char kActiveProgress[]  = "#7070ff";
 static const char kRetiredProgress[] = "#d0d0d0";
 
+// Aaah, I need to find the right Browser-Tab :)
+// Sneak in a favicon without another resource access.
+// TODO: make a nice icon, recognizable as something that has to do with "
+// files and music ...
+static const char kHtmlHeader[] = "<header><link rel='icon' type='image/png'"
+  "href='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2"
+  "AAAAAXNSR0IArs4c6QAAAAlwSFlzAAALEwAACxMBAJqcGAAAAAd0SU1FB9wJDwUlEA/UBrsA"
+  "AABSSURBVCjPrZIxDgAgDAKh8f9froOTirU1ssKFYqS7Q4mktAxFRQDJcsPORMDYsDCXhn331"
+  "9GPwHJVuaFl3l4D1+h0UjIdbTh9SpP2KQ2AgSfVAdEQGx23tOopAAAAAElFTkSuQmCC'/>"
+  "</header>";
+
 int StatusServer::HandleHttp(void* user_argument,
                              struct MHD_Connection *connection,
                              const char *url, const char *method,
@@ -140,6 +151,7 @@ struct CompareStats {
 void StatusServer::CreatePage(const char **buffer, size_t *size) {
   const double start = fuse_convolve::CurrentTime();
   current_page_.clear();
+  current_page_.append(kHtmlHeader);
   current_page_.append("<body style='font-family:Helvetica;'>\n");
   current_page_.append("<center>Welcome to fuse convolve ")
     .append(filesystem_->version()).append("</center>");
@@ -161,16 +173,17 @@ void StatusServer::CreatePage(const char **buffer, size_t *size) {
   const int t_filtered = total_seconds_filtered_ + active_filtered;
   char total_stats[1024];
   snprintf(total_stats, sizeof(total_stats),
-           "Total opening files <b>%d</b> | "
+           "Total opening files <b>%d</b> "
            ".. and re-opened from recency cache <b>%d</b><br/>"
-           "Total music seen <b>%dd %d:%02d:%02d</b> | "
-           ".. and convolved <b>%dd %d:%02d:%02d</b><br/>",
+           "Total music seen <b>%dd %d:%02d:%02d</b> "
+           ".. and convolved <b>%dd %d:%02d:%02d</b> (%.1f%%)<br/>",
            filesystem_->total_file_openings(),
            filesystem_->total_file_reopen(),
            t_seen / 86400, (t_seen % 86400) / 3600,
            (t_seen % 3600) / 60, t_seen % 60,
            t_filtered / 86400, (t_filtered % 86400) / 3600,
-           (t_filtered % 3600) / 60, t_filtered % 60);
+           (t_filtered % 3600) / 60, t_filtered % 60,
+           (t_seen == 0) ? 0.0 : (100.0 * t_filtered / t_seen));
   current_page_.append(total_stats);
 
   current_page_.append("<h3>Recent Files</h3>\n");
