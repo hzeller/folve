@@ -66,6 +66,10 @@ void FileHandlerCache::Unpin(const std::string &key) {
   CacheMap::iterator found = cache_.find(key);
   assert(found != cache_.end());
   --found->second->references;
+  // If we are already beyond cache size, clean up as soon as we get idle.
+  if (found->second->references == 0 && cache_.size() > max_size_) {
+    Erase_Locked(found);
+  }
 }
 
 void FileHandlerCache::SetObserver(Observer *observer) {
@@ -93,6 +97,13 @@ struct FileHandlerCache::CompareAge {
   }
 };
 
+void FileHandlerCache::Erase_Locked(CacheMap::iterator &cache_it) {
+  if (observer_) observer_->RetireHandlerEvent(cache_it->second->handler);
+  delete cache_it->second->handler;  // FileHandler
+  delete cache_it->second;           // Entry
+  cache_.erase(cache_it);
+}
+
 void FileHandlerCache::CleanupOldestUnreferenced_Locked() {
   assert(cache_.size() > max_size_);  // otherwise we shouldn't have been called
   // While this iterating through the whole cache might look expensive,
@@ -110,10 +121,7 @@ void FileHandlerCache::CleanupOldestUnreferenced_Locked() {
   CompareAge comparator;
   std::sort(for_removal.begin(), for_removal.end(), comparator);
   for (size_t i = 0; i < to_erase_count; ++i) {
-    CacheMap::iterator &cache_it = for_removal[i];
-    if (observer_) observer_->RetireHandlerEvent(cache_it->second->handler);
-    delete cache_it->second->handler;  // FileHandler
-    delete cache_it->second;           // Entry
-    cache_.erase(cache_it);
+    Erase_Locked(for_removal[i]);
   }
 }
+  

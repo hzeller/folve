@@ -68,6 +68,12 @@ public:
   struct CompareAge;
   typedef std::map<std::string, Entry*> CacheMap;
 
+  // -- methods called while holding the mutex.
+
+  // Inform observer, delete FileFilter and erase element from cache.
+  void Erase_Locked(CacheMap::iterator &cache_it);
+
+  // Find oldes element and get rid of it.
   void CleanupOldestUnreferenced_Locked();
 
   const size_t max_size_;
