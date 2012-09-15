@@ -17,6 +17,8 @@
 #ifndef _FUSE_CONVOLVER_FILE_HANDLER_CACHE_
 #define _FUSE_CONVOLVER_FILE_HANDLER_CACHE_
 
+#include <time.h>
+
 #include <map>
 #include <vector>
 #include <string>
@@ -38,6 +40,7 @@ public:
     const std::string key;
     FileHandler *const handler;
     int references;
+    double last_access;  // seconds since epoch, sub-second resolution.
   };
 
   FileHandlerCache(int low_watermark, int high_watermark)

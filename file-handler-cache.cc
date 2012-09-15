@@ -22,9 +22,10 @@
 
 #include "file-handler.h"
 #include "file-handler-cache.h"
+#include "util.h"
 
 FileHandlerCache::Entry::Entry(const std::string &k, FileHandler *h)
-  : key(k), handler(h), references(0) {}
+  : key(k), handler(h), references(0), last_access(0) {}
 
 FileHandler *FileHandlerCache::InsertPinned(const std::string &key,
                                             FileHandler *handler) {
@@ -40,6 +41,7 @@ FileHandler *FileHandlerCache::InsertPinned(const std::string &key,
   if (cache_.size() > high_watermark_) {
     CleanupUnreferencedLocked();
   }
+  ins->second->last_access = fuse_convolve::CurrentTime();
   return ins->second->handler;
 }
 
@@ -49,6 +51,7 @@ FileHandler *FileHandlerCache::FindAndPin(const std::string &key) {
   if (found == cache_.end())
     return NULL;
   ++found->second->references;
+  found->second->last_access = fuse_convolve::CurrentTime();
   return found->second->handler;
 }
 

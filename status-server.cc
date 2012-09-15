@@ -25,8 +25,9 @@
 
 #include <microhttpd.h>
 
-#include "status-server.h"
 #include "convolver-filesystem.h"
+#include "status-server.h"
+#include "util.h"
 
 int StatusServer::HandleHttp(void* user_argument,
                              struct MHD_Connection *connection,
@@ -64,31 +65,38 @@ StatusServer::~StatusServer() {
     MHD_stop_daemon(daemon_);
 }
 
-static const char sMessageRowHtml[] = "<td>%s</td><td>%s</td>"
+static const char sMessageRowHtml[] = "<td>%s</td><td>%s</td><td>%s</td>"
   "<td colspan='3'>-</td>";
 
 static const char sProgressRowHtml[] =
-  "<td>%s</td><td>"
+  "<td>%s</td><td>%s</td><td>"
   "<div style='width:%dpx; border:1px solid black;'>\n"
   "  <div style='width:%d%%;background:#7070ff;'>&nbsp;</div>\n</div></td>"
   "<td align='right'>%2d:%02d</td><td>/</td><td align='right'>%2d:%02d</td>";
 
+static void FmtTime(char *buf, size_t size, int duration) {
+  snprintf(buf, size, "%d:%02d", duration / 60, duration % 60);
+}
+
 static void AppendFileInfo(std::string *result, const std::string &filename,
-                           const FileHandler *handler, int refs) {
+                           const FileHandler *handler, int refs,
+                           double last_access) {
   result->append("<tr>");
   char row[1024];
   const int kMaxWidth = 400;
   const float progress = handler->Progress();
   const char *access_level = (refs == 1) ? "idle" : "open";
+  char last[128];
+  FmtTime(last, sizeof(last), last_access);
   if (progress <= 0) {
-    snprintf(row, sizeof(row), sMessageRowHtml, access_level,
+    snprintf(row, sizeof(row), sMessageRowHtml, access_level, last,
              (progress < 0)
              ? "Not a sound file or no filter found. Pass through."
              : "Only Header accessed.");
   } else {
     const int secs = handler->Duration();
     const int fract_sec = progress * secs;
-    snprintf(row, sizeof(row), sProgressRowHtml, access_level,
+    snprintf(row, sizeof(row), sProgressRowHtml, access_level, last,
              kMaxWidth, (int) (100 * progress),
              fract_sec / 60, fract_sec % 60, secs / 60, secs % 60);
   }
@@ -99,8 +107,8 @@ static void AppendFileInfo(std::string *result, const std::string &filename,
   result->append("</tr>\n");
 }
 
-
 void StatusServer::CreatePage(const char **buffer, size_t *size) {
+  const double start = fuse_convolve::CurrentTime();
   current_page_.clear();
   current_page_.append("<body style='font-family:Helvetica;'>");
   current_page_.append("<center>Welcome to fuse convolve ")
@@ -113,10 +121,15 @@ void StatusServer::CreatePage(const char **buffer, size_t *size) {
            entries.size());
   current_page_.append(current_open);
   current_page_.append("<table>\n");
+  current_page_.append("<tr><th>Stat</th><th>Last</th>"
+                       "<th width='400px'>Progress</th>"
+                       "<th>Pos</th><td></td><th>Tot</th><th>Format</th>"
+                       "<th>File</th></tr>\n");
+  const double now = fuse_convolve::CurrentTime();
   for (size_t i = 0; i < entries.size(); ++i) {
     const FileHandlerCache::Entry *entry = entries[i];
     AppendFileInfo(&current_page_, entry->key, entry->handler,
-                   entry->references);
+                   entry->references, now - entry->last_access);
     filesystem_->handler_cache()->Unpin(entry->key);
   }
   current_page_.append("</table><hr/>\n");
@@ -126,7 +139,11 @@ void StatusServer::CreatePage(const char **buffer, size_t *size) {
            filesystem_->total_file_openings(),
            filesystem_->total_file_reopen());
   current_page_.append(file_openings);
-  current_page_.append("<div align='right'>HZ</div></body>");
+  const double duration = fuse_convolve::CurrentTime() - start;
+  char time_buffer[128];
+  snprintf(time_buffer, sizeof(time_buffer), " | page-gen %.2fms",
+           duration * 1000.0);
+  current_page_.append(time_buffer).append("<div align='right'>HZ</div></body>");
   *buffer = current_page_.data();
   *size = current_page_.size();
 }
