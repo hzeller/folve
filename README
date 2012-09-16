@@ -100,5 +100,7 @@ The fuse-convolve filesystem will determine the samplerate/bits/channels and
 attempt to find the right filter in the filter directory. If there is a filter,
 the output is filtered on-the-fly, otherwise the original file is returned.
 
-There is a http status server running on fixed port 17322 (port not a flag yet)
+To watch what is happening: there is a http status server running on
+fixed port 17322 (TODO: port not a flag yet)
+
   http://localhost:17322/
