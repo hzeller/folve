@@ -59,7 +59,7 @@ static sf_count_t DummySeek(sf_count_t offset, int whence, void *userdata) {
   // because it would mess up the file.
   if (offset > 0 &&
       reinterpret_cast<ConversionBuffer*>(userdata)->sndfile_writes_enabled()) {
-    fprintf(stderr, "DummySeek called %zd\n", offset);
+    fprintf(stderr, "DummySeek called %lld\n", (long long int) offset);
   }
   return 0;
 }
