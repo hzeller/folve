@@ -33,7 +33,7 @@
 
 #define FOLVE_VERSION "v. 0.8 &mdash; 2012-09-15"
 
-// Compilation unit variables to communicate with the
+// Compilation unit variables to communicate with the fuse callbacks.
 static FolveFilesystem *folve_fs = NULL;
 static const char *underlying_dir = NULL;
 

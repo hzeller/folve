@@ -28,11 +28,13 @@
 
 #include <map>
 #include <string>
+#include <zita-convolver.h>
 
 #include "conversion-buffer.h"
 #include "file-handler-cache.h"
 #include "file-handler.h"
 #include "util.h"
+
 #include "zita-config.h"
 
 using folve::Appendf;

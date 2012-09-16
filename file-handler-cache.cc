@@ -79,7 +79,7 @@ void FileHandlerCache::SetObserver(Observer *observer) {
 
 void FileHandlerCache::GetStats(std::vector<HandlerStats> *stats) {
   HandlerStats s;
-  mutex_.lock();
+  boost::lock_guard<boost::mutex> l(mutex_);
   for (CacheMap::iterator it = cache_.begin(); it != cache_.end(); ++it) {
     it->second->handler->GetHandlerStatus(&s);
     s.status = ((it->second->references == 0)
@@ -88,14 +88,7 @@ void FileHandlerCache::GetStats(std::vector<HandlerStats> *stats) {
     s.last_access = it->second->last_access;
     stats->push_back(s);
   }
-  mutex_.unlock();
 }
-
-struct FileHandlerCache::CompareAge {
-  bool operator() (const CacheMap::iterator &a, const CacheMap::iterator &b) {
-    return a->second->last_access < b->second->last_access;
-  }
-};
 
 void FileHandlerCache::Erase_Locked(CacheMap::iterator &cache_it) {
   if (observer_) observer_->RetireHandlerEvent(cache_it->second->handler);
@@ -104,6 +97,11 @@ void FileHandlerCache::Erase_Locked(CacheMap::iterator &cache_it) {
   cache_.erase(cache_it);
 }
 
+struct FileHandlerCache::CompareAge {
+  bool operator() (const CacheMap::iterator &a, const CacheMap::iterator &b) {
+    return a->second->last_access < b->second->last_access;
+  }
+};
 void FileHandlerCache::CleanupOldestUnreferenced_Locked() {
   assert(cache_.size() > max_size_);  // otherwise we shouldn't have been called
   // While this iterating through the whole cache might look expensive,
@@ -112,8 +110,7 @@ void FileHandlerCache::CleanupOldestUnreferenced_Locked() {
   // we need to keep better track of age.
   std::vector<CacheMap::iterator> for_removal;
   for (CacheMap::iterator it = cache_.begin(); it != cache_.end(); ++it) {
-    if (it->second->references > 0) continue;
-    for_removal.push_back(it);
+    if (it->second->references == 0) for_removal.push_back(it);
   }
 
   const size_t to_erase_count = std::min(cache_.size() - max_size_,

@@ -50,7 +50,7 @@ JConvolver Jack audio convolver http://apps.linuxaudio.org/apps/all/jconvolver
 LibSndfile r/w audio files      http://www.mega-nerd.com/libsndfile/
 Microhttpd webserver library    http://www.gnu.org/software/libmicrohttpd/
 
-=== Compiling on Ubuntu 12.04 ===
+=== Compiling on Ubuntu (tested on 11.10 and 12.04) ===
 
   This requires the latest versions of libfuse and libzita convolver to compile.
   .. and a couple of other libs:
