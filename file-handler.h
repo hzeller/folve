@@ -14,8 +14,8 @@
 //  You should have received a copy of the GNU General Public License
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#ifndef _FUSE_CONVOLVER_FILE_HANDLER_H
-#define _FUSE_CONVOLVER_FILE_HANDLER_H
+#ifndef FOLVE_FILE_HANDLER_H
+#define FOLVE_FILE_HANDLER_H
 
 #include <string>
 
@@ -32,6 +32,11 @@ struct HandlerStats {
   double last_access;
 };
 
+// A handler that deals with operations on files. Since we only provide read
+// access, this is limited to very few operations.
+// Closing in particular is not done by this file handler as it might
+// have a longer life-time than an open()/close() cycle we get from the
+// fuse filesystem (see file-handler-cache.h for rationale)
 class FileHandler {
 public:
   virtual ~FileHandler() {}
@@ -44,4 +49,4 @@ public:
   virtual void GetHandlerStatus(struct HandlerStats *s) = 0;
 };
 
-#endif // _FUSE_CONVOLVER_FILE_HANDLER_H
+#endif // FOLVE_FILE_HANDLER_H

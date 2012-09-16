@@ -1,15 +1,41 @@
-A fuse filesystem that takes an original path to a directory with flac-files
-and provides these files that are convolved on the fly using the zita convolver
-(usually used in jconvolve).
+		            Folve - Fuse Convolve
+	 A fuse filesystem with on-the-fly convolving of sound files
+
+This fuse filesystem takes an original path to a directory with flac-files
+and provides these files at the mount point. Accessing sound files will
+automatically convolve these on-the-fly using the zita convolver by
+Fons Adriaensen (Files in this directory starting with zita-* are imported
+from his jconvolver project to parse the same configuration files).
+
+This solves the problem that many media servers don't provide a convolving
+option and their only interface to the outside world is to access a file
+system.
+Also in general the beauty of simply accessing files to convolve is very
+useful and allows for simple experiments.
+
+This project is based on
+Fuse: Filesystem in Userspace   http://fuse.sourceforge.net/
+JConvolver Jack audio convolver http://apps.linuxaudio.org/apps/all/jconvolver
+
+Folve has been tested with various players and music servers (and
+workes around bugs in these). Still, this is the first version made public, so
+you should expect rough edges.
 
 === To compile on Ubuntu ===
+
+  This requires the latest versions of libfuse and libzita convolver to compile.
+  .. and a couple of other libs:
 
   $ sudo aptitude install libsndfile-dev libflac-dev libzita-convolver-dev libfuse-dev fftw3-dev libboost-dev libmicrohttpd-dev
   $ make
 
 === Run ===
 
-  ./fuse-convolve /directory/with/filters /path/to/original/fileystem /mnt/mountpoint -f
+ Fuse convolve requires three parameters: the first is directory to filter
+ configurations, the second the directory to the original flac files. The
+ third is the mount-point, where the convolved flac files will show up:
+
+  ./fuse-convolve /directory/with/filters /path/to/original/files /mnt/mountpoint -f
 
 Parameters:
   1) The /directory/with/filters needs to be a directory that has

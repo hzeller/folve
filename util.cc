@@ -13,12 +13,12 @@
 //  You should have received a copy of the GNU General Public License
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+#include "util.h"
+
 #include <sys/time.h>
 #include <stdio.h>
 
-#include "util.h"
-
-double fuse_convolve::CurrentTime() {
+double folve::CurrentTime() {
   struct timeval tv;
   gettimeofday(&tv, NULL);
   return tv.tv_sec + tv.tv_usec / 1e6;

@@ -46,7 +46,7 @@ FileHandler *FileHandlerCache::InsertPinned(const std::string &key,
   if (cache_.size() > max_size_) {
     CleanupOldestUnreferenced_Locked();
   }
-  ins->second->last_access = fuse_convolve::CurrentTime();
+  ins->second->last_access = folve::CurrentTime();
   if (observer_) observer_->InsertHandlerEvent(ins->second->handler);
   return ins->second->handler;
 }
@@ -57,7 +57,7 @@ FileHandler *FileHandlerCache::FindAndPin(const std::string &key) {
   if (found == cache_.end())
     return NULL;
   ++found->second->references;
-  found->second->last_access = fuse_convolve::CurrentTime();
+  found->second->last_access = folve::CurrentTime();
   return found->second->handler;
 }
 

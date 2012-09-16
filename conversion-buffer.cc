@@ -13,6 +13,8 @@
 //  You should have received a copy of the GNU General Public License
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+#include "conversion-buffer.h"
+
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -21,16 +23,14 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "conversion-buffer.h"
-
 ConversionBuffer::ConversionBuffer(SoundSource *source, const SF_INFO &info)
-  : source_(source), tmpfile_(-1), snd_writing_enabled_(true),
+  : source_(source), tmpfile_filedes_(-1), snd_writing_enabled_(true),
     total_written_(0), header_end_(0) {
   // We need to be able to skip backwards but we don't want to fill our
   // memory. So lets create a temporary file.
-  const char *filename = tempnam(NULL, "fuse-");
-  tmpfile_ = open(filename, O_RDWR|O_CREAT|O_NOATIME, S_IRUSR|S_IWUSR);
-  if (tmpfile_ < 0) {
+  const char *filename = tempnam(NULL, "folve");
+  tmpfile_filedes_ = open(filename, O_RDWR|O_CREAT|O_NOATIME, S_IRUSR|S_IWUSR);
+  if (tmpfile_filedes_ < 0) {
     perror("Problem opening buffer file");
   }
   unlink(filename);
@@ -40,7 +40,7 @@ ConversionBuffer::ConversionBuffer(SoundSource *source, const SF_INFO &info)
 }
 
 ConversionBuffer::~ConversionBuffer() {
-  close(tmpfile_);
+  close(tmpfile_filedes_);
 }
 
 sf_count_t ConversionBuffer::SndTell(void *userdata) {
@@ -81,12 +81,12 @@ SNDFILE *ConversionBuffer::CreateOutputSoundfile(const SF_INFO &out_info) {
 }
 
 ssize_t ConversionBuffer::Append(const void *data, size_t count) {
-  if (tmpfile_ < 0) return -1;
+  if (tmpfile_filedes_ < 0) return -1;
   //fprintf(stderr, "Extend horizon by %ld bytes.\n", count);
   int remaining = count;
   const char *buf = (const char*)data;
   while (remaining > 0) {
-    int w = write(tmpfile_, data, count);
+    int w = write(tmpfile_filedes_, data, count);
     if (w < 0) return -errno;
     remaining -= w;
     buf += w;
@@ -96,8 +96,8 @@ ssize_t ConversionBuffer::Append(const void *data, size_t count) {
 }
 
 void ConversionBuffer::WriteCharAt(unsigned char c, off_t offset) {
-  if (tmpfile_ < 0) return;
-  if (pwrite(tmpfile_, &c, 1, offset) != 1) fprintf(stderr, "mmh");
+  if (tmpfile_filedes_ < 0) return;
+  if (pwrite(tmpfile_filedes_, &c, 1, offset) != 1) fprintf(stderr, "Oops.");
 }
 
 ssize_t ConversionBuffer::SndAppend(const void *data, size_t count) {
@@ -123,14 +123,6 @@ ssize_t ConversionBuffer::Read(char *buf, size_t size, off_t offset) {
   //     required_min_written = offset + size;  // all requested bytes.
   const off_t required_min_written = offset + (offset >= header_end_ ? size : 1);
 
-  // Skipping the file looks like reading beyond what the user already
-  // consumed. Print this as diagnostic message.
-#if 0
-  if (total_written_ + 1 < offset) {
-    fprintf(stderr, "(skip> %ld -> %ld)", total_written_, offset);
-  }
-#endif
-
   // As soon as someone tries to read beyond of what we already have, we call
   // our WriteToSoundfile() callback that fills more of it.
   while (total_written_ < required_min_written) {
@@ -138,5 +130,5 @@ ssize_t ConversionBuffer::Read(char *buf, size_t size, off_t offset) {
       break;
   }
 
-  return pread(tmpfile_, buf, size, offset);
+  return pread(tmpfile_filedes_, buf, size, offset);
 }

@@ -25,9 +25,12 @@
 
 #include <microhttpd.h>
 
-#include "convolver-filesystem.h"
+#include "folve-filesystem.h"
 #include "status-server.h"
 #include "util.h"
+
+// TODO: someone with a bit more stylesheet-fu can attempt to make this
+// more pretty and the HTML more compact.
 
 static const size_t kMaxRetired = 200;
 static const int kProgressWidth = 400;
@@ -39,7 +42,7 @@ static const char kRetiredProgress[] = "#d0d0d0";
 // TODO: make a nice icon, recognizable as something that has to do with "
 // files and music ...
 static const char kHtmlHeader[] = "<header>"
-  "<title>Fuse Convolver</title>\n"
+  "<title>Folve</title>\n"
   "<link rel='icon' type='image/png'"
   "href='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2"
   "AAAAAXNSR0IArs4c6QAAAAlwSFlzAAALEwAACxMBAJqcGAAAAAd0SU1FB9wJDwUlEA/UBrsA"
@@ -67,7 +70,7 @@ int StatusServer::HandleHttp(void* user_argument,
   return ret;
 }
 
-StatusServer::StatusServer(ConvolverFilesystem *fs)
+StatusServer::StatusServer(FolveFilesystem *fs)
   : total_seconds_filtered_(0), total_seconds_music_seen_(0),
     filesystem_(fs), daemon_(NULL) {
   fs->handler_cache()->SetObserver(this);
@@ -93,7 +96,7 @@ void StatusServer::RetireHandlerEvent(FileHandler *handler) {
     total_seconds_music_seen_ += stats.total_duration_seconds;
     total_seconds_filtered_ += stats.total_duration_seconds * stats.progress;
   }
-  stats.last_access = fuse_convolve::CurrentTime();
+  stats.last_access = folve::CurrentTime();
   stats.status = HandlerStats::RETIRED;
   retired_.push_front(stats);
   while (retired_.size() > kMaxRetired)
@@ -159,11 +162,11 @@ struct CompareStats {
 };
 
 void StatusServer::CreatePage(const char **buffer, size_t *size) {
-  const double start = fuse_convolve::CurrentTime();
+  const double start = folve::CurrentTime();
   current_page_.clear();
   current_page_.append(kHtmlHeader);
-  current_page_.append("<body style='font-family:Helvetica;'>\n");
-  Appendf(&current_page_, "<center>Welcome to Fuse Convolve %s</center>"
+  current_page_.append("<body style='font-family:Sans-Serif;'>\n");
+  Appendf(&current_page_, "<center>Welcome to Folve %s</center>"
           "Convolving files from <code>%s</code><br/>\n",
           filesystem_->version().c_str(), filesystem_->underlying_dir().c_str());
 
@@ -220,9 +223,11 @@ void StatusServer::CreatePage(const char **buffer, size_t *size) {
     current_page_.append("</table><hr/>\n");
   }
 
-  const double duration = fuse_convolve::CurrentTime() - start;
-  Appendf(&current_page_, "page-gen %.2fms <div align='right'>HZ</div></body>",
-          duration * 1000.0);
+  const double duration = folve::CurrentTime() - start;
+  Appendf(&current_page_,
+          "<span style='float:left;font-size:small;'>page-gen %.2fms</span>"
+          "<span style='float:right;font-size:small;'>HZ</span>"
+          "</body>", duration * 1000.0);
   *buffer = current_page_.data();
   *size = current_page_.size();
 }

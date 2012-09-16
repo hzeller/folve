@@ -13,6 +13,8 @@
 //  You should have received a copy of the GNU General Public License
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+#include "folve-filesystem.h"
+
 #include <FLAC/metadata.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -24,13 +26,12 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include <string>
 #include <map>
+#include <string>
 
-#include "file-handler.h"
-#include "file-handler-cache.h"
-#include "convolver-filesystem.h"
 #include "conversion-buffer.h"
+#include "file-handler-cache.h"
+#include "file-handler.h"
 #include "zita-config.h"
 
 static bool global_debug = false;
@@ -464,8 +465,8 @@ static FileHandler *CreateFilterFromFileType(int filedes,
 }
 
 // Implementation of the C functions in filter-interface.h
-FileHandler *ConvolverFilesystem::CreateHandler(const char *fs_path,
-                                                const char *underlying_path) {
+FileHandler *FolveFilesystem::CreateHandler(const char *fs_path,
+                                            const char *underlying_path) {
   FileHandler *handler = open_file_cache_.FindAndPin(fs_path);
   if (handler == NULL) {
     int filedes = open(underlying_path, O_RDONLY);
@@ -480,7 +481,7 @@ FileHandler *ConvolverFilesystem::CreateHandler(const char *fs_path,
   return handler;
 }
 
-int ConvolverFilesystem::StatByFilename(const char *fs_path, struct stat *st) {
+int FolveFilesystem::StatByFilename(const char *fs_path, struct stat *st) {
   FileHandler *handler = open_file_cache_.FindAndPin(fs_path);
   if (handler == 0)
     return -1;
@@ -489,13 +490,13 @@ int ConvolverFilesystem::StatByFilename(const char *fs_path, struct stat *st) {
   return result;
 }
 
-void ConvolverFilesystem::Close(const char *fs_path) {
+void FolveFilesystem::Close(const char *fs_path) {
   open_file_cache_.Unpin(fs_path);
 }
 
-ConvolverFilesystem::ConvolverFilesystem(const char *version_info,
-                                         const char *unerlying_dir,
-                                         const char *zita_config_dir)
+FolveFilesystem::FolveFilesystem(const char *version_info,
+                                 const char *unerlying_dir,
+                                 const char *zita_config_dir)
   : version_info_(version_info), underlying_dir_(unerlying_dir),
     open_file_cache_(3),
     total_file_openings_(0), total_file_reopen_(0) {

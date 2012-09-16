@@ -5,11 +5,11 @@ CFLAGS=-D_FILE_OFFSET_BITS=64 -Wall -O2
 CXXFLAGS=$(CFLAGS)
 LDFLAGS=-lfuse -lsndfile -lzita-convolver -lmicrohttpd
 
-OBJECTS = fuse-convolve.o convolver.o conversion-buffer.o \
+OBJECTS = folve-main.o folve-filesystem.o conversion-buffer.o \
           file-handler-cache.o status-server.o util.o \
           zita-audiofile.o zita-config.o zita-fconfig.o zita-sstring.o 
 
-fuse-convolve: $(OBJECTS)
+folve: $(OBJECTS)
 	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
 
 clean:

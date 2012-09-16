@@ -1,3 +1,4 @@
+// -*- c++ -*-
 //  Copyright (C) 2012 Henner Zeller <h.zeller@acm.org>
 //    
 //  This program is free software; you can redistribute it and/or modify
@@ -13,11 +14,11 @@
 //  You should have received a copy of the GNU General Public License
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#ifndef FUSE_CONVOLVE_UTIL_H
-#define FUSE_CONVOLVE_UTIL_H
+#ifndef FOLVE_UTIL_H
+#define FOLVE_UTIL_H
 
-namespace fuse_convolve {
+namespace folve {
   double CurrentTime();
 }  // namespece fuse_convolve
 
-#endif  // FUSE_CONVOLVE_UTIL_H
+#endif  // FOLVE_UTIL_H

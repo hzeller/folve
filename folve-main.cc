@@ -13,18 +13,10 @@
 //  You should have received a copy of the GNU General Public License
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// This fuse filesystem only provides read access to another filesystem that
-// contains *.flac and *.wav files. Accessing these files passes them
-// through a zita-filter transparently.
-// This is a pure C implementation, providing basic file operations and passing
-// actual reading to a filter aquired using the functions in filter-interface.h
-
 // Use latest version.
 #define FUSE_USE_VERSION 26
-
-#define FUSE_CONVOLVE_VERSION_INFO "v. 0.79 &mdash; 2012-09-15"
-
 #include <fuse.h>
+
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -36,11 +28,14 @@
 #include <limits.h>
 #include <stdlib.h>
 
-#include "convolver-filesystem.h"
+#include "folve-filesystem.h"
 #include "status-server.h"
 
-ConvolverFilesystem *convolver_fs = NULL;
-const char *orig_dir;
+#define FOLVE_VERSION "v. 0.79 &mdash; 2012-09-15"
+
+// Compilation unit variables to communicate with the
+static FolveFilesystem *folve_fs = NULL;
+static const char *underlying_dir = NULL;
 
 static int has_suffix_string (const char *str, const char *suffix) {
   if (!str || !suffix)
@@ -62,7 +57,7 @@ static char *concat_path(char *buf, const char *a, const char *b) {
 // original file from the source filesystem.
 // TODO(hzeller): move the ogg.fuse.flac logic into convolver-filesystem.
 static const char *assemble_orig_path(char *buf, const char *path) {
-  char *result = concat_path(buf, orig_dir, path);
+  char *result = concat_path(buf, underlying_dir, path);
   static const char magic_ogg_rewrite[] = ".ogg.fuse.flac";
   if (has_suffix_string(result, magic_ogg_rewrite)) {
     *(result + strlen(result) - strlen(".fuse.flac")) = '\0';
@@ -75,7 +70,7 @@ static const char *assemble_orig_path(char *buf, const char *path) {
 static int fuseconv_getattr(const char *path, struct stat *stbuf) {
   // If this is a currently open filename, we might be able to output a better
   // estimate.
-  int result = convolver_fs->StatByFilename(path, stbuf);
+  int result = folve_fs->StatByFilename(path, stbuf);
   if (result == 0) return result;
 
   char path_buf[PATH_MAX];
@@ -142,7 +137,7 @@ static int fuseconv_open(const char *path, struct fuse_file_info *fi) {
   // (Yay, someone was thinking while developing that API).
   char path_buf[PATH_MAX];
   const char *orig_path = assemble_orig_path(path_buf, path);
-  FileHandler * handler = convolver_fs->CreateHandler(path, orig_path);
+  FileHandler * handler = folve_fs->CreateHandler(path, orig_path);
   if (handler == NULL)
     return -errno;
   fi->fh = (uint64_t) handler;
@@ -155,7 +150,7 @@ static int fuseconv_read(const char *path, char *buf, size_t size, off_t offset,
 }
 
 static int fuseconv_release(const char *path, struct fuse_file_info *fi) {
-  convolver_fs->Close(path);
+  folve_fs->Close(path);
   return 0;
 }
 
@@ -178,14 +173,13 @@ int main(int argc, char *argv[]) {
   
   // First, let's extract our configuration.
   const char *config_dir = argv[1];
-  orig_dir   = argv[2];
+  underlying_dir   = argv[2];
   argc -=2;
   argv += 2;
-  convolver_fs = new ConvolverFilesystem(FUSE_CONVOLVE_VERSION_INFO,
-                                         orig_dir, config_dir);
+  folve_fs = new FolveFilesystem(FOLVE_VERSION, underlying_dir, config_dir);
   
   // TODO(hzeller): make this configurable
-  StatusServer *statusz = new StatusServer(convolver_fs);
+  StatusServer *statusz = new StatusServer(folve_fs);
   statusz->Start(17322);
 
   struct fuse_operations fuseconv_operations;

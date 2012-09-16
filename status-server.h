@@ -14,8 +14,8 @@
 //  You should have received a copy of the GNU General Public License
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#ifndef FUSE_CONVOLVER_STATUS_SERVER_H
-#define FUSE_CONVOLVER_STATUS_SERVER_H
+#ifndef FOLVE_STATUS_SERVER_H
+#define FOLVE_STATUS_SERVER_H
 
 #include <string>
 #include <deque>
@@ -23,16 +23,19 @@
 #include "file-handler-cache.h"
 #include "file-handler.h"
 
-class ConvolverFilesystem;
+class FolveFilesystem;
 struct MHD_Daemon;
 struct MHD_Connection;
 
 class StatusServer : protected FileHandlerCache::Observer {
 public:
   // Does not take over ownership of the filesystem.
-  StatusServer(ConvolverFilesystem *fs);
+  StatusServer(FolveFilesystem *fs);
+
+  // Start server, listing on given port.
   bool Start(int port);
 
+  // Shut down daemon.
   virtual ~StatusServer();
 
 private:
@@ -51,9 +54,9 @@ private:
   RetiredList retired_;
   double total_seconds_filtered_;
   double total_seconds_music_seen_;
-  ConvolverFilesystem *filesystem_;
+  FolveFilesystem *filesystem_;
   struct MHD_Daemon *daemon_;
   std::string current_page_;
 };
 
-#endif  // FUSE_CONVOLVER_STATUS_SERVER_H
+#endif  // FOLVE_STATUS_SERVER_H

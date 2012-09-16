@@ -14,19 +14,18 @@
 //  You should have received a copy of the GNU General Public License
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#ifndef _FUSE_CONVOLVER_FILESYSTEM_H
-#define _FUSE_CONVOLVER_FILESYSTEM_H
+#ifndef FOLVE_FILESYSTEM_H
+#define FOLVE_FILESYSTEM_H
 
 #include <unistd.h>
 
-#include "file-handler.h"
 #include "file-handler-cache.h"
+#include "file-handler.h"
 
-class ConvolverFilesystem {
+class FolveFilesystem {
 public:
-  ConvolverFilesystem(const char *version_info,
-                      const char *underlying_dir,
-                      const char *zita_config_dir);
+  FolveFilesystem(const char *version_info, const char *underlying_dir,
+                  const char *zita_config_dir);
 
   // Create a new filter given the filesystem path and the underlying
   // path.
@@ -57,4 +56,4 @@ private:
   int total_file_reopen_;
 };
 
-#endif // _FUSE_CONVOLVER_FILESYSTEM_H
+#endif // FOLVE_FILESYSTEM_H

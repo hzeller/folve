@@ -14,20 +14,24 @@
 //  You should have received a copy of the GNU General Public License
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#ifndef _FUSE_CONVOLVER_FILE_HANDLER_CACHE_H
-#define _FUSE_CONVOLVER_FILE_HANDLER_CACHE_H
+#ifndef FOLVE_FILE_HANDLER_CACHE_H
+#define FOLVE_FILE_HANDLER_CACHE_H
 
 #include <time.h>
 
 #include <map>
-#include <vector>
 #include <string>
+#include <vector>
+
 #include <boost/thread/mutex.hpp>
+
+#include "file-handler.h"
 
 class FileHandler;
 
-// Cache of in-use file handlers. We sometimes get multiple requests for the
-// same file, so we want to map them all to the same FileHandler.
+// Cache of in-use file handlers. We sometimes get multiple open()/close()
+// request for the same file by some programs. Also, some constantly monitor
+// the file-size while the file is open.
 //
 // This Cache manages the lifecycle of a FileHandler object; the user creates
 // it, but this Cache handles deletion.
@@ -48,12 +52,12 @@ public:
 
   // Insert a new object under the given key.
   // Ownership is handed over to this map.
-  // If there was already an object stored under that key, that is returned
-  // instead and the new object discarded.
+  // If there was already an object stored under that key, the existing one
+  // is returned instead and the passed object discarded.
   FileHandler *InsertPinned(const std::string &key, FileHandler *handler);
   
-  // Find an object in this map and pin it down. You've to Unpin() it after
-  // use.
+  // Find an object in this map and pin it down so that it is not evicted.
+  // You've to Unpin() it after use.
   FileHandler *FindAndPin(const std::string &key);
   
   // Unpin object. If the last object is unpinned, the PinnedMap may decide
@@ -82,4 +86,4 @@ public:
   CacheMap cache_;
 };
 
-#endif  // _FUSE_CONVOLVER_FILE_HANDLER_CACHE_H
+#endif  // FOLVE_FILE_HANDLER_CACHE_H
