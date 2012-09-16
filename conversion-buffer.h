@@ -61,11 +61,12 @@ public:
   ssize_t Read(char *buf, size_t size, off_t offset);
 
   // Append data. Usually called via the SndWrite() virtual-SNFFILE callback,
-  // but can be used to write raw data as well (e.g. to write headers).
+  // but can be used to write raw data as well (e.g. to write headers in
+  // SetOutputSoundfile())
   ssize_t Append(const void *data, size_t count);
 
   // Write at a particular position. Writes a single character - this is
-  // used for chirurgical editing...
+  // used for chirurgical header editing...
   void WriteCharAt(unsigned char c, off_t offset);
 
   // Enable writing through the SNDFILE.

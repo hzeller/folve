@@ -116,7 +116,7 @@ static void Appendf(std::string *str, const char *format, ...) {
                
 static const char sMessageRowHtml[] =
   "<td>%s</td><td style='font-size:small;'>%s</td>"
-  "<td colspan='3'>-</td>";
+  "<td colspan='3' align='center'>-</td>";
 
 static const char sProgressRowHtml[] =
   "<td>%s</td><td>"
