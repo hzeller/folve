@@ -13,4 +13,4 @@ folve: $(OBJECTS)
 	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
 
 clean:
-	rm -f fuse-convolve $(OBJECTS)
+	rm -f folve $(OBJECTS)
