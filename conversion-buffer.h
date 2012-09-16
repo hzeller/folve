@@ -18,6 +18,7 @@
 #define FOLVE_CONVERSION_BUFFER_H
 
 #include <sndfile.h>
+#include <boost/thread/mutex.hpp>
 
 // A file-backed buffer for a SNDFILE, that is only filled on demand via
 // a SoundSource.
@@ -98,6 +99,7 @@ private:
   bool snd_writing_enabled_;
   off_t total_written_;
   off_t header_end_;
+  boost::mutex mutex_;
 };
 
 #endif  // FOLVE_CONVERSION_BUFFER_H

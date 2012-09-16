@@ -23,6 +23,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <boost/thread/locks.hpp>
+
 ConversionBuffer::ConversionBuffer(SoundSource *source, const SF_INFO &info)
   : source_(source), out_filedes_(-1), snd_writing_enabled_(true),
     total_written_(0), header_end_(0) {
@@ -123,9 +125,13 @@ ssize_t ConversionBuffer::Read(char *buf, size_t size, off_t offset) {
 
   // As soon as someone tries to read beyond of what we already have, we call
   // our WriteToSoundfile() callback that fills more of it.
-  while (total_written_ < required_min_written) {
-    if (!source_->AddMoreSoundData())
-      break;
+  // We are shared between potentially several open files. Serialize threads.
+  {
+    boost::lock_guard<boost::mutex> l(mutex_);
+    while (total_written_ < required_min_written) {
+      if (!source_->AddMoreSoundData())
+        break;
+    }
   }
 
   return pread(out_filedes_, buf, size, offset);

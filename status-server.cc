@@ -114,7 +114,8 @@ static void Appendf(std::string *str, const char *format, ...) {
   str->resize(orig_len + written);
 }
                
-static const char sMessageRowHtml[] = "<td>%s</td><td>%s</td>"
+static const char sMessageRowHtml[] =
+  "<td>%s</td><td style='font-size:small;'>%s</td>"
   "<td colspan='3'>-</td>";
 
 static const char sProgressRowHtml[] =
