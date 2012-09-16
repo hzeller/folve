@@ -31,7 +31,7 @@
 #include "folve-filesystem.h"
 #include "status-server.h"
 
-#define FOLVE_VERSION "v. 0.79 &mdash; 2012-09-15"
+#define FOLVE_VERSION "v. 0.8 &mdash; 2012-09-15"
 
 // Compilation unit variables to communicate with the
 static FolveFilesystem *folve_fs = NULL;
@@ -165,9 +165,17 @@ static int usage(const char *prg) {
   return 1;
 }
 
+static bool IsDirectory(const char *path) {
+  struct stat st;
+  if (stat(path, &st) != 0)
+    return false;
+  return (st.st_mode & S_IFMT) == S_IFDIR;
+}
+
 int main(int argc, char *argv[]) {
+  const char *progname = argv[0];
   if (argc < 4) {
-    return usage(argv[0]);
+    return usage(progname);
   }
   
   // First, let's extract our configuration.
@@ -175,6 +183,14 @@ int main(int argc, char *argv[]) {
   underlying_dir   = argv[2];
   argc -=2;
   argv += 2;
+  if (!IsDirectory(config_dir)) {
+    fprintf(stderr, "%s <config-dir>: not a directory.\n", config_dir);
+    return usage(progname);
+  }
+  if (!IsDirectory(underlying_dir)) {
+    fprintf(stderr, "%s <underlying-dir>: not a directory.\n", underlying_dir);
+    return usage(progname);
+  }
   folve_fs = new FolveFilesystem(FOLVE_VERSION, underlying_dir, config_dir);
   
   // TODO(hzeller): make this configurable

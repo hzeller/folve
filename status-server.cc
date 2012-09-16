@@ -24,6 +24,8 @@
 
 #include <microhttpd.h>
 
+#include <boost/thread/locks.hpp>
+
 #include "folve-filesystem.h"
 #include "status-server.h"
 #include "util.h"
@@ -62,10 +64,9 @@ int StatusServer::HandleHttp(void* user_argument,
   StatusServer* server = (StatusServer*) user_argument;
   struct MHD_Response *response;
   int ret;
-  const char *buffer;
-  size_t size;
-  server->CreatePage(&buffer, &size);
-  response = MHD_create_response_from_data(size, (void*) buffer, MHD_NO, MHD_NO);
+  const std::string &page = server->CreatePage();
+  response = MHD_create_response_from_data(page.length(), (void*) page.data(),
+                                           MHD_NO, MHD_NO);
   MHD_add_response_header(response, "Content-Type", "text/html; charset=utf-8");
   ret = MHD_queue_response(connection, MHD_HTTP_OK, response);
   MHD_destroy_response(response);
@@ -73,7 +74,8 @@ int StatusServer::HandleHttp(void* user_argument,
 }
 
 StatusServer::StatusServer(FolveFilesystem *fs)
-  : total_seconds_filtered_(0), total_seconds_music_seen_(0),
+  : expunged_retired_(0), total_seconds_filtered_(0),
+    total_seconds_music_seen_(0),
     filesystem_(fs), daemon_(NULL) {
   fs->handler_cache()->SetObserver(this);
 }
@@ -99,9 +101,12 @@ void StatusServer::RetireHandlerEvent(FileHandler *handler) {
   }
   stats.last_access = folve::CurrentTime();
   stats.status = HandlerStats::RETIRED;
+  boost::lock_guard<boost::mutex> l(retired_mutex_);
   retired_.push_front(stats);
-  while (retired_.size() > kMaxRetired)
+  while (retired_.size() > kMaxRetired) {
+    ++expunged_retired_;
     retired_.pop_back();
+  }
 }
                
 static const char sMessageRowHtml[] =
@@ -151,7 +156,7 @@ struct CompareStats {
   }
 };
 
-void StatusServer::CreatePage(const char **buffer, size_t *size) {
+const std::string &StatusServer::CreatePage() {
   const double start = folve::CurrentTime();
   // We re-use a string to avoid re-allocing memory every time we generate
   // a page. Since we run with MHD_USE_SELECT_INTERNALLY, this is only accessed
@@ -192,7 +197,7 @@ void StatusServer::CreatePage(const char **buffer, size_t *size) {
   Appendf(&current_page_, "(%.1f%%)<br/>", 
           (t_seen == 0) ? 0.0 : (100.0 * t_filtered / t_seen));
 
-  Appendf(&current_page_, "<h3>Recent Files</h3>\n%ld in recency cache\n",
+  Appendf(&current_page_, "<h3>Accessed Recently</h3>\n%ld in recency cache\n",
           stat_list.size());
 
   current_page_.append("<table>\n");
@@ -209,11 +214,16 @@ void StatusServer::CreatePage(const char **buffer, size_t *size) {
   if (retired_.size() > 0) {
     current_page_.append("<h3>Retired</h3>\n");
     current_page_.append("<table>\n");
+    boost::lock_guard<boost::mutex> l(retired_mutex_);
     for (RetiredList::const_iterator it = retired_.begin(); 
          it != retired_.end(); ++it) {
       AppendFileInfo(&current_page_, kRetiredProgress, *it);
     }
-    current_page_.append("</table><hr/>\n");
+    current_page_.append("</table>\n");
+    if (expunged_retired_ > 0) {
+      Appendf(&current_page_, "... (%d more)<p></p>", expunged_retired_);
+    }
+    current_page_.append("<hr/>");
   }
 
   const double duration = folve::CurrentTime() - start;
@@ -221,6 +231,5 @@ void StatusServer::CreatePage(const char **buffer, size_t *size) {
           "<span style='float:left;font-size:small;'>page-gen %.2fms</span>"
           "<span style='float:right;font-size:small;'>HZ</span>"
           "</body>", duration * 1000.0);
-  *buffer = current_page_.data();
-  *size = current_page_.size();
+  return current_page_;
 }

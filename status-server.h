@@ -23,6 +23,8 @@
 #include "file-handler-cache.h"
 #include "file-handler.h"
 
+#include <boost/thread/mutex.hpp>
+
 class FolveFilesystem;
 struct MHD_Daemon;
 struct MHD_Connection;
@@ -44,7 +46,7 @@ private:
                         const char *, const char *, const char *,
                         const char *, size_t *, void **);
 
-  void CreatePage(const char **buffer, size_t *size);
+  const std::string &CreatePage();
 
   // -- interface FileHandlerCache::Observer
   virtual void InsertHandlerEvent(FileHandler *handler) {}
@@ -52,6 +54,9 @@ private:
   
   typedef std::deque<HandlerStats> RetiredList;
   RetiredList retired_;
+  int expunged_retired_;
+  boost::mutex retired_mutex_;
+
   double total_seconds_filtered_;
   double total_seconds_music_seen_;
   FolveFilesystem *filesystem_;
