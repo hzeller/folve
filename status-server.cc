@@ -197,7 +197,7 @@ const std::string &StatusServer::CreatePage() {
   Appendf(&current_page_, "(%.1f%%)<br/>", 
           (t_seen == 0) ? 0.0 : (100.0 * t_filtered / t_seen));
 
-  Appendf(&current_page_, "<h3>Accessed Recently</h3>\n%ld in recency cache\n",
+  Appendf(&current_page_, "<h3>Accessed Recently</h3>\n%zd in recency cache\n",
           stat_list.size());
 
   current_page_.append("<table>\n");
