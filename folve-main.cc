@@ -17,16 +17,16 @@
 #define FUSE_USE_VERSION 26
 #include <fuse.h>
 
-#include <stdio.h>
-#include <string.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <sys/stat.h>
 #include <dirent.h>
 #include <errno.h>
-#include <sys/time.h>
+#include <fcntl.h>
 #include <limits.h>
+#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <sys/time.h>
+#include <unistd.h>
 
 #include "folve-filesystem.h"
 #include "status-server.h"
@@ -133,7 +133,7 @@ static int fuseconv_open(const char *path, struct fuse_file_info *fi) {
   fi->direct_io = 1;
 
   // The file-handle has the neat property to be 64 bit - so we can actually
-  // store a pointer to our filte robject in there :)
+  // stuff a pointer to our file handler object in there :)
   // (Yay, someone was thinking while developing that API).
   char path_buf[PATH_MAX];
   const char *orig_path = assemble_orig_path(path_buf, path);
@@ -160,9 +160,8 @@ static int fuseconv_fgetattr(const char *path, struct stat *result,
 }
 
 
-static int usage(const char *prog) {
-  fprintf(stderr, "usage: %s <config-dir> <original-dir> <mount-point>\n",
-          prog);
+static int usage(const char *prg) {
+  fprintf(stderr, "usage: %s <config-dir> <original-dir> <mount-point>\n", prg);
   return 1;
 }
 

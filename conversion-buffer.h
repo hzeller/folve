@@ -94,7 +94,7 @@ private:
   SNDFILE *CreateOutputSoundfile(const SF_INFO &info);
 
   SoundSource *const source_;
-  int tmpfile_filedes_;
+  int out_filedes_;
   bool snd_writing_enabled_;
   off_t total_written_;
   off_t header_end_;

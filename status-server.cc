@@ -33,7 +33,7 @@
 // more pretty and the HTML more compact.
 
 static const size_t kMaxRetired = 200;
-static const int kProgressWidth = 400;
+static const int kProgressWidth = 300;
 static const char kActiveProgress[]  = "#7070ff";
 static const char kRetiredProgress[] = "#d0d0d0";
 
@@ -50,6 +50,8 @@ static const char kHtmlHeader[] = "<header>"
   "9GPwHJVuaFl3l4D1+h0UjIdbTh9SpP2KQ2AgSfVAdEQGx23tOopAAAAAElFTkSuQmCC'/>\n"
   "</header>";
 
+// Callback function called by micro http daemon. Gets the StatusServer pointer
+// in the user_argument.
 int StatusServer::HandleHttp(void* user_argument,
                              struct MHD_Connection *connection,
                              const char *url, const char *method,
@@ -62,8 +64,7 @@ int StatusServer::HandleHttp(void* user_argument,
   const char *buffer;
   size_t size;
   server->CreatePage(&buffer, &size);
-  response = MHD_create_response_from_data(size, (void*) buffer,
-                                           MHD_NO, MHD_NO);
+  response = MHD_create_response_from_data(size, (void*) buffer, MHD_NO, MHD_NO);
   MHD_add_response_header(response, "Content-Type", "text/html; charset=utf-8");
   ret = MHD_queue_response(connection, MHD_HTTP_OK, response);
   MHD_destroy_response(response);
@@ -84,8 +85,7 @@ bool StatusServer::Start(int port) {
 }
 
 StatusServer::~StatusServer() {
-  if (daemon_)
-    MHD_stop_daemon(daemon_);
+  if (daemon_) MHD_stop_daemon(daemon_);
 }
 
 // FileHandlerCache::Observer interface.
@@ -163,11 +163,15 @@ struct CompareStats {
 
 void StatusServer::CreatePage(const char **buffer, size_t *size) {
   const double start = folve::CurrentTime();
+  // We re-use a string to avoid re-allocing memory every time we generate
+  // a page. Since we run with MHD_USE_SELECT_INTERNALLY, this is only accessed
+  // by one thread.
   current_page_.clear();
   current_page_.append(kHtmlHeader);
   current_page_.append("<body style='font-family:Sans-Serif;'>\n");
-  Appendf(&current_page_, "<center>Welcome to Folve %s</center>"
-          "Convolving files from <code>%s</code><br/>\n",
+  Appendf(&current_page_, "<center style='background-color:#A0FFA0;'>"
+          "Welcome to Folve %s</center>\n"
+          "Convolving audio files from <code>%s</code><br/>\n",
           filesystem_->version().c_str(), filesystem_->underlying_dir().c_str());
 
   std::vector<HandlerStats> stat_list;
@@ -202,10 +206,9 @@ void StatusServer::CreatePage(const char **buffer, size_t *size) {
           stat_list.size());
 
   current_page_.append("<table>\n");
-  current_page_.append("<tr><th>Stat</th>"
-                       "<th width='400px'>Progress</th>"
-                       "<th>Pos</th><td></td><th>Len</th><th>Format</th>"
-                       "<th align='left'>File</th></tr>\n");
+  Appendf(&current_page_, "<tr><th>Stat</th><th width='%dpx'>Progress</th>"
+          "<th>Pos</th><td></td><th>Len</th><th>Format</th>"
+          "<th align='left'>File</th></tr>\n", kProgressWidth);
   CompareStats comparator;
   std::sort(stat_list.begin(), stat_list.end(), comparator);
   for (size_t i = 0; i < stat_list.size(); ++i) {
@@ -216,7 +219,7 @@ void StatusServer::CreatePage(const char **buffer, size_t *size) {
   if (retired_.size() > 0) {
     current_page_.append("<h3>Retired</h3>\n");
     current_page_.append("<table>\n");
-    for (RetiredList::const_iterator it = retired_.begin();
+    for (RetiredList::const_iterator it = retired_.begin(); 
          it != retired_.end(); ++it) {
       AppendFileInfo(&current_page_, kRetiredProgress, *it);
     }

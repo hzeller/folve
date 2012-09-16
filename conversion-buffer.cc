@@ -24,13 +24,11 @@
 #include <unistd.h>
 
 ConversionBuffer::ConversionBuffer(SoundSource *source, const SF_INFO &info)
-  : source_(source), tmpfile_filedes_(-1), snd_writing_enabled_(true),
+  : source_(source), out_filedes_(-1), snd_writing_enabled_(true),
     total_written_(0), header_end_(0) {
-  // We need to be able to skip backwards but we don't want to fill our
-  // memory. So lets create a temporary file.
   const char *filename = tempnam(NULL, "folve");
-  tmpfile_filedes_ = open(filename, O_RDWR|O_CREAT|O_NOATIME, S_IRUSR|S_IWUSR);
-  if (tmpfile_filedes_ < 0) {
+  out_filedes_ = open(filename, O_RDWR|O_CREAT|O_NOATIME, S_IRUSR|S_IWUSR);
+  if (out_filedes_ < 0) {
     perror("Problem opening buffer file");
   }
   unlink(filename);
@@ -40,7 +38,7 @@ ConversionBuffer::ConversionBuffer(SoundSource *source, const SF_INFO &info)
 }
 
 ConversionBuffer::~ConversionBuffer() {
-  close(tmpfile_filedes_);
+  close(out_filedes_);
 }
 
 sf_count_t ConversionBuffer::SndTell(void *userdata) {
@@ -81,12 +79,12 @@ SNDFILE *ConversionBuffer::CreateOutputSoundfile(const SF_INFO &out_info) {
 }
 
 ssize_t ConversionBuffer::Append(const void *data, size_t count) {
-  if (tmpfile_filedes_ < 0) return -1;
+  if (out_filedes_ < 0) return -1;
   //fprintf(stderr, "Extend horizon by %ld bytes.\n", count);
   int remaining = count;
   const char *buf = (const char*)data;
   while (remaining > 0) {
-    int w = write(tmpfile_filedes_, data, count);
+    int w = write(out_filedes_, data, count);
     if (w < 0) return -errno;
     remaining -= w;
     buf += w;
@@ -96,8 +94,8 @@ ssize_t ConversionBuffer::Append(const void *data, size_t count) {
 }
 
 void ConversionBuffer::WriteCharAt(unsigned char c, off_t offset) {
-  if (tmpfile_filedes_ < 0) return;
-  if (pwrite(tmpfile_filedes_, &c, 1, offset) != 1) fprintf(stderr, "Oops.");
+  if (out_filedes_ < 0) return;
+  if (pwrite(out_filedes_, &c, 1, offset) != 1) fprintf(stderr, "Oops.");
 }
 
 ssize_t ConversionBuffer::SndAppend(const void *data, size_t count) {
@@ -130,5 +128,5 @@ ssize_t ConversionBuffer::Read(char *buf, size_t size, off_t offset) {
       break;
   }
 
-  return pread(tmpfile_filedes_, buf, size, offset);
+  return pread(out_filedes_, buf, size, offset);
 }
