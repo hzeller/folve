@@ -49,8 +49,13 @@ public:
   int total_file_reopen() { return total_file_reopen_; }
 
 private:
+
+  FileHandler *CreateFromDescriptor(int filedes, const char *fs_path,
+                                    const char *underlying_file);
+
   const std::string version_info_;
   const std::string underlying_dir_;
+  const std::string zita_config_dir_;
   FileHandlerCache open_file_cache_;
   int total_file_openings_;
   int total_file_reopen_;

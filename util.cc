@@ -15,11 +15,23 @@
 
 #include "util.h"
 
-#include <sys/time.h>
+#include <stdarg.h>
 #include <stdio.h>
+#include <sys/time.h>
 
 double folve::CurrentTime() {
   struct timeval tv;
   gettimeofday(&tv, NULL);
   return tv.tv_sec + tv.tv_usec / 1e6;
+}
+
+void folve::Appendf(std::string *str, const char *format, ...) {
+  va_list ap;
+  const size_t orig_len = str->length();
+  const size_t space = 1024;
+  str->resize(orig_len + space);
+  va_start(ap, format);
+  int written = vsnprintf((char*)str->data() + orig_len, space, format, ap);
+  va_end(ap);
+  str->resize(orig_len + written);
 }

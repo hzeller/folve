@@ -32,12 +32,12 @@
 #include "conversion-buffer.h"
 #include "file-handler-cache.h"
 #include "file-handler.h"
+#include "util.h"
 #include "zita-config.h"
 
-static bool global_debug = false;
+using folve::Appendf;
 
-// TODO(hzeller): don't make this global.
-const char *global_zita_config_dir = NULL;
+static bool global_debug = false;
 
 #define LOGF if (!global_debug) {} else fprintf
 #define LOG_ERROR fprintf
@@ -48,9 +48,11 @@ namespace {
 // everything that is not a sound-file.
 class PassThroughFilter : public FileHandler {
 public:
-  PassThroughFilter(int filedes, const char *fs_path)
-  : filedes_(filedes), file_name_(fs_path) {
-    LOGF(stderr, "Creating PassThrough filter for '%s'\n", fs_path);
+  PassThroughFilter(int filedes, const HandlerStats &known_stats)
+    : filedes_(filedes), info_stats_(known_stats) {
+    info_stats_.message.append("; pass through.");
+    LOGF(stderr, "Creating PassThrough filter for '%s'\n",
+         known_stats.filename.c_str());
   }
   ~PassThroughFilter() { close(filedes_); }
 
@@ -61,17 +63,13 @@ public:
   virtual int Stat(struct stat *st) {
     return fstat(filedes_, st);
   }
-
   virtual void GetHandlerStatus(struct HandlerStats *stats) {
-    stats->progress = -1;  // fraction max-read-pos vs. stat ?
-    stats->total_duration_seconds = -1;
-    stats->format = "-";
-    stats->filename = file_name_;
+    *stats = info_stats_;
   }
   
 private:
   const int filedes_;
-  const std::string file_name_;
+  HandlerStats info_stats_;
 };
 
 class SndFileHandler :
@@ -81,13 +79,18 @@ public:
   // Attempt to create a SndFileHandler from the given file descriptor. This
   // returns NULL if this is not a sound-file or if there is no available
   // convolution filter configuration available.
+  // "partial_file_info" will be set to information known so far, including
+  // error message.
   static FileHandler *Create(int filedes, const char *fs_path,
-                             const char *underlying_file) {
+                             const char *underlying_file,
+                             const std::string &zita_config_dir,
+                             HandlerStats *partial_file_info) {
     SF_INFO in_info;
     memset(&in_info, 0, sizeof(in_info));
     SNDFILE *snd = sf_open_fd(filedes, SFM_READ, &in_info, 0);
     if (snd == NULL) {
       LOG_ERROR(stderr, "File %s: %s\n", underlying_file, sf_strerror(NULL));
+      partial_file_info->message = sf_strerror(NULL);
       return NULL;
     }
 
@@ -95,24 +98,28 @@ public:
     if ((in_info.format & SF_FORMAT_SUBMASK) == SF_FORMAT_PCM_24) bits = 24;
     if ((in_info.format & SF_FORMAT_SUBMASK) == SF_FORMAT_PCM_32) bits = 32;
 
-    char config_path[1024];
-    snprintf(config_path, sizeof(config_path), "%s/filter-%d-%d-%d.conf",
-             global_zita_config_dir, in_info.samplerate,
-             bits, in_info.channels);
-    const bool found_config = (access(config_path, R_OK) == 0);
+    // Remember whatever we could got to know in the partial file info.
+    Appendf(&partial_file_info->format, "%.1fkHz, %d Bit",
+            in_info.samplerate / 1000.0, bits);
+    partial_file_info->duration_seconds = in_info.frames / in_info.samplerate;
+
+    std::string config_name;
+    Appendf(&config_name, "filter-%d-%d-%d.conf", in_info.samplerate,
+            bits, in_info.channels);
+    const std::string config_path = zita_config_dir + "/" + config_name;
+    const bool found_config = (access(config_path.c_str(), R_OK) == 0);
     if (found_config) {
-      LOGF(stderr, "File %s: filter config %s\n", underlying_file, config_path);
+      LOGF(stderr, "File %s: filter config %s\n", underlying_file,
+           config_path.c_str());
     } else {
       LOG_ERROR(stderr, "File %s: couldn't find filter config %s\n",
-                underlying_file, config_path);
+                underlying_file, config_path.c_str());
+      partial_file_info->message = "Missing [" + config_name + "]";
       sf_close(snd);
       return NULL;
     }
-    char file_info[256];
-    snprintf(file_info, sizeof(file_info), "%.1fkHz, %d Bit",
-             in_info.samplerate / 1000.0, bits);
     return new SndFileHandler(fs_path, underlying_file, filedes, snd, in_info,
-                              file_info, config_path);
+                              *partial_file_info, config_path);
   }
   
   virtual ~SndFileHandler() {
@@ -155,14 +162,12 @@ public:
   }
 
   virtual void GetHandlerStatus(struct HandlerStats *stats) {
+    *stats = base_stats_;
     const int frames_done = total_frames_ - input_frames_left_;
     if (frames_done == 0 || total_frames_ == 0)
       stats->progress = 0.0;
     else
       stats->progress = 1.0 * frames_done / total_frames_;
-    stats->total_duration_seconds = duration_seconds_;
-    stats->format = file_format_;
-    stats->filename = file_name_;
   }
 
   virtual int Stat(struct stat *st) {
@@ -186,12 +191,11 @@ public:
 private:
   SndFileHandler(const char *fs_path,
                  const char *underlying_file, int filedes, SNDFILE *snd_in,
-                 const SF_INFO &in_info, const std::string &file_format,
-                 const char* config_path)
+                 const SF_INFO &in_info, const HandlerStats &file_info,
+                 const std::string &config_path)
     : filedes_(filedes), snd_in_(snd_in), total_frames_(in_info.frames),
-      channels_(in_info.channels),
-      duration_seconds_(in_info.frames / in_info.samplerate),
-      file_name_(fs_path), file_format_(file_format), config_path_(config_path),
+      channels_(in_info.channels), base_stats_(file_info),
+      config_path_(config_path),
       error_(false), output_buffer_(NULL),
       snd_out_(NULL),
       raw_sample_buffer_(NULL), input_frames_left_(in_info.frames) {
@@ -240,6 +244,7 @@ private:
     if (snd_out_ == NULL) {
       error_ = true;
       LOG_ERROR(stderr, "Opening output: %s\n", sf_strerror(NULL));
+      base_stats_.message = sf_strerror(NULL);
       return;
     }
     if (copy_flac_header_verbatim_) {
@@ -293,6 +298,7 @@ private:
       if (config(&zita_, config_path_.c_str()) != 0) {
         LOG_ERROR(stderr, "** filter-config %s is broken. Please fix. "
                   "Won't play this stream **\n", config_path_.c_str());
+        base_stats_.message = "Problem parsing " + config_path_;
         input_frames_left_ = 0;
         Close();
         return false;
@@ -304,7 +310,7 @@ private:
     if (r == 0) {
       LOG_ERROR(stderr, "Expected %d frames left, gave buffer sized %d, "
                 "but got EOF; corrupt file '%s' ?\n",
-                input_frames_left_, zita_.fragm, file_name_.c_str());
+                input_frames_left_, zita_.fragm, base_stats_.filename.c_str());
       input_frames_left_ = 0;
       Close();
       return false;
@@ -432,9 +438,7 @@ private:
   SNDFILE *const snd_in_;
   const unsigned int total_frames_;
   const int channels_;
-  const int duration_seconds_;
-  const std::string file_name_;
-  const std::string file_format_;
+  HandlerStats base_stats_;
   const std::string config_path_;
 
   struct stat file_stat_;   // we dynamically report a changing size.
@@ -453,15 +457,18 @@ private:
 }  // namespace
 
 
-static FileHandler *CreateFilterFromFileType(int filedes,
-                                             const char *fs_path,
-                                             const char *underlying_file) {
+FileHandler *FolveFilesystem::CreateFromDescriptor(int filedes,
+                                                   const char *fs_path,
+                                                   const char *underlying_file) {
+  HandlerStats file_info;
+  file_info.filename = fs_path;
   FileHandler *filter = SndFileHandler::Create(filedes, fs_path,
-                                               underlying_file);
+                                               underlying_file,
+                                               zita_config_dir_, &file_info);
   if (filter != NULL) return filter;
 
   // Every other file-type is just passed through as is.
-  return new PassThroughFilter(filedes, fs_path);
+  return new PassThroughFilter(filedes, file_info);
 }
 
 // Implementation of the C functions in filter-interface.h
@@ -473,7 +480,7 @@ FileHandler *FolveFilesystem::CreateHandler(const char *fs_path,
     if (filedes < 0)
       return NULL;
     ++total_file_openings_;
-    handler = CreateFilterFromFileType(filedes, fs_path, underlying_path);
+    handler = CreateFromDescriptor(filedes, fs_path, underlying_path);
     handler = open_file_cache_.InsertPinned(fs_path, handler);
   } else {
     ++total_file_reopen_;
@@ -498,7 +505,6 @@ FolveFilesystem::FolveFilesystem(const char *version_info,
                                  const char *unerlying_dir,
                                  const char *zita_config_dir)
   : version_info_(version_info), underlying_dir_(unerlying_dir),
-    open_file_cache_(3),
+    zita_config_dir_(zita_config_dir), open_file_cache_(3),
     total_file_openings_(0), total_file_reopen_(0) {
-  global_zita_config_dir = zita_config_dir;
 }

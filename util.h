@@ -17,8 +17,17 @@
 #ifndef FOLVE_UTIL_H
 #define FOLVE_UTIL_H
 
+#include <string>
+
 namespace folve {
+  // Returns the current time as seconds since the start of the unix epoch,
+  // but in microsecond resolution.
   double CurrentTime();
+  
+  // Like snprintf, but print to a std::string instead.
+  void Appendf(std::string *str, const char *format, ...) 
+    __attribute__ ((format (printf, 2, 3)));
+  
 }  // namespece fuse_convolve
 
 #endif  // FOLVE_UTIL_H

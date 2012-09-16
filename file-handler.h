@@ -21,15 +21,17 @@
 
 // Status about some handler, filled in by various subsystem.
 struct HandlerStats {
-  HandlerStats() {}
-  std::string filename;
-  std::string format;
-  int total_duration_seconds;
-  float progress;
+  HandlerStats()
+  : duration_seconds(-1), progress(-1), status(OPEN), last_access(0) {}
+  std::string filename;         // filesystem name.
+  std::string format;           // File format info if recognized.
+  std::string message;          // Per file (error) message if any.
+  int duration_seconds;         // Audio file length if known; -1 otherwise.
+  float progress;               // Convolving progress if known; -1 otherwise.
 
   enum Status { OPEN, IDLE, RETIRED };
-  Status status;
-  double last_access;
+  Status status;                // Status of this file handler.
+  double last_access;           // Last access in hi-res seconds since epoch.
 };
 
 // A handler that deals with operations on files. Since we only provide read

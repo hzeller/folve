@@ -15,7 +15,6 @@
 
 #include <arpa/inet.h>
 #include <fcntl.h>
-#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/select.h>
@@ -28,6 +27,8 @@
 #include "folve-filesystem.h"
 #include "status-server.h"
 #include "util.h"
+
+using folve::Appendf;
 
 // TODO: someone with a bit more stylesheet-fu can attempt to make this
 // more pretty and the HTML more compact.
@@ -93,25 +94,14 @@ void StatusServer::RetireHandlerEvent(FileHandler *handler) {
   HandlerStats stats;
   handler->GetHandlerStatus(&stats);  // Get last available stats.
   if (stats.progress >= 0) {
-    total_seconds_music_seen_ += stats.total_duration_seconds;
-    total_seconds_filtered_ += stats.total_duration_seconds * stats.progress;
+    total_seconds_music_seen_ += stats.duration_seconds;
+    total_seconds_filtered_ += stats.duration_seconds * stats.progress;
   }
   stats.last_access = folve::CurrentTime();
   stats.status = HandlerStats::RETIRED;
   retired_.push_front(stats);
   while (retired_.size() > kMaxRetired)
     retired_.pop_back();
-}
-
-static void Appendf(std::string *str, const char *format, ...) {
-  va_list ap;
-  const size_t orig_len = str->length();
-  const size_t space = 1024;
-  str->resize(orig_len + space);
-  va_start(ap, format);
-  int written = vsnprintf((char*)str->data() + orig_len, space, format, ap);
-  va_end(ap);
-  str->resize(orig_len + written);
 }
                
 static const char sMessageRowHtml[] =
@@ -134,13 +124,12 @@ static void AppendFileInfo(std::string *result, const char *progress_style,
   case HandlerStats::RETIRED: status = "&nbsp;----&nbsp;"; break;
     // no default to let the compiler detect new values.
   }
-  if (stats.progress <= 0) {
-    Appendf(result, sMessageRowHtml, status,
-            (stats.progress < 0)
-            ? "Not a sound file or no filter found. Pass through."
-            : "Only Header accessed.");
+  if (!stats.message.empty()) {
+    Appendf(result, sMessageRowHtml, status, stats.message.c_str());
+  } else if (stats.progress == 0) {
+    Appendf(result, sMessageRowHtml, status, "Only header accessed");
   } else {
-    const int secs = stats.total_duration_seconds;
+    const int secs = stats.duration_seconds;
     const int fract_sec = stats.progress * secs;
     Appendf(result, sProgressRowHtml, status,
             kProgressWidth, (int) (100 * stats.progress), progress_style,
@@ -184,8 +173,8 @@ void StatusServer::CreatePage(const char **buffer, size_t *size) {
   for (size_t i = 0; i < stat_list.size(); ++i) {
     const HandlerStats &stats = stat_list[i];
     if (stats.progress >= 0) {
-      active_music_seen += stats.total_duration_seconds;
-      active_filtered += stats.total_duration_seconds * stats.progress;
+      active_music_seen += stats.duration_seconds;
+      active_filtered += stats.duration_seconds * stats.progress;
     }
   }
   const int t_seen = total_seconds_music_seen_ + active_music_seen;
