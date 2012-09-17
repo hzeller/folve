@@ -171,7 +171,7 @@ static void *folve_init(struct fuse_conn_info *conn) {
   char *ident = (char*) malloc(ident_len);  // openlog() keeps reference. Leaks.
   snprintf(ident, ident_len, "[folve:%d]", getpid());
   openlog(ident, LOG_CONS|LOG_PERROR, LOG_USER);
-  syslog(LOG_INFO, "started.");
+  syslog(LOG_INFO, "Started. Serving %s", folve.fs->underlying_dir());
 
   if (folve.status_port > 0) {
     // Need to start status server after we're daemonized.
@@ -188,7 +188,7 @@ static void *folve_init(struct fuse_conn_info *conn) {
 }
 
 static void folve_destroy(void *) {
-  syslog(LOG_INFO, "exiting.");
+  syslog(LOG_INFO, "Exiting.");
 }
 
 static int usage(const char *prg) {
@@ -210,7 +210,7 @@ int main(int argc, char *argv[]) {
   }
 
   // First, let's extract our own configuration, redact them from argv[] and
-  // then pass everything on to fo
+  // then pass everything on to fuse-main.
   const char *config_dir = argv[1];
   const char *underlying_dir   = argv[2];
   argc -=2;
@@ -223,6 +223,7 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "%s <underlying-dir>: not a directory.\n", underlying_dir);
     return usage(progname);
   }
+          
   folve.fs = new FolveFilesystem(FOLVE_VERSION, underlying_dir, config_dir);
   
   // TODO(hzeller): make this configurable
