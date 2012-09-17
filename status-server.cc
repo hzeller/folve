@@ -171,6 +171,9 @@ const std::string &StatusServer::CreatePage() {
           "Convolving audio files from <code>%s</code><br/>\n",
           filesystem_->version(), filesystem_->underlying_dir());
 
+  Appendf(&current_page_, "Config directory <code>%s</code><br/>",
+          filesystem_->config_dir());
+
   std::vector<HandlerStats> stat_list;
   filesystem_->handler_cache()->GetStats(&stat_list);
 

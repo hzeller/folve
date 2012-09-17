@@ -37,9 +37,10 @@
 #endif
 
 // Compilation unit variables to communicate with the fuse callbacks.
-static struct FolveParams {
-  FolveParams() : fs(NULL), status_port(-1) {}
+static struct FolveRuntime {
+  FolveRuntime() : fs(NULL), status_port(-1) {}
   FolveFilesystem *fs;
+  const char *mount_point;
   int status_port;
 } folve;
 
@@ -169,9 +170,10 @@ static void *folve_init(struct fuse_conn_info *conn) {
   // If we're running in the foreground, we like to be seen on stderr as well.
   const int ident_len = 20;
   char *ident = (char*) malloc(ident_len);  // openlog() keeps reference. Leaks.
-  snprintf(ident, ident_len, "[folve:%d]", getpid());
+  snprintf(ident, ident_len, "folve[%d]", getpid());
   openlog(ident, LOG_CONS|LOG_PERROR, LOG_USER);
-  syslog(LOG_INFO, "Started. Serving %s", folve.fs->underlying_dir());
+  syslog(LOG_INFO, "Started. Serving %s on mount point %s",
+         folve.fs->underlying_dir(), folve.mount_point);
 
   if (folve.status_port > 0) {
     // Need to start status server after we're daemonized.
@@ -197,10 +199,48 @@ static int usage(const char *prg) {
 }
 
 static bool IsDirectory(const char *path) {
+  if (path == NULL)
+    return false;
   struct stat st;
   if (stat(path, &st) != 0)
     return false;
   return (st.st_mode & S_IFMT) == S_IFDIR;
+}
+
+struct FolveConfig {
+  FolveConfig() : base_dir(NULL), config_dir(NULL), port(-1) {}
+  const char *base_dir;
+  const char *mount_point;
+  const char *config_dir;
+  int port;
+};
+
+enum {
+  FOLVE_OPT_PORT = 42,
+  FOLVE_OPT_CONFIG,
+};
+
+int FolveOptionHandling(void *data, const char *arg, int key,
+                        struct fuse_args *outargs) {
+  FolveConfig *cfg = (FolveConfig*) data;
+  switch (key) {
+  case FUSE_OPT_KEY_NONOPT:
+    // First non-opt: our base mounting dir.
+    if (cfg->base_dir == NULL) {
+      cfg->base_dir = strdup(arg);
+      return 0;
+    } else {
+      cfg->mount_point = strdup(arg);  // remmber as FYI
+      return 1;   // Leave it to fuse
+    }
+  case FOLVE_OPT_PORT:
+    cfg->port = atoi(arg + 2);  // strip "-p"
+    return 0;
+  case FOLVE_OPT_CONFIG:
+    cfg->config_dir = strdup(arg + 2);  // strip "-c"
+    return 0;
+  }
+  return 1;
 }
 
 int main(int argc, char *argv[]) {
@@ -209,25 +249,27 @@ int main(int argc, char *argv[]) {
     return usage(progname);
   }
 
-  // First, let's extract our own configuration, redact them from argv[] and
-  // then pass everything on to fuse-main.
-  const char *config_dir = argv[1];
-  const char *underlying_dir   = argv[2];
-  argc -=2;
-  argv += 2;
-  if (!IsDirectory(config_dir)) {
-    fprintf(stderr, "%s <config-dir>: not a directory.\n", config_dir);
+  FolveConfig cfg;
+  static struct fuse_opt folve_options[] = {
+    FUSE_OPT_KEY("-p ",  FOLVE_OPT_PORT),
+    FUSE_OPT_KEY("-c ",  FOLVE_OPT_CONFIG),
+    FUSE_OPT_END
+  };
+  struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
+  fuse_opt_parse(&args, &cfg, folve_options, FolveOptionHandling);
+
+  if (!IsDirectory(cfg.config_dir)) {
+    fprintf(stderr, "<config-dir>: %s not a directory.\n", cfg.config_dir);
     return usage(progname);
   }
-  if (!IsDirectory(underlying_dir)) {
-    fprintf(stderr, "%s <underlying-dir>: not a directory.\n", underlying_dir);
+  if (!IsDirectory(cfg.base_dir)) {
+    fprintf(stderr, "<underlying-dir>: %s not a directory.\n", cfg.base_dir);
     return usage(progname);
   }
           
-  folve.fs = new FolveFilesystem(FOLVE_VERSION, underlying_dir, config_dir);
-  
-  // TODO(hzeller): make this configurable
-  folve.status_port = 17322;
+  folve.fs = new FolveFilesystem(FOLVE_VERSION, cfg.base_dir, cfg.config_dir);
+  folve.status_port = cfg.port;
+  folve.mount_point = cfg.mount_point;
 
   struct fuse_operations folve_operations;
   memset(&folve_operations, 0, sizeof(folve_operations));
@@ -249,6 +291,5 @@ int main(int argc, char *argv[]) {
   folve_operations.fgetattr  = folve_fgetattr;
   folve_operations.getattr   = folve_getattr;
 
-  // Lazy: let the rest handle by fuse provided main.
-  return fuse_main(argc, argv, &folve_operations, NULL);
+  return fuse_main(args.argc, args.argv, &folve_operations, NULL);
 }

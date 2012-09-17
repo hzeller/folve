@@ -68,10 +68,11 @@ Microhttpd webserver library    http://www.gnu.org/software/libmicrohttpd/
  configurations, the second the directory to the original flac files. The
  third is the mount-point, where the convolved flac files will show up:
 
-  ./folve /directory/with/filters /path/to/original/files /mnt/mountpoint -f
+  ./folve -c /filter/dir -f -p 17322 /path/to/original/files /mnt/mountpoint
 
 Parameters:
-  1) The /directory/with/filters needs to be a directory that has
+  1) The flag '-c' with parameter /filter/dir needs to be a
+     directory that has
      jconvolver filter-configuration files with the following naming scheme:
 
        filter-<samplerate>-<bits>-<channels>.conf
@@ -79,7 +80,7 @@ Parameters:
      So if you have flac files with 44.1khz, 16 bits and 2 channel stero,
      you need a filter configuration named:
 
-     /directory/with/filters/filter-44100-16-2.conf
+     /filter/dir/filter-44100-16-2.conf
 
     (See README.CONFIG in the jconfolver project how these look like)
 
@@ -89,9 +90,12 @@ Parameters:
 
   3) The mount point.
 
-There are couple of options.
-The '-f' option lets it run in foreground (useful, since right now this
-spits out some debugging information).
+Available flags:
+   -f           : Operate in foreground; mostly useful for debugging.
+   -d           : Detailed debug log of fuse accesses
+   -p <port>    : port to run an HTTP status server on
+   -c <cfg-dir> : Configuration directory.
+   -o <fuse-mount-option>  : other generic parameters passed to fuse.
 
 Now you can access the fileystem under that mount point, e.g.
   mplayer /mnt/mountpoint/foo.flac
@@ -100,7 +104,8 @@ The fuse-convolve filesystem will determine the samplerate/bits/channels and
 attempt to find the right filter in the filter directory. If there is a filter,
 the output is filtered on-the-fly, otherwise the original file is returned.
 
-To watch what is happening: there is a http status server running on
-fixed port 17322 (TODO: port not a flag yet)
 
+If you gave folve the flag -p with an status port, it will serve current
+status information on a http server; e.g. With ./folve ... -p 17322 have a look
+on
   http://localhost:17322/

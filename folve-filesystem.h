@@ -44,6 +44,7 @@ public:
 
   const char *version() const { return version_info_; }
   const char *underlying_dir() const { return underlying_dir_; }
+  const char *config_dir() const { return zita_config_dir_.c_str(); }
   FileHandlerCache *handler_cache() { return &open_file_cache_; }
 
   // Some stats.
