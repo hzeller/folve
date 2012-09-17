@@ -169,7 +169,7 @@ const std::string &StatusServer::CreatePage() {
           "<a href='https://github.com/hzeller/folve#readme'>Folve</a>"
           " %s</center>\n"
           "Convolving audio files from <code>%s</code><br/>\n",
-          filesystem_->version().c_str(), filesystem_->underlying_dir().c_str());
+          filesystem_->version(), filesystem_->underlying_dir());
 
   std::vector<HandlerStats> stat_list;
   filesystem_->handler_cache()->GetStats(&stat_list);

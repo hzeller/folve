@@ -24,6 +24,8 @@
 
 class FolveFilesystem {
 public:
+  // version_info and underlying_dir need to stay allocated by the calling
+  // context.
   FolveFilesystem(const char *version_info, const char *underlying_dir,
                   const char *zita_config_dir);
 
@@ -40,8 +42,8 @@ public:
   // errno value on failure.
   void Close(const char *fs_path);
 
-  const std::string &version() const { return version_info_; }
-  const std::string &underlying_dir() const { return underlying_dir_; }
+  const char *version() const { return version_info_; }
+  const char *underlying_dir() const { return underlying_dir_; }
   FileHandlerCache *handler_cache() { return &open_file_cache_; }
 
   // Some stats.
@@ -53,8 +55,8 @@ private:
   FileHandler *CreateFromDescriptor(int filedes, const char *fs_path,
                                     const char *underlying_file);
 
-  const std::string version_info_;
-  const std::string underlying_dir_;
+  const char *const version_info_;
+  const char *const underlying_dir_;
   const std::string zita_config_dir_;
   FileHandlerCache open_file_cache_;
   int total_file_openings_;
