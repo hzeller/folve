@@ -165,7 +165,9 @@ const std::string &StatusServer::CreatePage() {
   current_page_.append(kHtmlHeader);
   current_page_.append("<body style='font-family:Sans-Serif;'>\n");
   Appendf(&current_page_, "<center style='background-color:#A0FFA0;'>"
-          "Welcome to Folve %s</center>\n"
+          "Welcome to "
+          "<a href='https://github.com/hzeller/folve#readme'>Folve</a>"
+          "%s</center>\n"
           "Convolving audio files from <code>%s</code><br/>\n",
           filesystem_->version().c_str(), filesystem_->underlying_dir().c_str());
 
