@@ -308,11 +308,12 @@ private:
       raw_sample_buffer_ = new float[zita_.fragm * channels_];
       zita_.convproc->start_process(0, 0);
     }
-    int r = sf_readf_float(snd_in_, raw_sample_buffer_, zita_.fragm);
+    const int r = sf_readf_float(snd_in_, raw_sample_buffer_, zita_.fragm);
     if (r == 0) {
       LOG_ERROR(stderr, "Expected %d frames left, gave buffer sized %d, "
                 "but got EOF; corrupt file '%s' ?\n",
                 input_frames_left_, zita_.fragm, base_stats_.filename.c_str());
+      base_stats_.message = "Premature EOF in input file.";
       input_frames_left_ = 0;
       Close();
       return false;

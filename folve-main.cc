@@ -31,7 +31,9 @@
 #include "folve-filesystem.h"
 #include "status-server.h"
 
-#define FOLVE_VERSION "v. 0.8 &mdash; 2012-09-15"
+#ifndef FOLVE_VERSION
+#define FOLVE_VERSION "[unknown version - compile from git]"
+#endif
 
 // Compilation unit variables to communicate with the fuse callbacks.
 static FolveFilesystem *folve_fs = NULL;
