@@ -26,6 +26,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/time.h>
+#include <syslog.h>
 #include <unistd.h>
 
 #include "folve-filesystem.h"
@@ -179,7 +180,11 @@ int main(int argc, char *argv[]) {
   if (argc < 4) {
     return usage(progname);
   }
-  
+
+  // If we're running in the foreground, we like to be seen on stderr as well.
+  openlog("[folve]", LOG_CONS|LOG_PERROR, LOG_USER);
+  syslog(LOG_INFO, "started.");
+
   // First, let's extract our configuration.
   const char *config_dir = argv[1];
   underlying_dir   = argv[2];
@@ -196,8 +201,13 @@ int main(int argc, char *argv[]) {
   folve_fs = new FolveFilesystem(FOLVE_VERSION, underlying_dir, config_dir);
   
   // TODO(hzeller): make this configurable
-  StatusServer *statusz = new StatusServer(folve_fs);
-  statusz->Start(17322);
+  int port = 17322;
+  if (port > 0) {
+    StatusServer *statusz = new StatusServer(folve_fs);
+    if (!statusz->Start(port)) {
+      syslog(LOG_ERR, "Couldn't start HTTP server on port %d\n", port);
+    }
+  }
 
   struct fuse_operations fuseconv_operations;
   memset(&fuseconv_operations, 0, sizeof(fuseconv_operations));
