@@ -187,6 +187,10 @@ static void *folve_init(struct fuse_conn_info *conn) {
   return NULL;
 }
 
+static void folve_destroy(void *) {
+  syslog(LOG_INFO, "exiting.");
+}
+
 static int usage(const char *prg) {
   fprintf(stderr, "usage: %s <config-dir> <original-dir> <mount-point>\n", prg);
   return 1;
@@ -227,7 +231,9 @@ int main(int argc, char *argv[]) {
   struct fuse_operations folve_operations;
   memset(&folve_operations, 0, sizeof(folve_operations));
 
+  // Start/stop. Will write to syslog and start auxiliary http service.
   folve_operations.init      = folve_init;
+  folve_operations.destroy   = folve_destroy;
 
   // Basic operations to make navigation work.
   folve_operations.readdir   = folve_readdir;
