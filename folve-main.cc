@@ -207,7 +207,7 @@ static void folve_destroy(void *) {
 static int usage(const char *prg) {
   printf("usage: %s [options] <original-dir> <mount-point>\n", prg);
   printf("Options: (in sequence of usefulness)\n"
-         "\t-c <cfg-dir> : Configuration directory.\n"
+         "\t-c <cfg-dir> : Convolver configuration directory.\n"
          "\t               You can supply this option multiple times;\n"
          "\t               you'll get a drop-down select on the HTTP "
          "status page.\n"

@@ -93,7 +93,7 @@ Parameters:
 General usage:
 usage: ./folve [options] <original-dir> <mount-point>
 Options: (in sequence of usefulness)
-        -c <cfg-dir> : Configuration directory.
+        -c <cfg-dir> : Convolver configuration directory.
                        You can supply this option multiple times;
                        you'll get a drop-down select on the HTTP status page.
         -p <port>    : Port to run the HTTP status server on.
