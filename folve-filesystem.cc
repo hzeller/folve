@@ -208,7 +208,7 @@ public:
       stats->progress = 1.0 * frames_done / total_frames_;
     if (absolute_max_out_value_observed_ > 1.0) {
       base_stats_.message =
-        StringPrintf("Output overdrive! "
+        StringPrintf("Output clipping! "
                      "(max=%.3f; Multiply gain with <= %.5f<br/>in %s)",
                      absolute_max_out_value_observed_,
                      1.0 / absolute_max_out_value_observed_,
@@ -474,7 +474,7 @@ private:
   void Close() {
     if (snd_out_ == NULL) return;  // done.
     if (absolute_max_out_value_observed_ > 1.0) {
-      syslog(LOG_ERR, "Observed output overdrive (%s)."
+      syslog(LOG_ERR, "Observed output clipping (%s). "
              "Max=%.3f; Multiply gain with <= %.5f in %s",
              base_stats_.filename.c_str(), absolute_max_out_value_observed_,
              1.0 / absolute_max_out_value_observed_, config_path_.c_str());
