@@ -68,6 +68,10 @@ public:
 
   FileHandlerCache *handler_cache() { return &open_file_cache_; }
 
+  // Sets more fine grained debug log messages.
+  void SetDebugMode(bool b);
+  bool IsDebugMode() const;
+
   // Some stats.
   int total_file_openings() { return total_file_openings_; }
   int total_file_reopen() { return total_file_reopen_; }

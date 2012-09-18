@@ -171,6 +171,9 @@ static void *folve_init(struct fuse_conn_info *conn) {
   syslog(LOG_INFO, "Version " FOLVE_VERSION " started. "
          "Serving '%s' on mount point '%s'",
          folve_rt.fs->underlying_dir().c_str(), folve_rt.mount_point);
+  if (folve_rt.fs->IsDebugMode()) {
+    syslog(LOG_INFO, "Debug logging enabled (-D)");
+  }
 
   if (folve_rt.status_port > 0) {
     // Need to start status server after we're daemonized.
@@ -202,7 +205,17 @@ static void folve_destroy(void *) {
 }
 
 static int usage(const char *prg) {
-  fprintf(stderr, "usage: %s <config-dir> <original-dir> <mount-point>\n", prg);
+  printf("usage: %s [options] <original-dir> <mount-point>\n", prg);
+  printf("Options: (in sequence of usefulness)\n"
+         "\t-c <cfg-dir> : Configuration directory.\n"
+         "\t               You can supply this option multiple times;\n"
+         "\t               you'll get a drop-down select on the HTTP "
+         "status page.\n"
+         "\t-p <port>    : Port to run the HTTP status server on.\n"
+         "\t-D           : Moderate volume Folve debug messages.\n"
+         "\t-f           : Operate in foreground; useful for debugging.\n"
+         "\t-o <mnt-opt> : other generic mount parameters passed to fuse.\n"
+         "\t-d           : High volume fuse debug log. Implies -f.\n");
   return 1;
 }
 
@@ -217,6 +230,7 @@ struct FolveConfig {
 enum {
   FOLVE_OPT_PORT = 42,
   FOLVE_OPT_CONFIG,
+  FOLVE_OPT_DEBUG,
 };
 
 int FolveOptionHandling(void *data, const char *arg, int key,
@@ -238,6 +252,9 @@ int FolveOptionHandling(void *data, const char *arg, int key,
   case FOLVE_OPT_CONFIG:
     rt->fs->add_config_dir(arg + 2);  // strip "-c"
     return 0;
+  case FOLVE_OPT_DEBUG:
+    rt->fs->SetDebugMode(true);
+    return 0;
   }
   return 1;
 }
@@ -251,8 +268,9 @@ int main(int argc, char *argv[]) {
   folve_rt.fs = new FolveFilesystem();
 
   static struct fuse_opt folve_options[] = {
-    FUSE_OPT_KEY("-p ",  FOLVE_OPT_PORT),
-    FUSE_OPT_KEY("-c ",  FOLVE_OPT_CONFIG),
+    FUSE_OPT_KEY("-p ", FOLVE_OPT_PORT),
+    FUSE_OPT_KEY("-c ", FOLVE_OPT_CONFIG),
+    FUSE_OPT_KEY("-D",  FOLVE_OPT_DEBUG),
     FUSE_OPT_END
   };
   struct fuse_args args = FUSE_ARGS_INIT(argc, argv);

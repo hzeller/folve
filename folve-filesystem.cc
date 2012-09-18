@@ -19,11 +19,13 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <sndfile.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <syslog.h>
 #include <unistd.h>
 
 #include <map>
@@ -41,8 +43,13 @@ using folve::Appendf;
 
 static bool global_debug = false;
 
-#define LOGF if (!global_debug) {} else fprintf
-#define LOG_ERROR fprintf
+static void DebugLogf(const char *format, ...) {
+  if (!global_debug) return;
+  va_list ap;
+  va_start(ap, format);
+  vsyslog(LOG_DEBUG, format, ap);
+  va_end(ap);
+}
 
 namespace {
 
@@ -54,8 +61,8 @@ public:
                     const HandlerStats &known_stats)
     : FileHandler(filter_id), filedes_(filedes), info_stats_(known_stats) {
     info_stats_.message.append("; pass through.");
-    LOGF(stderr, "Creating PassThrough filter for '%s'\n",
-         known_stats.filename.c_str());
+    DebugLogf("Creating PassThrough filter for '%s'",
+              known_stats.filename.c_str());
   }
   ~PassThroughFilter() { close(filedes_); }
 
@@ -93,7 +100,7 @@ public:
     memset(&in_info, 0, sizeof(in_info));
     SNDFILE *snd = sf_open_fd(filedes, SFM_READ, &in_info, 0);
     if (snd == NULL) {
-      LOG_ERROR(stderr, "File %s: %s\n", underlying_file, sf_strerror(NULL));
+      syslog(LOG_ERR, "File %s: %s", underlying_file, sf_strerror(NULL));
       partial_file_info->message = sf_strerror(NULL);
       return NULL;
     }
@@ -112,11 +119,11 @@ public:
             in_info.samplerate, bits, in_info.channels);
     const bool found_config = (access(config_path.c_str(), R_OK) == 0);
     if (found_config) {
-      LOGF(stderr, "File %s: filter config %s\n", underlying_file,
-           config_path.c_str());
+      DebugLogf("File %s: filter config %s", underlying_file,
+                config_path.c_str());
     } else {
-      LOG_ERROR(stderr, "File %s: couldn't find filter config %s\n",
-                underlying_file, config_path.c_str());
+      syslog(LOG_ERR, "File %s: couldn't find filter config %s",
+             underlying_file, config_path.c_str());
       partial_file_info->message = "Missing [" + config_path + "]";
       sf_close(snd);
       return NULL;
@@ -249,7 +256,7 @@ private:
     snd_out_ = sndfile;
     if (snd_out_ == NULL) {
       error_ = true;
-      LOG_ERROR(stderr, "Opening output: %s\n", sf_strerror(NULL));
+      syslog(LOG_ERR, "Opening output: %s", sf_strerror(NULL));
       base_stats_.message = sf_strerror(NULL);
       return;
     }
@@ -291,7 +298,7 @@ private:
     }
 
     out_buffer->set_sndfile_writes_enabled(true);  // ready for sound-stream.
-    LOGF(stderr, "Header init done.\n");
+    DebugLogf("Header init done (%s).", base_stats_.filename.c_str());
     out_buffer->HeaderFinished();
   }
 
@@ -302,8 +309,8 @@ private:
       // First time we're called.
       zita_.convproc = new Convproc();
       if (config(&zita_, config_path_.c_str()) != 0) {
-        LOG_ERROR(stderr, "** filter-config %s is broken. Please fix. "
-                  "Won't play this stream **\n", config_path_.c_str());
+        syslog(LOG_ERR, "filter-config %s is broken. Please fix."
+               "Won't play this stream **\n", config_path_.c_str());
         base_stats_.message = "Problem parsing " + config_path_;
         input_frames_left_ = 0;
         Close();
@@ -314,9 +321,9 @@ private:
     }
     const int r = sf_readf_float(snd_in_, raw_sample_buffer_, zita_.fragm);
     if (r == 0) {
-      LOG_ERROR(stderr, "Expected %d frames left, gave buffer sized %d, "
-                "but got EOF; corrupt file '%s' ?\n",
-                input_frames_left_, zita_.fragm, base_stats_.filename.c_str());
+      syslog(LOG_ERR, "Expected %d frames left, gave buffer sized %d, "
+             "but got EOF; corrupt file '%s' ?",
+             input_frames_left_, zita_.fragm, base_stats_.filename.c_str());
       base_stats_.message = "Premature EOF in input file.";
       input_frames_left_ = 0;
       Close();
@@ -366,7 +373,8 @@ private:
   }
 
   void CopyFlacHeader(ConversionBuffer *out_buffer) {
-    LOGF(stderr, "Provide FLAC header from original file:\n");
+    DebugLogf("Provide FLAC header from original file %s",
+              base_stats_.filename.c_str());
     out_buffer->Append("fLaC", 4);
     off_t pos = 4;
     unsigned char header[4];
@@ -376,33 +384,32 @@ private:
       bool is_last = header[0] & 0x80;
       unsigned int type = header[0] & 0x7F;
       unsigned int byte_len = (header[1] << 16) + (header[2] << 8) + header[3];
-      LOGF(stderr, " %02x %02x %02x %02x type: %d, len: %6u %s ",
-           header[0], header[1], header[2], header[3],
-           type, byte_len, is_last ? "(last)" : "(cont)");
+      DebugLogf(" %02x %02x %02x %02x type: %d, len: %6u %s ",
+                header[0], header[1], header[2], header[3],
+                type, byte_len, is_last ? "(last)" : "(cont)");
       need_finish_padding = false;
       if (type == FLAC__METADATA_TYPE_STREAMINFO && byte_len == 34) {
         out_buffer->Append(&header, sizeof(header));
         // Copy everything but the MD5 at the end - which we set to empty.
         CopyBytes(filedes_, pos, out_buffer, byte_len - 16);
         for (int i = 0; i < 16; ++i) out_buffer->Append("\0", 1);
-        LOGF(stderr, " (copy streaminfo, but redacted MD5)\n");
+        // TODO append log (copy streaminfo, but redacted MD5)
       }
       else if (type == FLAC__METADATA_TYPE_SEEKTABLE) {
         // The SEEKTABLE header we skip, because it is bogus after encoding.
-        LOGF(stderr, " (skip the seektable)\n");
+        // TODO append log (skip the seektable)
         need_finish_padding = is_last;  // if we were last, force finish block.
       }
       else {
         out_buffer->Append(&header, sizeof(header));
         CopyBytes(filedes_, pos, out_buffer, byte_len);
-        LOGF(stderr, " (ok)\n");
       }
       pos += byte_len;
       if (is_last)
         break;
     }
     if (need_finish_padding) {  // if the last block was not is_last: pad.
-      LOGF(stderr, "write padding\n");
+      DebugLogf("write padding");
       memset(&header, 0, sizeof(header));
       header[0] = 0x80 /* is last */ | FLAC__METADATA_TYPE_PADDING;
       out_buffer->Append(&header, sizeof(header));
@@ -410,7 +417,7 @@ private:
   }
 
   void GenerateHeaderFromInputFile(ConversionBuffer *out_buffer) {
-    LOGF(stderr, "Generate header from original ID3-tags.\n");
+    DebugLogf("Generate header from original ID3-tags.");
     out_buffer->set_sndfile_writes_enabled(true);
     // Copy ID tags that are supported by sndfile.
     for (int i = SF_STR_FIRST; i <= SF_STR_LAST; ++i) {
@@ -535,7 +542,15 @@ FolveFilesystem::FolveFilesystem()
 void FolveFilesystem::SwitchCurrentConfigIndex(int i) {
   if (i < 0 || i >= (int) config_dirs_.size())
     return;
-  current_cfg_index_ = i;
+  if (i != current_cfg_index_) {
+    if (i == 0) {
+      syslog(LOG_INFO, "Switching to pass-through mode.");
+    } else {
+      syslog(LOG_INFO, "Switching config directory to '%s'",
+             config_dirs()[i].c_str());
+    }
+    current_cfg_index_ = i;
+  }
 }
 
 static bool IsDirectory(const std::string &path) {
@@ -545,6 +560,11 @@ static bool IsDirectory(const std::string &path) {
     return false;
   return (st.st_mode & S_IFMT) == S_IFDIR;
 }
+
+void FolveFilesystem::SetDebugMode(bool b) {
+  global_debug = b;
+}
+bool FolveFilesystem::IsDebugMode() const { return global_debug; }
 
 bool FolveFilesystem::CheckInitialized() {
   if (underlying_dir().empty()) {
