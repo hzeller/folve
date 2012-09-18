@@ -208,11 +208,12 @@ static int usage(const char *prg) {
   printf("usage: %s [options] <original-dir> <mount-point>\n", prg);
   printf("Options: (in sequence of usefulness)\n"
          "\t-c <cfg-dir> : Convolver configuration directory.\n"
-         "\t               You can supply this option multiple times;\n"
+         "\t               You can supply this option multiple times:\n"
          "\t               you'll get a drop-down select on the HTTP "
          "status page.\n"
          "\t-p <port>    : Port to run the HTTP status server on.\n"
-         "\t-D           : Moderate volume Folve debug messages.\n"
+         "\t-D           : Moderate volume Folve debug messages to syslog.\n"
+         "\t               Can then also be toggled in the UI.\n"
          "\t-f           : Operate in foreground; useful for debugging.\n"
          "\t-o <mnt-opt> : other generic mount parameters passed to fuse.\n"
          "\t-d           : High volume fuse debug log. Implies -f.\n");
@@ -253,6 +254,7 @@ int FolveOptionHandling(void *data, const char *arg, int key,
     rt->fs->add_config_dir(arg + 2);  // strip "-c"
     return 0;
   case FOLVE_OPT_DEBUG:
+    rt->fs->set_debug_ui_enabled(true);
     rt->fs->SetDebugMode(true);
     return 0;
   }

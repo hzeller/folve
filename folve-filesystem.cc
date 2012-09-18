@@ -500,6 +500,11 @@ private:
 };
 }  // namespace
 
+FolveFilesystem::FolveFilesystem()
+  : current_cfg_index_(0), debug_ui_enabled_(false),
+    open_file_cache_(3), total_file_openings_(0), total_file_reopen_(0) {
+  config_dirs_.push_back("");  // The first config is special: empty.
+}
 
 FileHandler *FolveFilesystem::CreateFromDescriptor(int filedes,
                                                    int cfg_idx,
@@ -561,12 +566,6 @@ int FolveFilesystem::StatByFilename(const char *fs_path, struct stat *st) {
 void FolveFilesystem::Close(const char *fs_path, const FileHandler *handler) {
   const std::string cache_key = CacheKey(handler->filter_id(), fs_path);
   open_file_cache_.Unpin(cache_key);
-}
-
-FolveFilesystem::FolveFilesystem()
-  : current_cfg_index_(0),
-    open_file_cache_(3), total_file_openings_(0), total_file_reopen_(0) {
-  config_dirs_.push_back("");  // The first config is special: empty.
 }
 
 void FolveFilesystem::SwitchCurrentConfigIndex(int i) {

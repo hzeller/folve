@@ -72,6 +72,9 @@ public:
   void SetDebugMode(bool b);
   bool IsDebugMode() const;
 
+  void set_debug_ui_enabled(bool b) { debug_ui_enabled_ = b; }
+  bool is_debug_ui_enabled() const { return debug_ui_enabled_; }
+
   // Some stats.
   int total_file_openings() { return total_file_openings_; }
   int total_file_reopen() { return total_file_reopen_; }
@@ -87,7 +90,7 @@ private:
   std::string underlying_dir_;
   std::vector<std::string> config_dirs_;
   int current_cfg_index_;
-
+  bool debug_ui_enabled_;
   FileHandlerCache open_file_cache_;
   int total_file_openings_;
   int total_file_reopen_;

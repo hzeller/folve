@@ -94,10 +94,11 @@ General usage:
 usage: ./folve [options] <original-dir> <mount-point>
 Options: (in sequence of usefulness)
         -c <cfg-dir> : Convolver configuration directory.
-                       You can supply this option multiple times;
+                       You can supply this option multiple times:
                        you'll get a drop-down select on the HTTP status page.
         -p <port>    : Port to run the HTTP status server on.
-        -D           : Moderate volume Folve debug messages.
+        -D           : Moderate volume Folve debug messages to syslog.
+                       Can then also be toggled in the UI.
         -f           : Operate in foreground; useful for debugging.
         -o <mnt-opt> : other generic mount parameters passed to fuse.
         -d           : High volume fuse debug log. Implies -f.

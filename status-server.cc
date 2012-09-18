@@ -99,6 +99,7 @@ void StatusServer::SetFilter(const char *filter) {
 }
 
 void StatusServer::SetDebug(const char *dbg) {
+  if (!filesystem_->is_debug_ui_enabled()) return;
   filesystem_->SetDebugMode(dbg != NULL && *dbg == '1');
 }
 
@@ -189,11 +190,13 @@ void StatusServer::AppendFilterOptions(std::string *result) {
     result->append(" <span style='font-size:small;'>Affects re- or newly opened "
                    "files.</span>");
   }
-  Appendf(result, "<span style='float:right;font-size:small;'>"
-          "<label for='dbg_sel'>Folve debug to syslog</label>"
-          "<input id='dbg_sel' onchange='this.form.submit();' "
-          "type='checkbox' name='d' value='1'%s/></span>",
-          filesystem_->IsDebugMode() ? " checked" : "");
+  if (filesystem_->is_debug_ui_enabled()) {
+    Appendf(result, "<span style='float:right;font-size:small;'>"
+            "<label for='dbg_sel'>Folve debug to syslog</label>"
+            "<input id='dbg_sel' onchange='this.form.submit();' "
+            "type='checkbox' name='d' value='1'%s/></span>",
+            filesystem_->IsDebugMode() ? " checked" : "");
+  }
   result->append("</form>");
 }
 
