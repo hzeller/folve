@@ -308,9 +308,12 @@ private:
     if (!zita_.convproc) {
       // First time we're called.
       zita_.convproc = new Convproc();
-      if (config(&zita_, config_path_.c_str()) != 0) {
-        syslog(LOG_ERR, "filter-config %s is broken. Please fix."
-               "Won't play this stream **\n", config_path_.c_str());
+      if ((config(&zita_, config_path_.c_str()) != 0)
+          || zita_.convproc->inpdata(channels_ - 1) == NULL
+          || zita_.convproc->outdata(channels_ - 1) == NULL) {
+        syslog(LOG_ERR, "filter-config %s is broken. Please fix. "
+               "Won't play this stream %s (simulating empty file)",
+               config_path_.c_str(), base_stats_.filename.c_str());
         base_stats_.message = "Problem parsing " + config_path_;
         input_frames_left_ = 0;
         Close();

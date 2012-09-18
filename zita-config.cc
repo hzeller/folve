@@ -26,9 +26,10 @@
 #include <ctype.h>
 #include <math.h>
 #include <libgen.h>
+#include <syslog.h>
+
 #include "zita-audiofile.h"
 #include "zita-config.h"
-
 
 // zita-config
 #define BSIZE  0x4000
@@ -75,7 +76,7 @@ static int readfile (ZitaConfig *cfg,
 	    k -= delay;
 	    delay = 0;
 	    offset += k;
-	    fprintf (stderr, "%s:%d: First %d frames removed by latency compensation.\n", cfg->config_file, lnum, k);
+	    syslog(LOG_ERR, "%s:%d: First %d frames removed by latency compensation.\n", cfg->config_file, lnum, k);
 	}
     }		
     err = check_inout (cfg, ip1, op1);
@@ -91,30 +92,30 @@ static int readfile (ZitaConfig *cfg,
 
     if (audio.open_read (path))
     {
-        fprintf (stderr, "%s:%d: Unable to open '%s'.\n", cfg->config_file,
-                 lnum, path);
+       syslog(LOG_ERR, "%s:%d: Unable to open '%s' >%s<.\n", cfg->config_file,
+              lnum, path, cdir);
         return ERR_OTHER;
     } 
 
     if (audio.rate () != (int) cfg->fsamp)
     {
-        fprintf (stderr, "%s:%d: Sample rate (%d) of '%s' does not match.\n",
-                 cfg->config_file, lnum, audio.rate (), path);
+         syslog(LOG_ERR, "%s:%d: Sample rate (%d) of '%s' does not match.\n",
+                cfg->config_file, lnum, audio.rate (), path);
     }
 
     nchan = audio.chan ();
     nfram = audio.size ();
     if ((ichan < 1) || (ichan > nchan))
     {
-        fprintf (stderr, "%s:%d: Channel not available.\n",
-                 cfg->config_file, lnum);
+        syslog(LOG_ERR, "%s:%d: Channel not available.\n",
+               cfg->config_file, lnum);
         audio.close ();
         return ERR_OTHER;
     } 
     if (offset && audio.seek (offset))
     {
-        fprintf (stderr, "%s:%d: Can't seek to offset.\n",
-                 cfg->config_file, lnum);
+        syslog(LOG_ERR, "%s:%d: Can't seek to offset.\n",
+               cfg->config_file, lnum);
         audio.close ();
         return ERR_OTHER;
     } 
@@ -122,7 +123,7 @@ static int readfile (ZitaConfig *cfg,
     if (length > cfg->size - delay) 
     {
 	length = cfg->size - delay;
-   	fprintf (stderr, "%s:%d: Data truncated.\n", cfg->config_file, lnum);
+   	syslog(LOG_ERR, "%s:%d: Data truncated.\n", cfg->config_file, lnum);
     }
 
     try 
@@ -141,8 +142,8 @@ static int readfile (ZitaConfig *cfg,
 	nfram = audio.read (buff, nfram);
 	if (nfram < 0)
 	{
-            fprintf (stderr, "%s:%d: Error reading file.\n",
-                     cfg->config_file, lnum);
+            syslog(LOG_ERR,  "%s:%d: Error reading file.\n",
+                   cfg->config_file, lnum);
 	    audio.close ();
 	    delete[] buff;
 	    return ERR_OTHER;
@@ -183,8 +184,8 @@ static int impdirac (ZitaConfig *cfg, const char *line, int lnum)
     k = cfg->latency;
     if (delay < k)
     {
-	fprintf (stderr, "%s:%d: Dirac pulse removed: delay < latency.\n",
-                 cfg->config_file, lnum);
+        syslog(LOG_ERR, "%s:%d: Dirac pulse removed: delay < latency.\n",
+               cfg->config_file, lnum);
 	return 0;
     }
     delay -= k;
@@ -222,7 +223,7 @@ static int imphilbert (ZitaConfig *cfg, const char *line, int lnum)
     k = cfg->latency;
     if (delay < k + length / 2)
     {
-        fprintf (stderr, "%s:%d: Hilbert impulse removed: delay < latency + lenght / 2.\n", cfg->config_file, lnum);
+        syslog(LOG_ERR, "%s:%d: Hilbert impulse removed: delay < latency + lenght / 2.\n", cfg->config_file, lnum);
 	return 0;
     }
     delay -= k + length / 2;
@@ -280,7 +281,7 @@ int config (ZitaConfig *cfg, const char *config_file)
 
     if (! (F = fopen (config_file, "r"))) 
     {
-	fprintf (stderr, "Can't open '%s' for reading\n", config_file);
+        syslog(LOG_ERR, "Can't open '%s' for reading\n", config_file);
         return -1;
     } 
     
@@ -313,7 +314,14 @@ int config (ZitaConfig *cfg, const char *config_file)
 
         if (! strcmp (p, "/cd"))
         {
-            if (sstring (q, cdir, 1024) == 0) stat = ERR_PARAM;
+            char tmp[1024];
+            if (sstring (q, tmp, 1024) == 0) stat = ERR_PARAM;
+            if (tmp[0] == '/') {
+              strcpy(cdir, tmp);
+            } else {
+              strcat(cdir, "/");
+              strcat(cdir, tmp);
+            }
         }	
         else if (! strcmp (p, "/convolver/new"))   stat = convnew (cfg, q, lnum);
         else if (! strcmp (p, "/impulse/read"))    stat = readfile (cfg, q, lnum, cdir);
@@ -329,32 +337,32 @@ int config (ZitaConfig *cfg, const char *config_file)
     if (stat == ERR_OTHER) stat = 0;
     if (stat)
     {
-        fprintf (stderr, "%s:%d: ", config_file, lnum);
+        syslog(LOG_ERR, "%s:%d: ", config_file, lnum);
 	switch (stat)
 	{
 	case ERR_SYNTAX:
-            fprintf (stderr, "Syntax error.\n");
+            syslog(LOG_ERR, "Syntax error.\n");
             break;
 	case ERR_PARAM:
-            fprintf (stderr, "Bad or missing parameters.\n");
+            syslog(LOG_ERR, "Bad or missing parameters.\n");
 	    break;
 	case ERR_ALLOC:
-            fprintf (stderr, "Out of memory.\n");
+            syslog(LOG_ERR, "Out of memory.\n");
 	    break;
 	case ERR_CANTCD:
-            fprintf (stderr, "Can't change directory to '%s'.\n", cdir);
+            syslog(LOG_ERR, "Can't change directory to '%s'.\n", cdir);
 	    break;
 	case ERR_COMMAND:
-            fprintf (stderr, "Unknown command.\n");
+            syslog(LOG_ERR, "Unknown command.\n");
 	    break;
 	case ERR_NOCONV:
-            fprintf (stderr, "No convolver yet defined.\n");
+            syslog(LOG_ERR, "No convolver yet defined.\n");
 	    break;
 	case ERR_IONUM:
-            fprintf (stderr, "Bad input or output number.\n");
+            syslog(LOG_ERR, "Bad input or output number.\n");
 	    break;
 	default:
-	    fprintf (stderr, "Unknown error.\n");		     
+	    syslog(LOG_ERR, "Unknown error.\n");		     
 	}
     }
 

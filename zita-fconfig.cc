@@ -22,6 +22,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <syslog.h>
+
 #include "zita-config.h"
 
 
@@ -38,25 +40,25 @@ int convnew (ZitaConfig *cfg, const char *line, int lnum)
 
     if ((cfg->ninp == 0) || (cfg->ninp > Convproc::MAXINP))
     {
-        fprintf (stderr, "%s:%d: Number of inputs (%d) is out of range.\n",
+        syslog(LOG_ERR, "%s:%d: Number of inputs (%d) is out of range.\n",
                  cfg->config_file, lnum, cfg->ninp);
         return ERR_OTHER;
     }
     if ((cfg->nout == 0) || (cfg->nout > Convproc::MAXOUT))
     {
-        fprintf (stderr, "%s:%d: Number of outputs (%d) is out of range.\n",
+        syslog(LOG_ERR, "%s:%d: Number of outputs (%d) is out of range.\n",
                  cfg->config_file, lnum, cfg->nout);
         return ERR_OTHER;
     }
     if (cfg->size > MAXSIZE)
     {
-        fprintf (stderr, "%s:%d: Convolver size (%d) is out of range.\n",
+        syslog(LOG_ERR, "%s:%d: Convolver size (%d) is out of range.\n",
                  cfg->config_file, lnum, cfg->size);
         return ERR_OTHER;
     }
     if ((dens < 0.0f) || (dens > 1.0f))
     {
-        fprintf (stderr, "%s:%d: Density parameter is out of range.\n",
+        syslog(LOG_ERR, "%s:%d: Density parameter is out of range.\n",
                  cfg->config_file, lnum);
         return ERR_OTHER;
     }
@@ -70,7 +72,7 @@ int convnew (ZitaConfig *cfg, const char *line, int lnum)
     if (cfg->convproc->configure (cfg->ninp, cfg->nout, cfg->size,
                                   cfg->fragm, cfg->fragm, cfg->fragm))
       {   
-        fprintf (stderr, "Can't initialise convolution engine\n");
+        syslog(LOG_ERR, "Can't initialise convolution engine\n");
         return ERR_OTHER;
     }
 
