@@ -50,8 +50,9 @@ private:
 
   void AppendFilterOptions(std::string *result);
 
-  // Set filter from http-request. Gracefully handles garbage.
+  // Set filter or debug mode from http-request. Gracefully handles garbage.
   void SetFilter(const char *filter);
+  void SetDebug(const char *filter);
 
   // -- interface FileHandlerCache::Observer
   virtual void InsertHandlerEvent(FileHandler *handler) {}

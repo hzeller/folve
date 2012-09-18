@@ -562,7 +562,10 @@ static bool IsDirectory(const std::string &path) {
 }
 
 void FolveFilesystem::SetDebugMode(bool b) {
-  global_debug = b;
+  if (b != global_debug) {
+    syslog(LOG_INFO, "Switch debug mode %s.", b ? "on" : "off");
+    global_debug = b;
+  }
 }
 bool FolveFilesystem::IsDebugMode() const { return global_debug; }
 

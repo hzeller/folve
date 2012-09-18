@@ -39,7 +39,7 @@ static const size_t kMaxRetired = 200;
 static const int kProgressWidth = 300;
 static const char kActiveProgress[]  = "#7070ff";
 static const char kRetiredProgress[] = "#d0d0d0";
-static const char kSetFilterUrl[] = "/set-filter";
+static const char kSettingsUrl[] = "/settings";
 
 // Aaah, I need to find the right Browser-Tab :)
 // Sneak in a favicon without another resource access.
@@ -64,9 +64,11 @@ int StatusServer::HandleHttp(void* user_argument,
                              void**) {
   StatusServer* server = (StatusServer*) user_argument;
   
-  if (strcmp(url, kSetFilterUrl) == 0) {
+  if (strcmp(url, kSettingsUrl) == 0) {
     server->SetFilter(MHD_lookup_connection_value(connection,
                                                   MHD_GET_ARGUMENT_KIND, "f"));
+    server->SetDebug(MHD_lookup_connection_value(connection,
+                                                 MHD_GET_ARGUMENT_KIND, "d"));
   }
 
   struct MHD_Response *response;
@@ -94,6 +96,10 @@ void StatusServer::SetFilter(const char *filter) {
   if (end == NULL || *end != '\0') return;
   filter_switched_ = (index != filesystem_->current_cfg_index());
   filesystem_->SwitchCurrentConfigIndex(index);
+}
+
+void StatusServer::SetDebug(const char *dbg) {
+  filesystem_->SetDebugMode(dbg != NULL && *dbg == '1');
 }
 
 bool StatusServer::Start(int port) {
@@ -166,13 +172,13 @@ static void AppendFileInfo(std::string *result, const char *progress_style,
 
 void StatusServer::AppendFilterOptions(std::string *result) {
   Appendf(result, "<form action='%s'>"
-          "<label for='cfg_sel'>Config directory</label> ", kSetFilterUrl);
+          "<label for='cfg_sel'>Config directory</label> ", kSettingsUrl);
   result->append("<select id='cfg_sel' name='f' "
                  "onchange='this.form.submit();'>\n");
   for (size_t i = 0; i < filesystem_->config_dirs().size(); ++i) {
     const std::string &c = filesystem_->config_dirs()[i];
-    Appendf(result, "<option value='%zd' %s>%s</option>\n",
-            i, ((int) i == filesystem_->current_cfg_index()) ? "selected" : "",
+    Appendf(result, "<option value='%zd'%s>%s</option>\n",
+            i, ((int) i == filesystem_->current_cfg_index()) ? " selected" : "",
             (i == 0) ? "[No convolver - just pass through]" : c.c_str());
   }
   result->append("</select>");
@@ -183,6 +189,11 @@ void StatusServer::AppendFilterOptions(std::string *result) {
     result->append(" <span style='font-size:small;'>Affects re- or newly opened "
                    "files.</span>");
   }
+  Appendf(result, "<span style='float:right;font-size:small;'>"
+          "<label for='dbg_sel'>Folve debug to syslog</label>"
+          "<input id='dbg_sel' onchange='this.form.submit();' "
+          "type='checkbox' name='d' value='1'%s/></span>",
+          filesystem_->IsDebugMode() ? " checked" : "");
   result->append("</form>");
 }
 
