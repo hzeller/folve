@@ -95,6 +95,9 @@ Available flags:
    -d           : Detailed debug log of fuse accesses
    -p <port>    : port to run an HTTP status server on
    -c <cfg-dir> : Configuration directory.
+                  You can give -c multiple times with different configuration
+                  directories; you'll get a drop-down box on the HTTP status
+                  page to select one of these (requires -p <port> to be set).
    -o <fuse-mount-option>  : other generic parameters passed to fuse.
 
 Now you can access the fileystem under that mount point, e.g.
