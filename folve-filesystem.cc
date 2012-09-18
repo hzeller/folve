@@ -112,7 +112,7 @@ public:
     memset(&in_info, 0, sizeof(in_info));
     SNDFILE *snd = sf_open_fd(filedes, SFM_READ, &in_info, 0);
     if (snd == NULL) {
-      syslog(LOG_ERR, "File %s: %s", underlying_file, sf_strerror(NULL));
+      DebugLogf("File %s: %s", underlying_file, sf_strerror(NULL));
       partial_file_info->message = sf_strerror(NULL);
       return NULL;
     }
@@ -147,9 +147,9 @@ public:
       DebugLogf("File %s: filter config %s", underlying_file,
                 config_path.c_str());
     } else {
-      syslog(LOG_ERR, "File %s: couldn't find filter config %s...%s",
-             underlying_file,
-             path_choices[0].c_str(), path_choices[max_choice].c_str());
+      DebugLogf("File %s: couldn't find filter config %s...%s",
+                underlying_file,
+                path_choices[0].c_str(), path_choices[max_choice].c_str());
       partial_file_info->message = "Missing ( " + path_choices[0]
         + "<br/> ... " + path_choices[max_choice] + " )";
       sf_close(snd);
