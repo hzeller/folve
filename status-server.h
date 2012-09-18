@@ -41,12 +41,17 @@ public:
   virtual ~StatusServer();
 
 private:
+  const std::string &CreatePage();
+
   static int HandleHttp(void* user_argument,
                         struct MHD_Connection *,
                         const char *, const char *, const char *,
                         const char *, size_t *, void **);
 
-  const std::string &CreatePage();
+  void AppendFilterOptions(std::string *result);
+
+  // Set filter from http-request. Gracefully handles garbage.
+  void SetFilter(const char *filter);
 
   // -- interface FileHandlerCache::Observer
   virtual void InsertHandlerEvent(FileHandler *handler) {}
@@ -62,6 +67,7 @@ private:
   FolveFilesystem *filesystem_;
   struct MHD_Daemon *daemon_;
   std::string current_page_;
+  bool filter_switched_;
 };
 
 #endif  // FOLVE_STATUS_SERVER_H

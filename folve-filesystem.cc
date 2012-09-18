@@ -50,8 +50,9 @@ namespace {
 // everything that is not a sound-file.
 class PassThroughFilter : public FileHandler {
 public:
-  PassThroughFilter(int filedes, const HandlerStats &known_stats)
-    : filedes_(filedes), info_stats_(known_stats) {
+  PassThroughFilter(int filedes, int filter_id,
+                    const HandlerStats &known_stats)
+    : FileHandler(filter_id), filedes_(filedes), info_stats_(known_stats) {
     info_stats_.message.append("; pass through.");
     LOGF(stderr, "Creating PassThrough filter for '%s'\n",
          known_stats.filename.c_str());
@@ -85,6 +86,7 @@ public:
   // error message.
   static FileHandler *Create(int filedes, const char *fs_path,
                              const char *underlying_file,
+                             int filter_id,
                              const std::string &zita_config_dir,
                              HandlerStats *partial_file_info) {
     SF_INFO in_info;
@@ -105,10 +107,9 @@ public:
             in_info.samplerate / 1000.0, bits);
     partial_file_info->duration_seconds = in_info.frames / in_info.samplerate;
 
-    std::string config_name;
-    Appendf(&config_name, "filter-%d-%d-%d.conf", in_info.samplerate,
-            bits, in_info.channels);
-    const std::string config_path = zita_config_dir + "/" + config_name;
+    std::string config_path;
+    Appendf(&config_path, "%s/filter-%d-%d-%d.conf", zita_config_dir.c_str(),
+            in_info.samplerate, bits, in_info.channels);
     const bool found_config = (access(config_path.c_str(), R_OK) == 0);
     if (found_config) {
       LOGF(stderr, "File %s: filter config %s\n", underlying_file,
@@ -116,11 +117,12 @@ public:
     } else {
       LOG_ERROR(stderr, "File %s: couldn't find filter config %s\n",
                 underlying_file, config_path.c_str());
-      partial_file_info->message = "Missing [" + config_name + "]";
+      partial_file_info->message = "Missing [" + config_path + "]";
       sf_close(snd);
       return NULL;
     }
-    return new SndFileHandler(fs_path, underlying_file, filedes, snd, in_info,
+    return new SndFileHandler(fs_path, filter_id,
+                              underlying_file, filedes, snd, in_info,
                               *partial_file_info, config_path);
   }
   
@@ -191,11 +193,13 @@ public:
   }
     
 private:
-  SndFileHandler(const char *fs_path,
+  // TODO(hzeller): trim parameter list.
+  SndFileHandler(const char *fs_path, int filter_id,
                  const char *underlying_file, int filedes, SNDFILE *snd_in,
                  const SF_INFO &in_info, const HandlerStats &file_info,
                  const std::string &config_path)
-    : filedes_(filedes), snd_in_(snd_in), total_frames_(in_info.frames),
+    : FileHandler(filter_id),
+      filedes_(filedes), snd_in_(snd_in), total_frames_(in_info.frames),
       channels_(in_info.channels), base_stats_(file_info),
       config_path_(config_path),
       error_(false), output_buffer_(NULL),
@@ -461,30 +465,46 @@ private:
 
 
 FileHandler *FolveFilesystem::CreateFromDescriptor(int filedes,
+                                                   int cfg_idx,
                                                    const char *fs_path,
                                                    const char *underlying_file) {
   HandlerStats file_info;
   file_info.filename = fs_path;
-  FileHandler *filter = SndFileHandler::Create(filedes, fs_path,
-                                               underlying_file,
-                                               zita_config_dir_, &file_info);
-  if (filter != NULL) return filter;
+  if (cfg_idx != 0) {
+    FileHandler *filter = SndFileHandler::Create(filedes, fs_path,
+                                                 underlying_file,
+                                                 cfg_idx,
+                                                 config_dirs()[cfg_idx],
+                                                 &file_info);
+    if (filter != NULL) return filter;
+  } else {
+    file_info.message = "No filter config selected.";
+  }
 
   // Every other file-type is just passed through as is.
-  return new PassThroughFilter(filedes, file_info);
+  return new PassThroughFilter(filedes, cfg_idx, file_info);
+}
+
+std::string FolveFilesystem::CacheKey(int config_idx, const char *fs_path) {
+  std::string result;
+  Appendf(&result, "%d/%s", config_idx, fs_path);
+  return result;
 }
 
 // Implementation of the C functions in filter-interface.h
 FileHandler *FolveFilesystem::CreateHandler(const char *fs_path,
                                             const char *underlying_path) {
-  FileHandler *handler = open_file_cache_.FindAndPin(fs_path);
+  const int config_idx = current_cfg_index_;
+  const std::string cache_key = CacheKey(config_idx, fs_path);
+  FileHandler *handler = open_file_cache_.FindAndPin(cache_key);
   if (handler == NULL) {
     int filedes = open(underlying_path, O_RDONLY);
     if (filedes < 0)
       return NULL;
     ++total_file_openings_;
-    handler = CreateFromDescriptor(filedes, fs_path, underlying_path);
-    handler = open_file_cache_.InsertPinned(fs_path, handler);
+    handler = CreateFromDescriptor(filedes, config_idx,
+                                   fs_path, underlying_path);
+    handler = open_file_cache_.InsertPinned(cache_key, handler);
   } else {
     ++total_file_reopen_;
   }
@@ -492,22 +512,61 @@ FileHandler *FolveFilesystem::CreateHandler(const char *fs_path,
 }
 
 int FolveFilesystem::StatByFilename(const char *fs_path, struct stat *st) {
-  FileHandler *handler = open_file_cache_.FindAndPin(fs_path);
+  const std::string cache_key = CacheKey(current_cfg_index_, fs_path);
+  FileHandler *handler = open_file_cache_.FindAndPin(cache_key);
   if (handler == 0)
     return -1;
   ssize_t result = handler->Stat(st);
-  open_file_cache_.Unpin(fs_path);
+  open_file_cache_.Unpin(cache_key);
   return result;
 }
 
-void FolveFilesystem::Close(const char *fs_path) {
-  open_file_cache_.Unpin(fs_path);
+void FolveFilesystem::Close(const char *fs_path, const FileHandler *handler) {
+  const std::string cache_key = CacheKey(handler->filter_id(), fs_path);
+  open_file_cache_.Unpin(cache_key);
 }
 
-FolveFilesystem::FolveFilesystem(const char *version_info,
-                                 const char *unerlying_dir,
-                                 const char *zita_config_dir)
-  : version_info_(version_info), underlying_dir_(unerlying_dir),
-    zita_config_dir_(zita_config_dir), open_file_cache_(3),
-    total_file_openings_(0), total_file_reopen_(0) {
+FolveFilesystem::FolveFilesystem()
+  : current_cfg_index_(0),
+    open_file_cache_(3), total_file_openings_(0), total_file_reopen_(0) {
+  config_dirs_.push_back("");  // The first config is special: empty.
+}
+
+void FolveFilesystem::SwitchCurrentConfigIndex(int i) {
+  if (i < 0 || i >= (int) config_dirs_.size())
+    return;
+  current_cfg_index_ = i;
+}
+
+static bool IsDirectory(const std::string &path) {
+  if (path.empty()) return false;
+  struct stat st;
+  if (stat(path.c_str(), &st) != 0)
+    return false;
+  return (st.st_mode & S_IFMT) == S_IFDIR;
+}
+
+bool FolveFilesystem::CheckInitialized() {
+  if (underlying_dir().empty()) {
+    fprintf(stderr, "Don't know the underlying directory to read from.\n");
+    return false;
+  }
+  if (!IsDirectory(underlying_dir())) {
+    fprintf(stderr, "<underlying-dir>: '%s' not a directory.\n",
+            underlying_dir().c_str());
+    return false;
+  }
+
+  for (size_t i = 1; i < config_dirs_.size(); ++i) {
+    if (!IsDirectory(config_dirs_[i])) {
+      fprintf(stderr, "<config-dir>: '%s' not a directory.\n",
+              config_dirs_[i].c_str());
+      return false;
+    }
+  }
+  if (config_dirs_.size() > 1) {
+    // By default, lets set the index to the first filter the user provided.
+    SwitchCurrentConfigIndex(1);
+  }
+  return true;
 }

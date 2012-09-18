@@ -19,15 +19,39 @@
 
 #include <unistd.h>
 
+#include <string>
+#include <vector>
+
 #include "file-handler-cache.h"
 #include "file-handler.h"
 
+#ifndef FOLVE_VERSION
+#define FOLVE_VERSION "[unknown version - compile from git]"
+#endif
+
 class FolveFilesystem {
 public:
-  // version_info and underlying_dir need to stay allocated by the calling
-  // context.
-  FolveFilesystem(const char *version_info, const char *underlying_dir,
-                  const char *zita_config_dir);
+  // Create a new filesystem. At least SetBasedir() needs to be called
+  // for this to be properly initialized.
+  FolveFilesystem();
+
+  // Underlying directory - the directory we read files from.
+  void set_underlying_dir(const std::string &dir) { underlying_dir_ = dir; }
+  const std::string &underlying_dir() const { return underlying_dir_; }
+
+  // Config directories contain the filter configurations.
+  void add_config_dir(const char *config_dir) {
+    config_dirs_.push_back(config_dir);
+  }
+  const std::vector<std::string> &config_dirs() const { return config_dirs_; }
+
+  // Switch the current config to i. Values out of range are not accepted.
+  void SwitchCurrentConfigIndex(int i);
+  int current_cfg_index() const { return current_cfg_index_; }
+
+  // Check if properly initialized. Return 'false' if not and print a message
+  // to stderr.
+  bool CheckInitialized();
 
   // Create a new filter given the filesystem path and the underlying
   // path.
@@ -38,13 +62,10 @@ public:
   // Return dynamic size of file.
   int StatByFilename(const char *fs_path, struct stat *st);
   
-  // At the end of the operation, close filter. Return 0 on success or negative
-  // errno value on failure.
-  void Close(const char *fs_path);
+  // Inform filesystem that this file handler is not needed anymore
+  // (FS still might consider keeping it around for a while).
+  void Close(const char *fs_path, const FileHandler *handler);
 
-  const char *version() const { return version_info_; }
-  const char *underlying_dir() const { return underlying_dir_; }
-  const char *config_dir() const { return zita_config_dir_.c_str(); }
   FileHandlerCache *handler_cache() { return &open_file_cache_; }
 
   // Some stats.
@@ -52,13 +73,17 @@ public:
   int total_file_reopen() { return total_file_reopen_; }
 
 private:
+  // Get cache key, depending on the given configuration.
+  std::string CacheKey(int config_idx, const char *fs_path);
 
-  FileHandler *CreateFromDescriptor(int filedes, const char *fs_path,
+  FileHandler *CreateFromDescriptor(int filedes, int cfg_idx,
+                                    const char *fs_path,
                                     const char *underlying_file);
 
-  const char *const version_info_;
-  const char *const underlying_dir_;
-  const std::string zita_config_dir_;
+  std::string underlying_dir_;
+  std::vector<std::string> config_dirs_;
+  int current_cfg_index_;
+
   FileHandlerCache open_file_cache_;
   int total_file_openings_;
   int total_file_reopen_;

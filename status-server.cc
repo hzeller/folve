@@ -39,6 +39,7 @@ static const size_t kMaxRetired = 200;
 static const int kProgressWidth = 300;
 static const char kActiveProgress[]  = "#7070ff";
 static const char kRetiredProgress[] = "#d0d0d0";
+static const char kSetFilterUrl[] = "/set-filter";
 
 // Aaah, I need to find the right Browser-Tab :)
 // Sneak in a favicon without another resource access.
@@ -62,6 +63,12 @@ int StatusServer::HandleHttp(void* user_argument,
                              const char *upload_data, size_t *upload_size,
                              void**) {
   StatusServer* server = (StatusServer*) user_argument;
+  
+  if (strcmp(url, kSetFilterUrl) == 0) {
+    server->SetFilter(MHD_lookup_connection_value(connection,
+                                                  MHD_GET_ARGUMENT_KIND, "f"));
+  }
+
   struct MHD_Response *response;
   int ret;
   const std::string &page = server->CreatePage();
@@ -76,8 +83,17 @@ int StatusServer::HandleHttp(void* user_argument,
 StatusServer::StatusServer(FolveFilesystem *fs)
   : expunged_retired_(0), total_seconds_filtered_(0),
     total_seconds_music_seen_(0),
-    filesystem_(fs), daemon_(NULL) {
+    filesystem_(fs), daemon_(NULL), filter_switched_(false) {
   fs->handler_cache()->SetObserver(this);
+}
+
+void StatusServer::SetFilter(const char *filter) {
+  if (filter == NULL || *filter == '\0') return;
+  char *end;
+  int index = strtol(filter, &end, 10);
+  if (end == NULL || *end != '\0') return;
+  filter_switched_ = (index != filesystem_->current_cfg_index());
+  filesystem_->SwitchCurrentConfigIndex(index);
 }
 
 bool StatusServer::Start(int port) {
@@ -148,6 +164,28 @@ static void AppendFileInfo(std::string *result, const char *progress_style,
   result->append("</tr>\n");
 }
 
+void StatusServer::AppendFilterOptions(std::string *result) {
+  Appendf(result, "<form action='%s'>"
+          "<label for='cfg_sel'>Config directory</label> ", kSetFilterUrl);
+  result->append("<select id='cfg_sel' name='f' "
+                 "onchange='this.form.submit();'>\n");
+  for (size_t i = 0; i < filesystem_->config_dirs().size(); ++i) {
+    const std::string &c = filesystem_->config_dirs()[i];
+    Appendf(result, "<option value='%zd' %s>%s</option>\n",
+            i, ((int) i == filesystem_->current_cfg_index()) ? "selected" : "",
+            (i == 0) ? "[No convolver - just pass through]" : c.c_str());
+  }
+  result->append("</select>");
+  if (filesystem_->config_dirs().size() == 1) {
+    result->append(" (This is a boring configuration, add filter directories "
+                   "with -c &lt;dir&gt; [-c &lt;another-dir&gt; ...] :-) )");
+  } else if (filter_switched_) {
+    result->append(" <span style='font-size:small;'>Affects re- or newly opened "
+                   "files.</span>");
+  }
+  result->append("</form>");
+}
+
 struct CompareStats {
   bool operator() (const HandlerStats &a, const HandlerStats &b) {
     if (a.status < b.status) return true;   // open before idle.
@@ -166,13 +204,12 @@ const std::string &StatusServer::CreatePage() {
   current_page_.append("<body style='font-family:Sans-Serif;'>\n");
   Appendf(&current_page_, "<center style='background-color:#A0FFA0;'>"
           "Welcome to "
-          "<a href='https://github.com/hzeller/folve#readme'>Folve</a>"
-          " %s</center>\n"
-          "Convolving audio files from <code>%s</code><br/>\n",
-          filesystem_->version(), filesystem_->underlying_dir());
+          "<a href='https://github.com/hzeller/folve#readme'>Folve</a> "
+          FOLVE_VERSION "</center>\n"
+          "Convolving audio files from <code>%s</code>\n",
+          filesystem_->underlying_dir().c_str());
 
-  Appendf(&current_page_, "Config directory <code>%s</code><br/>",
-          filesystem_->config_dir());
+  AppendFilterOptions(&current_page_);
 
   std::vector<HandlerStats> stat_list;
   filesystem_->handler_cache()->GetStats(&stat_list);

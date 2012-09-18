@@ -41,7 +41,10 @@ struct HandlerStats {
 // fuse filesystem (see file-handler-cache.h for rationale)
 class FileHandler {
 public:
+  explicit FileHandler(int filter_id) : filter_id_(filter_id) {}
   virtual ~FileHandler() {}
+
+  int filter_id() const { return filter_id_; }
 
   // Returns bytes read or a negative value indicating a negative errno.
   virtual int Read(char *buf, size_t size, off_t offset) = 0;
@@ -49,6 +52,9 @@ public:
 
   // Get handler status.
   virtual void GetHandlerStatus(struct HandlerStats *s) = 0;
+
+private:
+  const int filter_id_;
 };
 
 #endif // FOLVE_FILE_HANDLER_H
