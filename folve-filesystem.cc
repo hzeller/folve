@@ -206,6 +206,14 @@ public:
       stats->progress = 0.0;
     else
       stats->progress = 1.0 * frames_done / total_frames_;
+    if (absolute_max_out_value_observed_ > 1.0) {
+      base_stats_.message =
+        StringPrintf("Output overdrive! "
+                     "(max=%.3f; Multiply gain with <= %.5f<br/>in %s)",
+                     absolute_max_out_value_observed_,
+                     1.0 / absolute_max_out_value_observed_,
+                     config_path_.c_str());
+    }
   }
 
   virtual int Stat(struct stat *st) {
@@ -238,7 +246,8 @@ private:
       config_path_(config_path),
       error_(false), output_buffer_(NULL),
       snd_out_(NULL),
-      raw_sample_buffer_(NULL), input_frames_left_(in_info.frames) {
+      raw_sample_buffer_(NULL), absolute_max_out_value_observed_(0.0),
+      input_frames_left_(in_info.frames) {
 
     // Initial stat that we're going to report to clients. We'll adapt
     // the filesize as we see it grow. Some clients continuously monitor
@@ -381,6 +390,10 @@ private:
       float *source = zita_.convproc->outdata(ch);
       for (int j = 0; j < r; ++j) {
         raw_sample_buffer_[j * channels_ + ch] = source[j];
+        const float out_abs = source[j];
+        if (out_abs > absolute_max_out_value_observed_) {
+          absolute_max_out_value_observed_ = out_abs;
+        }
       }
     }
     sf_writef_float(snd_out_, raw_sample_buffer_, r);
@@ -460,6 +473,12 @@ private:
 
   void Close() {
     if (snd_out_ == NULL) return;  // done.
+    if (absolute_max_out_value_observed_ > 1.0) {
+      syslog(LOG_ERR, "Observed output overdrive (%s)."
+             "Max=%.3f; Multiply gain with <= %.5f in %s",
+             base_stats_.filename.c_str(), absolute_max_out_value_observed_,
+             1.0 / absolute_max_out_value_observed_, config_path_.c_str());
+    }
     output_buffer_->set_sndfile_writes_enabled(false);
     if (snd_in_) sf_close(snd_in_);
     if (snd_out_) sf_close(snd_out_);
@@ -495,6 +514,7 @@ private:
 
   // Used in conversion.
   float *raw_sample_buffer_;
+  float absolute_max_out_value_observed_;
   int input_frames_left_;
   ZitaConfig zita_;
 };
