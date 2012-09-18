@@ -67,7 +67,7 @@ private:
   double total_seconds_music_seen_;
   FolveFilesystem *filesystem_;
   struct MHD_Daemon *daemon_;
-  std::string current_page_;
+  std::string content_;
   bool filter_switched_;
 };
 

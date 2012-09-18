@@ -213,17 +213,17 @@ const std::string &StatusServer::CreatePage() {
   // We re-use a string to avoid re-allocing memory every time we generate
   // a page. Since we run with MHD_USE_SELECT_INTERNALLY, this is only accessed
   // by one thread.
-  current_page_.clear();
-  current_page_.append(kHtmlHeader);
-  current_page_.append("<body style='font-family:Sans-Serif;'>\n");
-  Appendf(&current_page_, "<center style='background-color:#A0FFA0;'>"
+  content_.clear();
+  content_.append(kHtmlHeader);
+  content_.append("<body style='font-family:Sans-Serif;'>\n");
+  Appendf(&content_, "<center style='background-color:#A0FFA0;'>"
           "Welcome to "
           "<a href='https://github.com/hzeller/folve#readme'>Folve</a> "
           FOLVE_VERSION "</center>\n"
           "Convolving audio files from <code>%s</code>\n",
           filesystem_->underlying_dir().c_str());
 
-  AppendFilterOptions(&current_page_);
+  AppendFilterOptions(&content_);
 
   std::vector<HandlerStats> stat_list;
   filesystem_->handler_cache()->GetStats(&stat_list);
@@ -240,52 +240,52 @@ const std::string &StatusServer::CreatePage() {
   }
   const int t_seen = total_seconds_music_seen_ + active_music_seen;
   const int t_filtered = total_seconds_filtered_ + active_filtered;
-  Appendf(&current_page_, "Total opening files <b>%d</b> "
+  Appendf(&content_, "Total opening files <b>%d</b> "
           ".. and re-opened from recency cache <b>%d</b><br/>",
           filesystem_->total_file_openings(),
           filesystem_->total_file_reopen());
-  Appendf(&current_page_, "Total music seen <b>%dd %d:%02d:%02d</b> ",
+  Appendf(&content_, "Total music seen <b>%dd %d:%02d:%02d</b> ",
           t_seen / 86400, (t_seen % 86400) / 3600,
           (t_seen % 3600) / 60, t_seen % 60);
-  Appendf(&current_page_, ".. and convolved <b>%dd %d:%02d:%02d</b> ",
+  Appendf(&content_, ".. and convolved <b>%dd %d:%02d:%02d</b> ",
           t_filtered / 86400, (t_filtered % 86400) / 3600,
           (t_filtered % 3600) / 60, t_filtered % 60);
-  Appendf(&current_page_, "(%.1f%%)<br/>", 
+  Appendf(&content_, "(%.1f%%)<br/>", 
           (t_seen == 0) ? 0.0 : (100.0 * t_filtered / t_seen));
 
-  Appendf(&current_page_, "<h3>Accessed Recently</h3>\n%zd in recency cache\n",
+  Appendf(&content_, "<h3>Accessed Recently</h3>\n%zd in recency cache\n",
           stat_list.size());
 
-  current_page_.append("<table>\n");
-  Appendf(&current_page_, "<tr><th>Stat</th><th width='%dpx'>Progress</th>"
+  content_.append("<table>\n");
+  Appendf(&content_, "<tr><th>Stat</th><th width='%dpx'>Progress</th>"
           "<th>Pos</th><td></td><th>Len</th><th>Format</th>"
           "<th align='left'>File</th></tr>\n", kProgressWidth);
   CompareStats comparator;
   std::sort(stat_list.begin(), stat_list.end(), comparator);
   for (size_t i = 0; i < stat_list.size(); ++i) {
-    AppendFileInfo(&current_page_, kActiveProgress, stat_list[i]);
+    AppendFileInfo(&content_, kActiveProgress, stat_list[i]);
   }
-  current_page_.append("</table><hr/>\n");
+  content_.append("</table><hr/>\n");
 
   if (retired_.size() > 0) {
-    current_page_.append("<h3>Retired</h3>\n");
-    current_page_.append("<table>\n");
+    content_.append("<h3>Retired</h3>\n");
+    content_.append("<table>\n");
     boost::lock_guard<boost::mutex> l(retired_mutex_);
     for (RetiredList::const_iterator it = retired_.begin(); 
          it != retired_.end(); ++it) {
-      AppendFileInfo(&current_page_, kRetiredProgress, *it);
+      AppendFileInfo(&content_, kRetiredProgress, *it);
     }
-    current_page_.append("</table>\n");
+    content_.append("</table>\n");
     if (expunged_retired_ > 0) {
-      Appendf(&current_page_, "... (%d more)<p></p>", expunged_retired_);
+      Appendf(&content_, "... (%d more)<p></p>", expunged_retired_);
     }
-    current_page_.append("<hr/>");
+    content_.append("<hr/>");
   }
 
   const double duration = folve::CurrentTime() - start;
-  Appendf(&current_page_,
+  Appendf(&content_,
           "<span style='float:left;font-size:small;'>page-gen %.2fms</span>"
           "<span style='float:right;font-size:small;'>HZ</span>"
           "</body>", duration * 1000.0);
-  return current_page_;
+  return content_;
 }
