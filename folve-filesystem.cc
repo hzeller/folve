@@ -40,6 +40,7 @@
 #include "zita-config.h"
 
 using folve::Appendf;
+using folve::StringPrintf;
 
 static bool global_debug = false;
 
@@ -82,6 +83,17 @@ private:
   HandlerStats info_stats_;
 };
 
+static bool FindFirstAccessiblePath(const std::vector<std::string> &path,
+                                    std::string *match) {
+  for (size_t i = 0; i < path.size(); ++i) {
+    if (access(path[i].c_str(), R_OK) == 0) {
+      *match = path[i];
+      return true;
+    }
+  }
+  return false;
+}
+
 class SndFileHandler :
     public FileHandler,
     public ConversionBuffer::SoundSource {
@@ -114,17 +126,32 @@ public:
             in_info.samplerate / 1000.0, bits);
     partial_file_info->duration_seconds = in_info.frames / in_info.samplerate;
 
+    std::vector<std::string> path_choices;
+    // From specific to non-specific.
+    path_choices.push_back(StringPrintf("%s/filter-%d-%d-%d.conf",
+                                        zita_config_dir.c_str(),
+                                        in_info.samplerate,
+                                        in_info.channels, bits));
+    path_choices.push_back(StringPrintf("%s/filter-%d-%d.conf",
+                                        zita_config_dir.c_str(),
+                                        in_info.samplerate,
+                                        in_info.channels));
+    path_choices.push_back(StringPrintf("%s/filter-%d.conf",
+                                        zita_config_dir.c_str(),
+                                        in_info.samplerate));
+    const int max_choice = path_choices.size() - 1;
     std::string config_path;
-    Appendf(&config_path, "%s/filter-%d-%d-%d.conf", zita_config_dir.c_str(),
-            in_info.samplerate, bits, in_info.channels);
-    const bool found_config = (access(config_path.c_str(), R_OK) == 0);
+    const bool found_config = FindFirstAccessiblePath(path_choices,
+                                                      &config_path);
     if (found_config) {
       DebugLogf("File %s: filter config %s", underlying_file,
                 config_path.c_str());
     } else {
-      syslog(LOG_ERR, "File %s: couldn't find filter config %s",
-             underlying_file, config_path.c_str());
-      partial_file_info->message = "Missing [" + config_path + "]";
+      syslog(LOG_ERR, "File %s: couldn't find filter config %s...%s",
+             underlying_file,
+             path_choices[0].c_str(), path_choices[max_choice].c_str());
+      partial_file_info->message = "Missing ( " + path_choices[0]
+        + "<br/> ... " + path_choices[max_choice] + " )";
       sf_close(snd);
       return NULL;
     }

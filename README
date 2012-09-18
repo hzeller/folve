@@ -64,31 +64,31 @@ Microhttpd webserver library    http://www.gnu.org/software/libmicrohttpd/
 === Run ===
  Since there is no 'make install' yet, let's run it from the local directory.
 
- Folve requires three parameters: the first is directory to filter
- configurations, the second the directory to the original flac files. The
- third is the mount-point, where the convolved flac files will show up:
+ Folve requires at least two parameters: the directory where your original
+ *.flac files reside and the mount point of this filesystem.
+ Also, do be useful, you need to supply at least one configuration directory
+ with the -c <config-dir> option. Very useful is the -p <port> that starts
+ an HTTP server.
 
-  ./folve -c /filter/dir -f -p 17322 /path/to/original/files /mnt/mountpoint
+  ./folve -c /filter/dir -p 17322 /path/to/original/files /mnt/mountpoint
 
-Parameters:
-  1) The flag '-c' with parameter /filter/dir needs to be a
-     directory that has
-     jconvolver filter-configuration files with the following naming scheme:
+The configuration directory should contain configuration files as they're
+found in jconvolver, with the following naming scheme:
 
-       filter-<samplerate>-<bits>-<channels>.conf
+       filter-<samplerate>-<channels>-<bits>.conf   OR
+       filter-<samplerate>-<channels>.conf          OR
+       filter-<samplerate>.conf
 
-     So if you have flac files with 44.1khz, 16 bits and 2 channel stero,
-     you need a filter configuration named:
+So if you have flac files with 44.1kHz, 16 bits and 2 channel stero,
+you need a filter configuration named one of these (in matching sequence):
 
-     /filter/dir/filter-44100-16-2.conf
+     /filter/dir/filter-44100-2-16.conf            OR
+     /filter/dir/filter-44100-2.conf               OR
+     /filter/dir/filter-44100.conf
 
-    (See README.CONFIG in the jconfolver project how these look like)
+The files are searched from the most specific to the least specific type.
 
-  2) The original directory that contains your collection of audio files.
-     Right now, *.flac files are directly supported; others are attempted
-     to read and write out as the same format (libsndfile)
-
-  3) The mount point.
+(See README.CONFIG in the jconvolver project how these look like)
 
 General usage:
 usage: ./folve [options] <original-dir> <mount-point>
@@ -109,8 +109,7 @@ The fuse-convolve filesystem will determine the samplerate/bits/channels and
 attempt to find the right filter in the filter directory. If there is a filter,
 the output is filtered on-the-fly, otherwise the original file is returned.
 
-
-If you gave folve the flag -p with an status port, it will serve current
+If you gave Folve the flag -p with an status port, it will serve current
 status information on a http server; e.g. With ./folve ... -p 17322 have a look
 on
   http://localhost:17322/

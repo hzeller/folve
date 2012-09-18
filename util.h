@@ -27,7 +27,11 @@ namespace folve {
   // Like snprintf, but print to a std::string instead.
   void Appendf(std::string *str, const char *format, ...) 
     __attribute__ ((format (printf, 2, 3)));
-  
+
+  // Convenience, that returns a string directly. A bit less efficient than
+  // Appendf().
+  std::string StringPrintf(const char *format, ...)
+    __attribute__ ((format (printf, 1, 2)));
 }  // namespece fuse_convolve
 
 #endif  // FOLVE_UTIL_H

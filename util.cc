@@ -25,13 +25,26 @@ double folve::CurrentTime() {
   return tv.tv_sec + tv.tv_usec / 1e6;
 }
 
+static void vAppendf(std::string *str, const char *format, va_list ap) {
+  const size_t orig_len = str->length();
+  const size_t space = 1024;   // there should be better ways to do this...
+  str->resize(orig_len + space);
+  int written = vsnprintf((char*)str->data() + orig_len, space, format, ap);
+  str->resize(orig_len + written);
+}
+
 void folve::Appendf(std::string *str, const char *format, ...) {
   va_list ap;
-  const size_t orig_len = str->length();
-  const size_t space = 1024;
-  str->resize(orig_len + space);
   va_start(ap, format);
-  int written = vsnprintf((char*)str->data() + orig_len, space, format, ap);
+  vAppendf(str, format, ap);
   va_end(ap);
-  str->resize(orig_len + written);
+}
+
+std::string folve::StringPrintf(const char *format, ...) {
+  std::string result;
+  va_list ap;
+  va_start(ap, format);
+  vAppendf(&result, format, ap);
+  va_end(ap);
+  return result;
 }
