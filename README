@@ -90,15 +90,17 @@ Parameters:
 
   3) The mount point.
 
-Available flags:
-   -f           : Operate in foreground; mostly useful for debugging.
-   -d           : Detailed debug log of fuse accesses
-   -p <port>    : port to run an HTTP status server on
-   -c <cfg-dir> : Configuration directory.
-                  You can give -c multiple times with different configuration
-                  directories; you'll get a drop-down box on the HTTP status
-                  page to select one of these (requires -p <port> to be set).
-   -o <fuse-mount-option>  : other generic parameters passed to fuse.
+General usage:
+usage: ./folve [options] <original-dir> <mount-point>
+Options: (in sequence of usefulness)
+        -c <cfg-dir> : Configuration directory.
+                       You can supply this option multiple times;
+                       you'll get a drop-down select on the HTTP status page.
+        -p <port>    : Port to run the HTTP status server on.
+        -D           : Moderate volume Folve debug messages.
+        -f           : Operate in foreground; useful for debugging.
+        -o <mnt-opt> : other generic mount parameters passed to fuse.
+        -d           : High volume fuse debug log. Implies -f.
 
 Now you can access the fileystem under that mount point, e.g.
   mplayer /mnt/mountpoint/foo.flac
