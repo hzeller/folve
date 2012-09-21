@@ -55,6 +55,7 @@ public:
 
   // Maximum absolute output value observe (>= 0.0).
   float max_output_value() const { return max_out_value_observed_; }
+  void ResetMaxValues();
 
 private:
   SoundProcessor(const ZitaConfig &config);

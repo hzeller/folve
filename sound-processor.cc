@@ -103,10 +103,14 @@ void SoundProcessor::Process() {
   output_pos_ = 0;
 }
 
+void SoundProcessor::ResetMaxValues() {
+  max_out_value_observed_ = 0.0;
+}
+
 void SoundProcessor::Reset() {
   zita_config_.convproc->reset();
   input_pos_ = 0;
   output_pos_ = -1;
-  max_out_value_observed_ = 0.0;
+  ResetMaxValues();
   zita_config_.convproc->start_process(0, 0);
 }

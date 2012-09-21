@@ -416,6 +416,7 @@ private:
       processor_->WriteProcessed(snd_out_, r);
       if (passed_processor) {
         base_stats_.out_gapless = true;
+        LogClipping();
         processor_ = NULL;   // we handed over ownership.
       }
       if (next_file) fs_->Close(found->c_str(), next_file);
@@ -498,16 +499,18 @@ private:
     }
   }
 
-  void Close() {
-    if (snd_out_ == NULL) return;  // done.
+  void LogClipping() {
     if (processor_ && processor_->max_output_value() > 1.0) {
-      // TODO(hzeller): move this somewhere else if we pass on the processor
-      // for gapless.
       syslog(LOG_ERR, "Observed output clipping (%s). "
              "Max=%.3f; Multiply gain with <= %.5f in %s",
              base_stats_.filename.c_str(), processor_->max_output_value(),
              1.0 / processor_->max_output_value(), config_path_.c_str());
+      processor_->ResetMaxValues();
     }
+  }
+  void Close() {
+    if (snd_out_ == NULL) return;  // done.
+    LogClipping();
     // We can't disable buffer writes here, because outfile closing will flush
     // the last couple of sound samples.
     if (snd_in_) sf_close(snd_in_);
