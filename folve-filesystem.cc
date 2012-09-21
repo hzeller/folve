@@ -210,7 +210,7 @@ public:
       stats->progress = 0.0;
     else
       stats->progress = 1.0 * frames_done / in_info_.frames;
-    if (base_stats_.max_output_value) {
+    if (base_stats_.max_output_value > 1.0) {
       // TODO: the status server could inspect this value and make better
       // rendering.
       base_stats_.message =

@@ -261,7 +261,7 @@ const std::string &StatusServer::CreatePage() {
           stat_list.size());
 
   if (filesystem_->gapless_processing()) {
-    content_.append("<br/>'&rarr;' denote gapless transfers\n");
+    content_.append("<br/>&rarr; : denotes gapless transfers\n");
   }
   content_.append("<table>\n");
   Appendf(&content_, "<tr><th>Stat</th><td><!--gapless in--></td>"
