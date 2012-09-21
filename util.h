@@ -32,6 +32,9 @@ namespace folve {
   // Appendf().
   std::string StringPrintf(const char *format, ...)
     __attribute__ ((format (printf, 1, 2)));
+
+  // Return if "str" has suffix "suffix".
+  bool HasSuffix(const std::string &str, const std::string &suffix);
 }  // namespece fuse_convolve
 
 #endif  // FOLVE_UTIL_H

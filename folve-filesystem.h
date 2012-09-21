@@ -66,9 +66,11 @@ public:
   // Return dynamic size of file.
   int StatByFilename(const char *fs_path, struct stat *st);
 
-  // List files in given filesystem directory. Returns a set of filesystem
-  // paths of existing files.
-  bool ListDirectory(const std::string &fs_dir, std::set<std::string> *files);
+  // List files in given filesystem directory that match the suffix.
+  // Returns a set of filesystem paths of existing files.
+  // (We don't want globbing as filenames might contain weird characters).
+  bool ListDirectory(const std::string &fs_dir, const std::string &suffix,
+                     std::set<std::string> *files);
 
   FileHandlerCache *handler_cache() { return &open_file_cache_; }
 

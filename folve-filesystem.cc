@@ -339,6 +339,8 @@ private:
   virtual bool AcceptProcessor(SoundProcessor *processor) {
     if (processor_ != NULL || !input_frames_left_)
       return false;  // We already have one.
+    // TODO: check that other parameters such as sampling rate and channels
+    // match (should be a are problem).
     processor_ = processor;
     if (!processor_->is_input_buffer_complete()) {
       input_frames_left_ -= processor_->FillBuffer(snd_in_);
@@ -347,8 +349,16 @@ private:
     return true;
   }
 
-  static std::string Dirname(const std::string &filename) {
-    return filename.substr(0, filename.find_last_of('/') + 1);
+  static bool ExtractDirAndSuffix(const std::string &filename,
+                                  std::string *dir, std::string *suffix) {
+    const std::string::size_type slash_pos = filename.find_last_of('/');
+    if (slash_pos == std::string::npos) return false;
+    *dir = filename.substr(0, slash_pos + 1);
+    const std::string::size_type dot_pos = filename.find_last_of('.');
+    if (dot_pos != std::string::npos && dot_pos > slash_pos) {
+      *suffix = filename.substr(dot_pos);
+    }
+    return true;
   }
 
   virtual bool AddMoreSoundData() {
@@ -386,22 +396,24 @@ private:
     if (!input_frames_left_ && !processor_->is_input_buffer_complete()
         && fs_->gapless_processing()) {
       typedef std::set<std::string> DirSet;
-      DirSet dirents;
-      fs_->ListDirectory(Dirname(base_stats_.filename), &dirents);
-      DirSet::const_iterator found = dirents.upper_bound(base_stats_.filename);
+      DirSet dirset;
+      std::string fs_dir, file_suffix;
       FileHandler *next_file = NULL;
+      DirSet::const_iterator found;
       const bool passed_processor
-        = (found != dirents.end()
+        = (ExtractDirAndSuffix(base_stats_.filename, &fs_dir, &file_suffix)
+           && fs_->ListDirectory(fs_dir, file_suffix, &dirset)
+           && (found = dirset.upper_bound(base_stats_.filename)) != dirset.end()
            && (next_file = fs_->GetOrCreateHandler(found->c_str()))
            && next_file->AcceptProcessor(processor_));
       if (passed_processor) {
-        DebugLogf("Gapless pass-on from '%s' to '%s'",
+        DebugLogf("Gapless pass-on from '%s' to alphabetically next '%s'",
                   base_stats_.filename.c_str(), found->c_str());
       }
       processor_->WriteProcessed(snd_out_, r);
       if (passed_processor) {
         base_stats_.out_gapless = true;
-        processor_ = NULL;
+        processor_ = NULL;   // we handed over ownership.
       }
       if (next_file) fs_->Close(found->c_str(), next_file);
     } else {
@@ -603,13 +615,15 @@ void FolveFilesystem::Close(const char *fs_path, const FileHandler *handler) {
 }
 
 bool FolveFilesystem::ListDirectory(const std::string &fs_dir,
+                                    const std::string &suffix,
                                     std::set<std::string> *files) {
   const std::string real_dir = underlying_dir() + fs_dir;
   DIR *dp = opendir(real_dir.c_str());
   if (dp == NULL) return false;
   struct dirent *dent;
   while ((dent = readdir(dp)) != NULL) {
-    std::string x = fs_dir + dent->d_name;
+    if (!folve::HasSuffix(dent->d_name, suffix))
+      continue;
     files->insert(fs_dir + dent->d_name);
   }
   closedir(dp);
