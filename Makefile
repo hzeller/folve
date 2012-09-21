@@ -7,7 +7,7 @@ CXXFLAGS=$(CFLAGS)
 LDFLAGS=-lfuse -lsndfile -lzita-convolver -lmicrohttpd
 
 OBJECTS = folve-main.o folve-filesystem.o conversion-buffer.o \
-          file-handler-cache.o status-server.o util.o \
+          sound-processor.o file-handler-cache.o status-server.o util.o \
           zita-audiofile.o zita-config.o zita-fconfig.o zita-sstring.o 
 
 folve: $(OBJECTS)

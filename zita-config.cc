@@ -35,7 +35,7 @@
 #define BSIZE  0x4000
 
 
-static int check_inout (ZitaConfig *cfg, unsigned int ip, unsigned int op)
+static int check_inout (ZitaConfig *cfg, int ip, int op)
 {
     if (!cfg->size) return ERR_NOCONV;
     if ((ip < 1) || (ip > cfg->ninp)) return ERR_IONUM;
@@ -171,8 +171,8 @@ static int readfile (ZitaConfig *cfg,
 
 static int impdirac (ZitaConfig *cfg, const char *line, int lnum)
 {
-    unsigned int  ip1, op1, k;
-    unsigned int  delay;
+    int  ip1, op1, k;
+    int  delay;
     float         gain;
     int           stat;
 

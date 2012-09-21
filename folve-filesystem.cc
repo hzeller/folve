@@ -35,6 +35,7 @@
 #include "conversion-buffer.h"
 #include "file-handler-cache.h"
 #include "file-handler.h"
+#include "sound-processor.h"
 #include "util.h"
 
 #include "zita-config.h"
@@ -162,13 +163,8 @@ public:
   
   virtual ~SndFileHandler() {
     Close();
-    if (zita_.convproc) {
-      zita_.convproc->stop_process();
-      zita_.convproc->cleanup();
-      delete zita_.convproc;
-    }
+    delete processor_;
     delete output_buffer_;
-    delete [] raw_sample_buffer_;
   }
 
   virtual int Read(char *buf, size_t size, off_t offset) {
@@ -201,26 +197,26 @@ public:
 
   virtual void GetHandlerStatus(struct HandlerStats *stats) {
     *stats = base_stats_;
-    const int frames_done = total_frames_ - input_frames_left_;
-    if (frames_done == 0 || total_frames_ == 0)
+    const int frames_done = in_info_.frames - input_frames_left_;
+    if (frames_done == 0 || in_info_.frames == 0)
       stats->progress = 0.0;
     else
-      stats->progress = 1.0 * frames_done / total_frames_;
-    if (absolute_max_out_value_observed_ > 1.0) {
+      stats->progress = 1.0 * frames_done / in_info_.frames;
+    if (processor_ && processor_->max_output_value() > 1.0) {
       base_stats_.message =
         StringPrintf("Output clipping! "
                      "(max=%.3f; Multiply gain with <= %.5f<br/>in %s)",
-                     absolute_max_out_value_observed_,
-                     1.0 / absolute_max_out_value_observed_,
+                     processor_->max_output_value(),
+                     1.0 / processor_->max_output_value(),
                      config_path_.c_str());
     }
   }
 
   virtual int Stat(struct stat *st) {
     if (output_buffer_->FileSize() > start_estimating_size_) {
-      const int frames_done = total_frames_ - input_frames_left_;
+      const int frames_done = in_info_.frames - input_frames_left_;
       if (frames_done > 0) {
-        const float estimated_end = 1.0 * total_frames_ / frames_done;
+        const float estimated_end = 1.0 * in_info_.frames / frames_done;
         off_t new_size = estimated_end * output_buffer_->FileSize();
         // Report a bit bigger size which is less harmful than programs
         // reading short.
@@ -241,12 +237,11 @@ private:
                  const SF_INFO &in_info, const HandlerStats &file_info,
                  const std::string &config_path)
     : FileHandler(filter_id),
-      filedes_(filedes), snd_in_(snd_in), total_frames_(in_info.frames),
-      channels_(in_info.channels), base_stats_(file_info),
+      filedes_(filedes), snd_in_(snd_in), in_info_(in_info),
       config_path_(config_path),
+      base_stats_(file_info),
       error_(false), output_buffer_(NULL),
-      snd_out_(NULL),
-      raw_sample_buffer_(NULL), absolute_max_out_value_observed_(0.0),
+      snd_out_(NULL), processor_(NULL),
       input_frames_left_(in_info.frames) {
 
     // Initial stat that we're going to report to clients. We'll adapt
@@ -258,12 +253,6 @@ private:
     // The flac header we get is more rich than what we can create via
     // sndfile. So if we have one, just copy it.
     copy_flac_header_verbatim_ = LooksLikeInputIsFlac(in_info, filedes);
-
-    // Initialize zita config, but don't allocate converter quite yet.
-    memset(&zita_, 0, sizeof(zita_));
-    zita_.fsamp = in_info.samplerate;
-    zita_.ninp = in_info.channels;
-    zita_.nout = in_info.channels;
 
     // Create a conversion buffer that creates a soundfile of a particular
     // format that we choose here. Essentially we want to generate mostly what
@@ -327,10 +316,10 @@ private:
       // The MD5 sum starts at position strlen("fLaC") + 4 + 18 = 26
       // The 32 bits before that are the samples (and another 4 bit before that,
       // ignoring that for now).
-      out_buffer->WriteCharAt((total_frames_ & 0xFF000000) >> 24, 22);
-      out_buffer->WriteCharAt((total_frames_ & 0x00FF0000) >> 16, 23);
-      out_buffer->WriteCharAt((total_frames_ & 0x0000FF00) >>  8, 24);
-      out_buffer->WriteCharAt((total_frames_ & 0x000000FF),       25);
+      out_buffer->WriteCharAt((in_info_.frames & 0xFF000000) >> 24, 22);
+      out_buffer->WriteCharAt((in_info_.frames & 0x00FF0000) >> 16, 23);
+      out_buffer->WriteCharAt((in_info_.frames & 0x0000FF00) >>  8, 24);
+      out_buffer->WriteCharAt((in_info_.frames & 0x000000FF),       25);
     }
 
     out_buffer->set_sndfile_writes_enabled(true);  // ready for sound-stream.
@@ -341,13 +330,12 @@ private:
   virtual bool AddMoreSoundData() {
     if (!input_frames_left_)
       return false;
-    if (!zita_.convproc) {
+    if (!processor_) {
       // First time we're called.
-      zita_.convproc = new Convproc();
-      if ((config(&zita_, config_path_.c_str()) != 0)
-          || zita_.convproc->inpdata(channels_ - 1) == NULL
-          || zita_.convproc->outdata(channels_ - 1) == NULL) {
-        syslog(LOG_ERR, "filter-config %s is broken. Please fix. "
+      processor_ = SoundProcessor::Create(config_path_, in_info_.samplerate,
+                                          in_info_.channels);
+      if (processor_ == NULL) {
+        syslog(LOG_ERR, "Oops - filter-config %s is broken. Please fix. "
                "Won't play this stream %s (simulating empty file)",
                config_path_.c_str(), base_stats_.filename.c_str());
         base_stats_.message = "Problem parsing " + config_path_;
@@ -355,48 +343,18 @@ private:
         Close();
         return false;
       }
-      raw_sample_buffer_ = new float[zita_.fragm * channels_];
-      zita_.convproc->start_process(0, 0);
     }
-    const int r = sf_readf_float(snd_in_, raw_sample_buffer_, zita_.fragm);
+    const int r = processor_->FillBuffer(snd_in_);
     if (r == 0) {
-      syslog(LOG_ERR, "Expected %d frames left, gave buffer sized %d, "
+      syslog(LOG_ERR, "Expected %d frames left, "
              "but got EOF; corrupt file '%s' ?",
-             input_frames_left_, zita_.fragm, base_stats_.filename.c_str());
+             input_frames_left_, base_stats_.filename.c_str());
       base_stats_.message = "Premature EOF in input file.";
       input_frames_left_ = 0;
       Close();
       return false;
     }
-    if (r < (int) zita_.fragm) {
-      // Zero out the rest of the buffer.
-      const int missing = zita_.fragm - r;
-      memset(raw_sample_buffer_ + r * channels_, 0,
-             missing * channels_ * sizeof(float));
-    }
-
-    // Separate channels.
-    for (int ch = 0; ch < channels_; ++ch) {
-      float *dest = zita_.convproc->inpdata(ch);
-      for (int j = 0; j < r; ++j) {
-        dest[j] = raw_sample_buffer_[j * channels_ + ch];
-      }
-    }
-
-    zita_.convproc->process();
-
-    // Join channels again.
-    for (int ch = 0; ch < channels_; ++ch) {
-      float *source = zita_.convproc->outdata(ch);
-      for (int j = 0; j < r; ++j) {
-        raw_sample_buffer_[j * channels_ + ch] = source[j];
-        const float out_abs = source[j];
-        if (out_abs > absolute_max_out_value_observed_) {
-          absolute_max_out_value_observed_ = out_abs;
-        }
-      }
-    }
-    sf_writef_float(snd_out_, raw_sample_buffer_, r);
+    processor_->WriteProcessed(snd_out_, r);
     input_frames_left_ -= r;
     if (input_frames_left_ == 0) {
       Close();
@@ -473,11 +431,13 @@ private:
 
   void Close() {
     if (snd_out_ == NULL) return;  // done.
-    if (absolute_max_out_value_observed_ > 1.0) {
+    if (processor_ && processor_->max_output_value() > 1.0) {
+      // TODO(hzeller): move this somewhere else if we pass on the processor
+      // for gapless.
       syslog(LOG_ERR, "Observed output clipping (%s). "
              "Max=%.3f; Multiply gain with <= %.5f in %s",
-             base_stats_.filename.c_str(), absolute_max_out_value_observed_,
-             1.0 / absolute_max_out_value_observed_, config_path_.c_str());
+             base_stats_.filename.c_str(), processor_->max_output_value(),
+             1.0 / processor_->max_output_value(), config_path_.c_str());
     }
     output_buffer_->set_sndfile_writes_enabled(false);
     if (snd_in_) sf_close(snd_in_);
@@ -499,12 +459,12 @@ private:
 
   const int filedes_;
   SNDFILE *const snd_in_;
-  const unsigned int total_frames_;
-  const int channels_;
-  HandlerStats base_stats_;
+  const SF_INFO in_info_;
   const std::string config_path_;
 
-  struct stat file_stat_;   // we dynamically report a changing size.
+  HandlerStats base_stats_;      // UI information about current file.
+
+  struct stat file_stat_;        // we dynamically report a changing size.
   off_t start_estimating_size_;  // essentially const.
 
   bool error_;
@@ -513,10 +473,8 @@ private:
   SNDFILE *snd_out_;
 
   // Used in conversion.
-  float *raw_sample_buffer_;
-  float absolute_max_out_value_observed_;
+  SoundProcessor *processor_;
   int input_frames_left_;
-  ZitaConfig zita_;
 };
 }  // namespace
 

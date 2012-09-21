@@ -28,13 +28,13 @@
 
 struct ZitaConfig {
   Convproc *convproc;
-  unsigned int  latency;
-  unsigned int  options;
-  unsigned int  fsamp;
-  unsigned int  fragm;
-  unsigned int  ninp;
-  unsigned int  nout;
-  unsigned int  size;
+  int latency;
+  int options;
+  int fsamp;
+  int fragm;
+  int ninp;
+  int nout;
+  int size;
   const char *config_file;
 };
 
