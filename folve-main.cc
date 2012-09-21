@@ -163,7 +163,6 @@ static int folve_fgetattr(const char *path, struct stat *result,
 }
 
 static void *folve_init(struct fuse_conn_info *conn) {
-  // If we're running in the foreground, we like to be seen on stderr as well.
   const int ident_len = 20;
   char *ident = (char*) malloc(ident_len);  // openlog() keeps reference. Leaks.
   snprintf(ident, ident_len, "folve[%d]", getpid());
@@ -294,7 +293,7 @@ int main(int argc, char *argv[]) {
   folve_operations.readlink  = folve_readlink;
 
   // open() and close() file.
-  folve_operations.open	= folve_open;
+  folve_operations.open	     = folve_open;
   folve_operations.release   = folve_release;
 
   // Actual workhorse: reading a file and returning predicted file-size
