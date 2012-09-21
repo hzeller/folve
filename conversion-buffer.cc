@@ -53,13 +53,14 @@ sf_count_t ConversionBuffer::SndWrite(const void *ptr, sf_count_t count,
 
 // These callbacks we don't care about.
 static sf_count_t DummySeek(sf_count_t offset, int whence, void *userdata) {
-  // This seems to be called after we're closing, probably to modify the
-  // header. It then actually attempts to write, but we're already not
-  // sndfile write enabled. So print this as a warning if we're write enabled,
+  // This seems to be called while closing, probably to modify the
+  // header. But we already have a custom header, so we need to avoid writing
+  // to that position. So as soon as we see this, disable writing,
   // because it would mess up the file.
-  if (offset > 0 &&
-      reinterpret_cast<ConversionBuffer*>(userdata)->sndfile_writes_enabled()) {
-    fprintf(stderr, "DummySeek called %lld\n", (long long int) offset);
+  if (offset > 0) {
+    reinterpret_cast<ConversionBuffer*>(userdata)
+      ->set_sndfile_writes_enabled(false);
+    //fprintf(stderr, "Skipping seek to %lld\n", (long long int) offset);
   }
   return 0;
 }

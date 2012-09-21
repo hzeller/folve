@@ -45,7 +45,10 @@ using folve::StringPrintf;
 
 static bool global_debug = false;
 
-static void DebugLogf(const char *format, ...) {
+static void DebugLogf(const char *format, ...)
+  __attribute__ ((format (printf, 1, 2)));
+
+void DebugLogf(const char *format, ...) {
   if (!global_debug) return;
   va_list ap;
   va_start(ap, format);
@@ -140,12 +143,15 @@ public:
     path_choices.push_back(StringPrintf("%s/filter-%d.conf",
                                         zita_config_dir.c_str(),
                                         in_info.samplerate));
+    const int seconds = in_info.frames / in_info.samplerate;
     const int max_choice = path_choices.size() - 1;
     std::string config_path;
     const bool found_config = FindFirstAccessiblePath(path_choices,
                                                       &config_path);
     if (found_config) {
-      DebugLogf("File %s: filter config %s", underlying_file,
+      DebugLogf("File %s, %.1fkHz, %d Bit, %d:%02d: filter config %s",
+                underlying_file, in_info.samplerate / 1000.0, bits,
+                seconds / 60, seconds % 60,
                 config_path.c_str());
     } else {
       DebugLogf("File %s: couldn't find filter config %s...%s",
@@ -439,7 +445,8 @@ private:
              base_stats_.filename.c_str(), processor_->max_output_value(),
              1.0 / processor_->max_output_value(), config_path_.c_str());
     }
-    output_buffer_->set_sndfile_writes_enabled(false);
+    // We can't disable buffer writes here, because outfile closing will flush
+    // the last couple of sound samples.
     if (snd_in_) sf_close(snd_in_);
     if (snd_out_) sf_close(snd_out_);
     snd_out_ = NULL;
