@@ -74,13 +74,14 @@ static int folve_getattr(const char *path, struct stat *stbuf) {
   // If this is a currently open filename, we might be able to output a better
   // estimate.
   int result = folve_rt.fs->StatByFilename(path, stbuf);
-  if (result == 0) return result;
-
-  char path_buf[PATH_MAX];
-  result = lstat(assemble_orig_path(path_buf, path), stbuf);
-  if (result == -1)
-    return -errno;
-
+  if (result != 0) {
+    char path_buf[PATH_MAX];
+    result = lstat(assemble_orig_path(path_buf, path), stbuf);
+    if (result == -1)
+      return -errno;
+  }
+  // Whatever write mode was there before: now things are readonly.
+  stbuf->st_mode &= ~(S_IWUSR | S_IWGRP | S_IWOTH);
   return 0;
 }
 
