@@ -187,7 +187,7 @@ static int usage(const char *prg) {
          "\t               you'll get a drop-down select on the HTTP "
          "status page.\n"
          "\t-p <port>    : Port to run the HTTP status server on.\n"
-         "\t-g           : 'gapless': convolve adjacent files (experimental).\n"
+         "\t-g           : Gapless convolving alphabetically adjacent files.\n"
          "\t-D           : Moderate volume Folve debug messages to syslog.\n"
          "\t               Can then also be toggled in the UI.\n"
          "\t-f           : Operate in foreground; useful for debugging.\n"
