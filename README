@@ -97,6 +97,7 @@ Options: (in sequence of usefulness)
                        You can supply this option multiple times:
                        you'll get a drop-down select on the HTTP status page.
         -p <port>    : Port to run the HTTP status server on.
+        -g           : 'gapless': convolve adjacent files (experimental).
         -D           : Moderate volume Folve debug messages to syslog.
                        Can then also be toggled in the UI.
         -f           : Operate in foreground; useful for debugging.

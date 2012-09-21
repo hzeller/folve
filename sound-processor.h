@@ -39,6 +39,12 @@ public:
     return zita_config_.fragm == input_pos_;
   }
 
+  // Number of samples that are pending. Typically once we have this passed
+  // over to a new file.
+  int pending_writes() const {
+    return output_pos_ >= 0 ? zita_config_.fragm - output_pos_ : 0;
+  }
+
   // Write number of processed samples out to given soundfile. Processes
   // the data first if necessary. assert(), that there is at least 1 sample
   // to process.
@@ -57,6 +63,8 @@ private:
   const ZitaConfig zita_config_;
   float *const buffer_;
   const int channels_;
+  // TODO: instead of two positions, better have one position and two states
+  // READ, WRITE
   int input_pos_;
   int output_pos_;  // written position. -1, if not processed yet.
   float max_out_value_observed_;

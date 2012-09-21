@@ -133,13 +133,15 @@ void StatusServer::RetireHandlerEvent(FileHandler *handler) {
 }
                
 static const char sMessageRowHtml[] =
-  "<td>%s</td><td style='font-size:small;'>%s</td>"
+  "<td>%s</td><td colspan='3' style='font-size:small;'>%s</td>"
   "<td colspan='3' align='center'>-</td>";
 
 static const char sProgressRowHtml[] =
-  "<td>%s</td><td>"
-  "<div style='width:%dpx; border:1px solid black;'>\n"
+  "<td>%s</td>"
+  "<td>%s</td>"  // gapless marker
+  "<td><div style='width:%dpx; border:1px solid black;'>\n"
   "  <div style='width:%d%%;background:%s;'>&nbsp;</div>\n</div></td>"
+  "<td>%s</td>"  // gapless
   "<td align='right'>%2d:%02d</td><td>/</td><td align='right'>%2d:%02d</td>";
 
 static void AppendFileInfo(std::string *result, const char *progress_style,
@@ -160,7 +162,9 @@ static void AppendFileInfo(std::string *result, const char *progress_style,
     const int secs = stats.duration_seconds;
     const int fract_sec = stats.progress * secs;
     Appendf(result, sProgressRowHtml, status,
+            stats.in_gapless ? "&rarr;" : "",
             kProgressWidth, (int) (100 * stats.progress), progress_style,
+            stats.out_gapless ? "&rarr;" : "",
             fract_sec / 60, fract_sec % 60, secs / 60, secs % 60);
   }
   Appendf(result, "<td bgcolor='#c0c0c0'>&nbsp;%s&nbsp;</td>",
@@ -256,8 +260,13 @@ const std::string &StatusServer::CreatePage() {
   Appendf(&content_, "<h3>Accessed Recently</h3>\n%zd in recency cache\n",
           stat_list.size());
 
+  if (filesystem_->gapless_processing()) {
+    content_.append("<br/>'&rarr;' denote gapless transfers\n");
+  }
   content_.append("<table>\n");
-  Appendf(&content_, "<tr><th>Stat</th><th width='%dpx'>Progress</th>"
+  Appendf(&content_, "<tr><th>Stat</th><td><!--gapless in--></td>"
+          "<th width='%dpx'>Progress</th>"  // progress bar.
+          "<td><!-- gapless out --></td>"
           "<th>Pos</th><td></td><th>Len</th><th>Format</th>"
           "<th align='left'>File</th></tr>\n", kProgressWidth);
   CompareStats comparator;

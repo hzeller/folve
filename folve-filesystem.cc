@@ -16,6 +16,7 @@
 #include "folve-filesystem.h"
 
 #include <FLAC/metadata.h>
+#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <sndfile.h>
@@ -107,8 +108,9 @@ public:
   // convolution filter configuration available.
   // "partial_file_info" will be set to information known so far, including
   // error message.
-  static FileHandler *Create(int filedes, const char *fs_path,
-                             const char *underlying_file,
+  static FileHandler *Create(FolveFilesystem *fs,
+                             int filedes, const char *fs_path,
+                             const std::string &underlying_file,
                              int filter_id,
                              const std::string &zita_config_dir,
                              HandlerStats *partial_file_info) {
@@ -116,7 +118,7 @@ public:
     memset(&in_info, 0, sizeof(in_info));
     SNDFILE *snd = sf_open_fd(filedes, SFM_READ, &in_info, 0);
     if (snd == NULL) {
-      DebugLogf("File %s: %s", underlying_file, sf_strerror(NULL));
+      DebugLogf("File %s: %s", underlying_file.c_str(), sf_strerror(NULL));
       partial_file_info->message = sf_strerror(NULL);
       return NULL;
     }
@@ -150,19 +152,19 @@ public:
                                                       &config_path);
     if (found_config) {
       DebugLogf("File %s, %.1fkHz, %d Bit, %d:%02d: filter config %s",
-                underlying_file, in_info.samplerate / 1000.0, bits,
+                underlying_file.c_str(), in_info.samplerate / 1000.0, bits,
                 seconds / 60, seconds % 60,
                 config_path.c_str());
     } else {
       DebugLogf("File %s: couldn't find filter config %s...%s",
-                underlying_file,
+                underlying_file.c_str(),
                 path_choices[0].c_str(), path_choices[max_choice].c_str());
       partial_file_info->message = "Missing ( " + path_choices[0]
         + "<br/> ... " + path_choices[max_choice] + " )";
       sf_close(snd);
       return NULL;
     }
-    return new SndFileHandler(fs_path, filter_id,
+    return new SndFileHandler(fs, fs_path, filter_id,
                               underlying_file, filedes, snd, in_info,
                               *partial_file_info, config_path);
   }
@@ -238,11 +240,12 @@ public:
     
 private:
   // TODO(hzeller): trim parameter list.
-  SndFileHandler(const char *fs_path, int filter_id,
-                 const char *underlying_file, int filedes, SNDFILE *snd_in,
+  SndFileHandler(FolveFilesystem *fs, const char *fs_path, int filter_id,
+                 const std::string &underlying_file,
+                 int filedes, SNDFILE *snd_in,
                  const SF_INFO &in_info, const HandlerStats &file_info,
                  const std::string &config_path)
-    : FileHandler(filter_id),
+    : FileHandler(filter_id), fs_(fs),
       filedes_(filedes), snd_in_(snd_in), in_info_(in_info),
       config_path_(config_path),
       base_stats_(file_info),
@@ -333,11 +336,30 @@ private:
     out_buffer->HeaderFinished();
   }
 
+  virtual bool AcceptProcessor(SoundProcessor *processor) {
+    if (processor_ != NULL || !input_frames_left_)
+      return false;  // We already have one.
+    processor_ = processor;
+    if (!processor_->is_input_buffer_complete()) {
+      input_frames_left_ -= processor_->FillBuffer(snd_in_);
+    }
+    base_stats_.in_gapless = true;
+    return true;
+  }
+
+  static std::string Dirname(const std::string &filename) {
+    return filename.substr(0, filename.find_last_of('/') + 1);
+  }
+
   virtual bool AddMoreSoundData() {
+    if (processor_ && processor_->pending_writes() > 0) {
+      processor_->WriteProcessed(snd_out_, processor_->pending_writes());
+      return input_frames_left_;
+    }
     if (!input_frames_left_)
       return false;
     if (!processor_) {
-      // First time we're called.
+      // First time we're called and we don't have any processor yet.
       processor_ = SoundProcessor::Create(config_path_, in_info_.samplerate,
                                           in_info_.channels);
       if (processor_ == NULL) {
@@ -360,14 +382,38 @@ private:
       Close();
       return false;
     }
-    processor_->WriteProcessed(snd_out_, r);
     input_frames_left_ -= r;
+    if (!input_frames_left_ && !processor_->is_input_buffer_complete()
+        && fs_->gapless_processing()) {
+      typedef std::set<std::string> DirSet;
+      DirSet dirents;
+      fs_->ListDirectory(Dirname(base_stats_.filename), &dirents);
+      DirSet::const_iterator found = dirents.upper_bound(base_stats_.filename);
+      FileHandler *next_file = NULL;
+      const bool passed_processor
+        = (found != dirents.end()
+           && (next_file = fs_->GetOrCreateHandler(found->c_str()))
+           && next_file->AcceptProcessor(processor_));
+      if (passed_processor) {
+        DebugLogf("Gapless pass-on from '%s' to '%s'",
+                  base_stats_.filename.c_str(), found->c_str());
+      }
+      processor_->WriteProcessed(snd_out_, r);
+      if (passed_processor) {
+        base_stats_.out_gapless = true;
+        processor_ = NULL;
+      }
+      if (next_file) fs_->Close(found->c_str(), next_file);
+    } else {
+      processor_->WriteProcessed(snd_out_, r);
+    }
     if (input_frames_left_ == 0) {
       Close();
     }
     return input_frames_left_;
   }
 
+  // TODO add as a utility function to ConversionBuffer ?
   void CopyBytes(int fd, off_t pos, ConversionBuffer *out, size_t len) {
     char buf[256];
     while (len > 0) {
@@ -466,6 +512,7 @@ private:
     return memcmp(flac_magic, "fLaC", sizeof(flac_magic)) == 0;
   }
 
+  FolveFilesystem *const fs_;
   const int filedes_;
   SNDFILE *const snd_in_;
   const SF_INFO in_info_;
@@ -488,19 +535,20 @@ private:
 }  // namespace
 
 FolveFilesystem::FolveFilesystem()
-  : current_cfg_index_(0), debug_ui_enabled_(false),
+  : current_cfg_index_(0), debug_ui_enabled_(false), gapless_processing_(false),
     open_file_cache_(3), total_file_openings_(0), total_file_reopen_(0) {
   config_dirs_.push_back("");  // The first config is special: empty.
 }
 
-FileHandler *FolveFilesystem::CreateFromDescriptor(int filedes,
-                                                   int cfg_idx,
-                                                   const char *fs_path,
-                                                   const char *underlying_file) {
+FileHandler *FolveFilesystem::CreateFromDescriptor(
+     int filedes,
+     int cfg_idx,
+     const char *fs_path,
+     const std::string &underlying_file) {
   HandlerStats file_info;
   file_info.filename = fs_path;
   if (cfg_idx != 0) {
-    FileHandler *filter = SndFileHandler::Create(filedes, fs_path,
+    FileHandler *filter = SndFileHandler::Create(this, filedes, fs_path,
                                                  underlying_file,
                                                  cfg_idx,
                                                  config_dirs()[cfg_idx],
@@ -520,19 +568,18 @@ std::string FolveFilesystem::CacheKey(int config_idx, const char *fs_path) {
   return result;
 }
 
-// Implementation of the C functions in filter-interface.h
-FileHandler *FolveFilesystem::CreateHandler(const char *fs_path,
-                                            const char *underlying_path) {
+FileHandler *FolveFilesystem::GetOrCreateHandler(const char *fs_path) {
   const int config_idx = current_cfg_index_;
   const std::string cache_key = CacheKey(config_idx, fs_path);
+  const std::string underlying_file = underlying_dir() + fs_path;
   FileHandler *handler = open_file_cache_.FindAndPin(cache_key);
   if (handler == NULL) {
-    int filedes = open(underlying_path, O_RDONLY);
+    int filedes = open(underlying_file.c_str(), O_RDONLY);
     if (filedes < 0)
       return NULL;
     ++total_file_openings_;
     handler = CreateFromDescriptor(filedes, config_idx,
-                                   fs_path, underlying_path);
+                                   fs_path, underlying_file);
     handler = open_file_cache_.InsertPinned(cache_key, handler);
   } else {
     ++total_file_reopen_;
@@ -553,6 +600,20 @@ int FolveFilesystem::StatByFilename(const char *fs_path, struct stat *st) {
 void FolveFilesystem::Close(const char *fs_path, const FileHandler *handler) {
   const std::string cache_key = CacheKey(handler->filter_id(), fs_path);
   open_file_cache_.Unpin(cache_key);
+}
+
+bool FolveFilesystem::ListDirectory(const std::string &fs_dir,
+                                    std::set<std::string> *files) {
+  const std::string real_dir = underlying_dir() + fs_dir;
+  DIR *dp = opendir(real_dir.c_str());
+  if (dp == NULL) return false;
+  struct dirent *dent;
+  while ((dent = readdir(dp)) != NULL) {
+    std::string x = fs_dir + dent->d_name;
+    files->insert(fs_dir + dent->d_name);
+  }
+  closedir(dp);
+  return true;
 }
 
 void FolveFilesystem::SwitchCurrentConfigIndex(int i) {

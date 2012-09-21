@@ -40,16 +40,6 @@ static struct FolveRuntime {
   int status_port;
 } folve_rt;
 
-static int has_suffix_string (const char *str, const char *suffix) {
-  if (!str || !suffix)
-    return 0;
-  size_t str_len = strlen(str);
-  size_t suffix_len = strlen(suffix);
-  if (suffix_len > str_len)
-    return 0;
-  return strncmp(str + str_len - suffix_len, suffix, suffix_len) == 0;
-}
-
 static char *concat_path(char *buf, const char *a, const char *b) {
   strcpy(buf, a);
   strcat(buf, b);
@@ -58,14 +48,8 @@ static char *concat_path(char *buf, const char *a, const char *b) {
 
 // Given a relative path from the root of the mounted file-system, get the
 // original file from the source filesystem.
-// TODO(hzeller): move the ogg.fuse.flac logic into convolver-filesystem.
 static const char *assemble_orig_path(char *buf, const char *path) {
-  char *result = concat_path(buf, folve_rt.fs->underlying_dir().c_str(), path);
-  static const char magic_ogg_rewrite[] = ".ogg.fuse.flac";
-  if (has_suffix_string(result, magic_ogg_rewrite)) {
-    *(result + strlen(result) - strlen(".fuse.flac")) = '\0';
-  }
-  return result;
+  return concat_path(buf, folve_rt.fs->underlying_dir().c_str(), path);
 }
 
 // Essentially lstat(). Just forward to the original filesystem (this
@@ -96,19 +80,12 @@ static int folve_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
   if (dp == NULL)
     return -errno;
 
-  char ogg_rewrite_buffer[PATH_MAX];
-
   while ((de = readdir(dp)) != NULL) {
     struct stat st;
     memset(&st, 0, sizeof(st));
     st.st_ino = de->d_ino;
     st.st_mode = de->d_type << 12;
     const char *entry_name = de->d_name;
-    if (has_suffix_string(entry_name, ".ogg")) {
-      // For ogg files, we pretend they actually end with 'flac', because
-      // we transparently rewrite them.
-      entry_name = concat_path(ogg_rewrite_buffer, entry_name, ".fuse.flac");
-    }
     if (filler(buf, entry_name, &st, 0))
       break;
   }
@@ -139,9 +116,7 @@ static int folve_open(const char *path, struct fuse_file_info *fi) {
   // The file-handle has the neat property to be 64 bit - so we can actually
   // stuff a pointer to our file handler object in there :)
   // (Yay, someone was thinking while developing that API).
-  char path_buf[PATH_MAX];
-  const char *orig_path = assemble_orig_path(path_buf, path);
-  FileHandler *handler = folve_rt.fs->CreateHandler(path, orig_path);
+  FileHandler *handler = folve_rt.fs->GetOrCreateHandler(path);
   if (handler == NULL)
     return -errno;
   fi->fh = (uint64_t) handler;
@@ -212,6 +187,7 @@ static int usage(const char *prg) {
          "\t               you'll get a drop-down select on the HTTP "
          "status page.\n"
          "\t-p <port>    : Port to run the HTTP status server on.\n"
+         "\t-g           : 'gapless': convolve adjacent files (experimental).\n"
          "\t-D           : Moderate volume Folve debug messages to syslog.\n"
          "\t               Can then also be toggled in the UI.\n"
          "\t-f           : Operate in foreground; useful for debugging.\n"
@@ -232,6 +208,7 @@ enum {
   FOLVE_OPT_PORT = 42,
   FOLVE_OPT_CONFIG,
   FOLVE_OPT_DEBUG,
+  FOLVE_OPT_GAPLESS,
 };
 
 int FolveOptionHandling(void *data, const char *arg, int key,
@@ -257,6 +234,9 @@ int FolveOptionHandling(void *data, const char *arg, int key,
     rt->fs->set_debug_ui_enabled(true);
     rt->fs->SetDebugMode(true);
     return 0;
+  case FOLVE_OPT_GAPLESS:
+    rt->fs->set_gapless_processing(true);
+    return 0;
   }
   return 1;
 }
@@ -273,6 +253,7 @@ int main(int argc, char *argv[]) {
     FUSE_OPT_KEY("-p ", FOLVE_OPT_PORT),
     FUSE_OPT_KEY("-c ", FOLVE_OPT_CONFIG),
     FUSE_OPT_KEY("-D",  FOLVE_OPT_DEBUG),
+    FUSE_OPT_KEY("-g",  FOLVE_OPT_GAPLESS),
     FUSE_OPT_END
   };
   struct fuse_args args = FUSE_ARGS_INIT(argc, argv);

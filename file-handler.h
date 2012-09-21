@@ -22,7 +22,8 @@
 // Status about some handler, filled in by various subsystem.
 struct HandlerStats {
   HandlerStats()
-  : duration_seconds(-1), progress(-1), status(OPEN), last_access(0) {}
+    : duration_seconds(-1), progress(-1), status(OPEN), last_access(0),
+      in_gapless(false), out_gapless(false) {}
   std::string filename;         // filesystem name.
   std::string format;           // File format info if recognized.
   std::string message;          // Per file (error) message if any.
@@ -32,8 +33,11 @@ struct HandlerStats {
   enum Status { OPEN, IDLE, RETIRED };
   Status status;                // Status of this file handler.
   double last_access;           // Last access in hi-res seconds since epoch.
+  bool in_gapless;              // Were we handed a processor to continue.
+  bool out_gapless;             // Did we pass on our processor.
 };
 
+class SoundProcessor;
 // A handler that deals with operations on files. Since we only provide read
 // access, this is limited to very few operations.
 // Closing in particular is not done by this file handler as it might
@@ -52,6 +56,7 @@ public:
 
   // Get handler status.
   virtual void GetHandlerStatus(struct HandlerStats *s) = 0;
+  virtual bool AcceptProcessor(SoundProcessor *s) { return false; }
 
 private:
   const int filter_id_;

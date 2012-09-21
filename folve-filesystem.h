@@ -21,6 +21,7 @@
 
 #include <string>
 #include <vector>
+#include <set>
 
 #include "file-handler-cache.h"
 #include "file-handler.h"
@@ -56,15 +57,18 @@ public:
   // Create a new filter given the filesystem path and the underlying
   // path.
   // Returns NULL, if it cannot be created.
-  FileHandler *CreateHandler(const char *fs_path,
-                             const char *underlying_path);
-  
-  // Return dynamic size of file.
-  int StatByFilename(const char *fs_path, struct stat *st);
+  FileHandler *GetOrCreateHandler(const char *fs_path);
   
   // Inform filesystem that this file handler is not needed anymore
   // (FS still might consider keeping it around for a while).
   void Close(const char *fs_path, const FileHandler *handler);
+
+  // Return dynamic size of file.
+  int StatByFilename(const char *fs_path, struct stat *st);
+
+  // List files in given filesystem directory. Returns a set of filesystem
+  // paths of existing files.
+  bool ListDirectory(const std::string &fs_dir, std::set<std::string> *files);
 
   FileHandlerCache *handler_cache() { return &open_file_cache_; }
 
@@ -74,6 +78,9 @@ public:
 
   void set_debug_ui_enabled(bool b) { debug_ui_enabled_ = b; }
   bool is_debug_ui_enabled() const { return debug_ui_enabled_; }
+
+  void set_gapless_processing(bool b) { gapless_processing_ = b; }
+  bool gapless_processing() const { return gapless_processing_; }
 
   // Some stats.
   int total_file_openings() { return total_file_openings_; }
@@ -85,12 +92,13 @@ private:
 
   FileHandler *CreateFromDescriptor(int filedes, int cfg_idx,
                                     const char *fs_path,
-                                    const char *underlying_file);
+                                    const std::string &underlying_file);
 
   std::string underlying_dir_;
   std::vector<std::string> config_dirs_;
   int current_cfg_index_;
   bool debug_ui_enabled_;
+  bool gapless_processing_;
   FileHandlerCache open_file_cache_;
   int total_file_openings_;
   int total_file_reopen_;
