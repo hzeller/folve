@@ -337,8 +337,11 @@ private:
   }
 
   virtual bool AcceptProcessor(SoundProcessor *processor) {
-    if (processor_ != NULL || !input_frames_left_)
+    if (processor_ != NULL || !input_frames_left_) {
+      DebugLogf("Gapless attempt: Cannot bridge gap to alrady open file %s",
+                base_stats_.filename.c_str());
       return false;  // We already have one.
+    }
     // TODO: check that other parameters such as sampling rate and channels
     // match (should be a are problem).
     processor_ = processor;
