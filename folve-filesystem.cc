@@ -210,12 +210,14 @@ public:
       stats->progress = 0.0;
     else
       stats->progress = 1.0 * frames_done / in_info_.frames;
-    if (processor_ && processor_->max_output_value() > 1.0) {
+    if (base_stats_.max_output_value) {
+      // TODO: the status server could inspect this value and make better
+      // rendering.
       base_stats_.message =
         StringPrintf("Output clipping! "
                      "(max=%.3f; Multiply gain with <= %.5f<br/>in %s)",
-                     processor_->max_output_value(),
-                     1.0 / processor_->max_output_value(),
+                     base_stats_.max_output_value,
+                     1.0 / base_stats_.max_output_value,
                      config_path_.c_str());
     }
   }
@@ -416,7 +418,7 @@ private:
       processor_->WriteProcessed(snd_out_, r);
       if (passed_processor) {
         base_stats_.out_gapless = true;
-        LogClipping();
+        ExtractOutputValues();
         processor_ = NULL;   // we handed over ownership.
       }
       if (next_file) fs_->Close(found->c_str(), next_file);
@@ -499,18 +501,22 @@ private:
     }
   }
 
-  void LogClipping() {
-    if (processor_ && processor_->max_output_value() > 1.0) {
-      syslog(LOG_ERR, "Observed output clipping (%s). "
-             "Max=%.3f; Multiply gain with <= %.5f in %s",
-             base_stats_.filename.c_str(), processor_->max_output_value(),
-             1.0 / processor_->max_output_value(), config_path_.c_str());
+  void ExtractOutputValues() {
+    if (processor_) {
+      base_stats_.max_output_value = processor_->max_output_value();
       processor_->ResetMaxValues();
     }
   }
+
   void Close() {
     if (snd_out_ == NULL) return;  // done.
-    LogClipping();
+    ExtractOutputValues();
+    if (base_stats_.max_output_value > 1.0) {
+      syslog(LOG_ERR, "Observed output clipping in '%s': "
+             "Max=%.3f; Multiply gain with <= %.5f in %s",
+             base_stats_.filename.c_str(), base_stats_.max_output_value,
+             1.0 / base_stats_.max_output_value, config_path_.c_str());
+    }
     // We can't disable buffer writes here, because outfile closing will flush
     // the last couple of sound samples.
     if (snd_in_) sf_close(snd_in_);

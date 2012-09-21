@@ -23,7 +23,7 @@
 struct HandlerStats {
   HandlerStats()
     : duration_seconds(-1), progress(-1), status(OPEN), last_access(0),
-      in_gapless(false), out_gapless(false) {}
+      max_output_value(0), in_gapless(false), out_gapless(false) {}
   std::string filename;         // filesystem name.
   std::string format;           // File format info if recognized.
   std::string message;          // Per file (error) message if any.
@@ -33,6 +33,7 @@ struct HandlerStats {
   enum Status { OPEN, IDLE, RETIRED };
   Status status;                // Status of this file handler.
   double last_access;           // Last access in hi-res seconds since epoch.
+  float max_output_value;       // Clipping ? Should be [0 .. 1]
   bool in_gapless;              // Were we handed a processor to continue.
   bool out_gapless;             // Did we pass on our processor.
 };
