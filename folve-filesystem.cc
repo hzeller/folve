@@ -315,7 +315,7 @@ private:
       out_buffer->WriteCharAt((1152 & 0x00FF)     ,  9);
       out_buffer->WriteCharAt((32768 & 0xFF00) >> 8, 10);
       out_buffer->WriteCharAt((32768 & 0x00FF)     , 11);
-      for (int i = 12; i < 18; ++i) out_buffer->WriteCharAt(0, i);
+      for (int i = 12; i < 18; ++i) out_buffer->WriteCharAt(0, i);  // MD5
     } else {
       // .. and if SNDFILE writes the header, it misses out in writing the
       // number of samples to be expected. So let's fill that in.
@@ -391,26 +391,28 @@ private:
       bool is_last = header[0] & 0x80;
       unsigned int type = header[0] & 0x7F;
       unsigned int byte_len = (header[1] << 16) + (header[2] << 8) + header[3];
-      DebugLogf(" %02x %02x %02x %02x type: %d, len: %6u %s ",
-                header[0], header[1], header[2], header[3],
-                type, byte_len, is_last ? "(last)" : "(cont)");
+      const char *extra_info = "";
       need_finish_padding = false;
       if (type == FLAC__METADATA_TYPE_STREAMINFO && byte_len == 34) {
         out_buffer->Append(&header, sizeof(header));
         // Copy everything but the MD5 at the end - which we set to empty.
         CopyBytes(filedes_, pos, out_buffer, byte_len - 16);
         for (int i = 0; i < 16; ++i) out_buffer->Append("\0", 1);
-        // TODO append log (copy streaminfo, but redacted MD5)
+        extra_info = "Streaminfo; redact MD5.";
       }
       else if (type == FLAC__METADATA_TYPE_SEEKTABLE) {
         // The SEEKTABLE header we skip, because it is bogus after encoding.
         // TODO append log (skip the seektable)
         need_finish_padding = is_last;  // if we were last, force finish block.
+        extra_info = "Skip seektable.";
       }
       else {
         out_buffer->Append(&header, sizeof(header));
         CopyBytes(filedes_, pos, out_buffer, byte_len);
       }
+      DebugLogf(" %02x %02x %02x %02x type: %d, len: %6u %s %s ",
+                header[0], header[1], header[2], header[3],
+                type, byte_len, is_last ? "(last)" : "(cont)", extra_info);
       pos += byte_len;
       if (is_last)
         break;
