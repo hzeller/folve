@@ -574,7 +574,7 @@ private:
 
 FolveFilesystem::FolveFilesystem()
   : current_cfg_index_(0), debug_ui_enabled_(false), gapless_processing_(false),
-    open_file_cache_(3), total_file_openings_(0), total_file_reopen_(0) {
+    open_file_cache_(4), total_file_openings_(0), total_file_reopen_(0) {
   config_dirs_.push_back("");  // The first config is special: empty.
 }
 
