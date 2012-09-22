@@ -117,7 +117,7 @@ Now you can access the fileystem under that mount point, e.g.
 
     mplayer /mnt/mountpoint/foo.flac
 
-The fuse-convolve filesystem will determine the samplerate/bits/channels and
+The Folve filesystem will determine the samplerate/bits/channels and
 attempt to find the right filter in the filter directory. If there is a filter,
 the output is filtered on-the-fly, otherwise the original file is returned.
 
@@ -134,4 +134,4 @@ To manually switch the configuration from the command line, you can use wget
 The parameter given to `f=` is the configuration in the same sequence you
 supplied on startup, starting to count from 1. Configuration 0 means
 'no filter' (And no, there is no security built-in. If you want people from
-messing with the configuration of your folve-daemon, don't use -p :)).
+messing with the configuration of your Folve-daemon, don't use -p :)).
