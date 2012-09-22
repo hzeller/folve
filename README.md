@@ -127,7 +127,7 @@ have a look on
 
   http://localhost:17322/
 
-To manually switch the configuration from the command line, you can use wget
+To manually switch the configuration from the command line, you can use wget:
 
     wget -q -O/dev/null http://localhost:17322/settings?f=2
 
