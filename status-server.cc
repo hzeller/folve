@@ -220,7 +220,6 @@ void StatusServer::PrepareConfigDirectoriesForUI() {
     if (slash_pos != std::string::npos) {
       d = d.substr(slash_pos + 1);
     }
-    d[0] = toupper(d[0]);
     ui_config_directories_.push_back(d);
   }
 }
