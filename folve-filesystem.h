@@ -74,10 +74,6 @@ public:
 
   FileHandlerCache *handler_cache() { return &open_file_cache_; }
 
-  // Sets more fine grained debug log messages.
-  void SetDebugMode(bool b);
-  bool IsDebugMode() const;
-
   void set_debug_ui_enabled(bool b) { debug_ui_enabled_ = b; }
   bool is_debug_ui_enabled() const { return debug_ui_enabled_; }
 

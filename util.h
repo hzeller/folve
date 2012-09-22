@@ -19,22 +19,32 @@
 
 #include <string>
 
+  // Define this with empty, if you're not using gcc.
+#define PRINTF_FMT_CHECK(fmt_pos, args_pos) \
+    __attribute__ ((format (printf, fmt_pos, args_pos)))
+
+// Some utility functions needed everywhere.
 namespace folve {
   // Returns the current time as seconds since the start of the unix epoch,
   // but in microsecond resolution.
   double CurrentTime();
-  
+
   // Like snprintf, but print to a std::string instead.
-  void Appendf(std::string *str, const char *format, ...) 
-    __attribute__ ((format (printf, 2, 3)));
+  void Appendf(std::string *str, const char *format, ...) PRINTF_FMT_CHECK(2,3);
 
   // Convenience, that returns a string directly. A bit less efficient than
   // Appendf().
-  std::string StringPrintf(const char *format, ...)
-    __attribute__ ((format (printf, 1, 2)));
+  std::string StringPrintf(const char *format, ...) PRINTF_FMT_CHECK(1, 2);
 
   // Return if "str" has suffix "suffix".
   bool HasSuffix(const std::string &str, const std::string &suffix);
-}  // namespece fuse_convolve
+
+  // Log formatted string if debugging enabled.
+  void DLogf(const char *format, ...) PRINTF_FMT_CHECK(1, 2);
+  void EnableDebugLog(bool b);
+  bool IsDebugLogEnabled();
+}  // namespece folve
+
+#undef PRINTF_FMT_CHECK
 
 #endif  // FOLVE_UTIL_H

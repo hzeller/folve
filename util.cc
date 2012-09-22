@@ -18,6 +18,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <sys/time.h>
+#include <syslog.h>
 
 double folve::CurrentTime() {
   struct timeval tv;
@@ -47,6 +48,26 @@ std::string folve::StringPrintf(const char *format, ...) {
   vAppendf(&result, format, ap);
   va_end(ap);
   return result;
+}
+
+static bool global_debug_log = false;
+void folve::EnableDebugLog(bool b) {
+  if (b != global_debug_log) {
+    syslog(LOG_INFO, "Switch debug mode %s.", b ? "on" : "off");
+    global_debug_log = b;
+  }
+}
+
+bool folve::IsDebugLogEnabled() {
+  return global_debug_log;
+}
+
+void folve::DLogf(const char *format, ...) {
+  if (!global_debug_log) return;
+  va_list ap;
+  va_start(ap, format);
+  vsyslog(LOG_DEBUG, format, ap);
+  va_end(ap);
 }
 
 bool folve::HasSuffix(const std::string &str, const std::string &suffix) {

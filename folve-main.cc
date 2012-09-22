@@ -31,6 +31,7 @@
 
 #include "folve-filesystem.h"
 #include "status-server.h"
+#include "util.h"
 
 // Compilation unit variables to communicate with the fuse callbacks.
 static struct FolveRuntime {
@@ -146,7 +147,7 @@ static void *folve_init(struct fuse_conn_info *conn) {
   syslog(LOG_INFO, "Version " FOLVE_VERSION " started. "
          "Serving '%s' on mount point '%s'",
          folve_rt.fs->underlying_dir().c_str(), folve_rt.mount_point);
-  if (folve_rt.fs->IsDebugMode()) {
+  if (folve::IsDebugLogEnabled()) {
     syslog(LOG_INFO, "Debug logging enabled (-D)");
   }
 
@@ -232,7 +233,7 @@ int FolveOptionHandling(void *data, const char *arg, int key,
     return 0;
   case FOLVE_OPT_DEBUG:
     rt->fs->set_debug_ui_enabled(true);
-    rt->fs->SetDebugMode(true);
+    folve::EnableDebugLog(true);
     return 0;
   case FOLVE_OPT_GAPLESS:
     rt->fs->set_gapless_processing(true);

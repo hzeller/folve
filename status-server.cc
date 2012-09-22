@@ -109,7 +109,7 @@ void StatusServer::SetFilter(const char *filter) {
 
 void StatusServer::SetDebug(const char *dbg) {
   if (!filesystem_->is_debug_ui_enabled()) return;
-  filesystem_->SetDebugMode(dbg != NULL && *dbg == '1');
+  folve::EnableDebugLog(dbg != NULL && *dbg == '1');
 }
 
 bool StatusServer::Start(int port) {
@@ -229,7 +229,7 @@ void StatusServer::AppendFilterOptions(std::string *result) {
             "<label for='dbg_sel'>Folve debug to syslog</label>"
             "<input id='dbg_sel' onchange='this.form.submit();' "
             "type='checkbox' name='d' value='1'%s/></span>",
-            filesystem_->IsDebugMode() ? " checked" : "");
+            folve::IsDebugLogEnabled() ? " checked" : "");
   }
   result->append("</form>");
 }

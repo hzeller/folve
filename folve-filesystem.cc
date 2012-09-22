@@ -43,19 +43,7 @@
 
 using folve::Appendf;
 using folve::StringPrintf;
-
-static bool global_debug = false;
-
-static void DebugLogf(const char *format, ...)
-  __attribute__ ((format (printf, 1, 2)));
-
-void DebugLogf(const char *format, ...) {
-  if (!global_debug) return;
-  va_list ap;
-  va_start(ap, format);
-  vsyslog(LOG_DEBUG, format, ap);
-  va_end(ap);
-}
+using folve::DLogf;
 
 namespace {
 
@@ -68,8 +56,7 @@ public:
     : FileHandler(filter_id), filedes_(filedes),
       file_size_(-1), max_accessed_(0), info_stats_(known_stats) {
     info_stats_.message.append("; pass through.");
-    DebugLogf("Creating PassThrough filter for '%s'",
-              known_stats.filename.c_str());
+    DLogf("Creating PassThrough filter for '%s'", known_stats.filename.c_str());
     struct stat st;
     file_size_ = (Stat(&st) == 0) ? st.st_size : -1;
   }
@@ -127,7 +114,7 @@ public:
     memset(&in_info, 0, sizeof(in_info));
     SNDFILE *snd = sf_open_fd(filedes, SFM_READ, &in_info, 0);
     if (snd == NULL) {
-      DebugLogf("File %s: %s", underlying_file.c_str(), sf_strerror(NULL));
+      DLogf("File %s: %s", underlying_file.c_str(), sf_strerror(NULL));
       partial_file_info->message = sf_strerror(NULL);
       return NULL;
     }
@@ -160,14 +147,14 @@ public:
     const bool found_config = FindFirstAccessiblePath(path_choices,
                                                       &config_path);
     if (found_config) {
-      DebugLogf("File %s, %.1fkHz, %d Bit, %d:%02d: filter config %s",
-                underlying_file.c_str(), in_info.samplerate / 1000.0, bits,
-                seconds / 60, seconds % 60,
-                config_path.c_str());
+      DLogf("File %s, %.1fkHz, %d Bit, %d:%02d: filter config %s",
+            underlying_file.c_str(), in_info.samplerate / 1000.0, bits,
+            seconds / 60, seconds % 60,
+            config_path.c_str());
     } else {
-      DebugLogf("File %s: couldn't find filter config %s...%s",
-                underlying_file.c_str(),
-                path_choices[0].c_str(), path_choices[max_choice].c_str());
+      DLogf("File %s: couldn't find filter config %s...%s",
+            underlying_file.c_str(),
+            path_choices[0].c_str(), path_choices[max_choice].c_str());
       partial_file_info->message = "Missing ( " + path_choices[0]
         + "<br/> ... " + path_choices[max_choice] + " )";
       sf_close(snd);
@@ -345,18 +332,18 @@ private:
     }
 
     out_buffer->set_sndfile_writes_enabled(true);  // ready for sound-stream.
-    DebugLogf("Header init done (%s).", base_stats_.filename.c_str());
+    DLogf("Header init done (%s).", base_stats_.filename.c_str());
     out_buffer->HeaderFinished();
   }
 
   virtual bool AcceptProcessor(SoundProcessor *new_processor) {
     if (processor_ != NULL || !input_frames_left_) {
-      DebugLogf("Gapless attempt: Cannot bridge gap to alrady open file %s",
-                base_stats_.filename.c_str());
+      DLogf("Gapless attempt: Cannot bridge gap to alrady open file %s",
+            base_stats_.filename.c_str());
       return false;  // We already have one.
     }
     if (new_processor->config_file() != config_path_) {
-      DebugLogf("Gapless: Configuration changed; can't join gapless");
+      DLogf("Gapless: Configuration changed; can't join gapless");
       return false;
     }
     // TODO: check that other parameters such as sampling rate and channels
@@ -428,8 +415,8 @@ private:
            && (next_file = fs_->GetOrCreateHandler(found->c_str()))
            && next_file->AcceptProcessor(processor_));
       if (passed_processor) {
-        DebugLogf("Gapless pass-on from '%s' to alphabetically next '%s'",
-                  base_stats_.filename.c_str(), found->c_str());
+        DLogf("Gapless pass-on from '%s' to alphabetically next '%s'",
+              base_stats_.filename.c_str(), found->c_str());
       }
       processor_->WriteProcessed(snd_out_, r);
       if (passed_processor) {
@@ -460,8 +447,8 @@ private:
   }
 
   void CopyFlacHeader(ConversionBuffer *out_buffer) {
-    DebugLogf("Provide FLAC header from original file %s",
-              base_stats_.filename.c_str());
+    DLogf("Provide FLAC header from original file %s",
+          base_stats_.filename.c_str());
     out_buffer->Append("fLaC", 4);
     off_t pos = 4;
     unsigned char header[4];
@@ -490,15 +477,15 @@ private:
         out_buffer->Append(&header, sizeof(header));
         CopyBytes(filedes_, pos, out_buffer, byte_len);
       }
-      DebugLogf(" %02x %02x %02x %02x type: %d, len: %6u %s %s ",
-                header[0], header[1], header[2], header[3],
-                type, byte_len, is_last ? "(last)" : "(cont)", extra_info);
+      DLogf(" %02x %02x %02x %02x type: %d, len: %6u %s %s ",
+            header[0], header[1], header[2], header[3],
+            type, byte_len, is_last ? "(last)" : "(cont)", extra_info);
       pos += byte_len;
       if (is_last)
         break;
     }
     if (need_finish_padding) {  // if the last block was not is_last: pad.
-      DebugLogf("write padding");
+      DLogf("write padding");
       memset(&header, 0, sizeof(header));
       header[0] = 0x80 /* is last */ | FLAC__METADATA_TYPE_PADDING;
       out_buffer->Append(&header, sizeof(header));
@@ -506,7 +493,7 @@ private:
   }
 
   void GenerateHeaderFromInputFile(ConversionBuffer *out_buffer) {
-    DebugLogf("Generate header from original ID3-tags.");
+    DLogf("Generate header from original ID3-tags.");
     out_buffer->set_sndfile_writes_enabled(true);
     // Copy ID tags that are supported by sndfile.
     for (int i = SF_STR_FIRST; i <= SF_STR_LAST; ++i) {
@@ -681,14 +668,6 @@ static bool IsDirectory(const std::string &path) {
     return false;
   return (st.st_mode & S_IFMT) == S_IFDIR;
 }
-
-void FolveFilesystem::SetDebugMode(bool b) {
-  if (b != global_debug) {
-    syslog(LOG_INFO, "Switch debug mode %s.", b ? "on" : "off");
-    global_debug = b;
-  }
-}
-bool FolveFilesystem::IsDebugMode() const { return global_debug; }
 
 bool FolveFilesystem::CheckInitialized() {
   if (underlying_dir().empty()) {
