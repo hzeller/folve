@@ -1,7 +1,10 @@
-			    Folve - Fuse Convolve
-	 A fuse filesystem for on-the-fly convolving of audio files.
+<center>Folve - Fuse Convolve</center>
+===
 
-=== Overview ===
+<center>A fuse filesystem for on-the-fly convolving of audio files.</center>
+
+Overview
+--------
 
 This fuse filesystem takes an original path to a directory with flac-files
 and provides these files at the mount point. Accessing audio files will
@@ -42,26 +45,28 @@ before continuing with the convolved audio stream.
 Folve has been tested with some players and media servers (and
 works around bugs in these). Still, this is the first version made public, so
 expect rough edges. Please report observations with particular media servers
-or send patches to h.zeller@acm.org.
+or send patches to <h.zeller@acm.org>.
 
 This project is notably based on
-Fuse: Filesystem in Userspace   http://fuse.sourceforge.net/
-JConvolver Jack audio convolver http://apps.linuxaudio.org/apps/all/jconvolver
-LibSndfile r/w audio files      http://www.mega-nerd.com/libsndfile/
-Microhttpd webserver library    http://www.gnu.org/software/libmicrohttpd/
 
-=== Compiling on Ubuntu (tested on 11.10 and 12.04) ===
+ * Fuse: Filesystem in Userspace   <http://fuse.sourceforge.net/>
+ * JConvolver audio convolver <http://apps.linuxaudio.org/apps/all/jconvolver>
+ * LibSndfile r/w audio files <http://www.mega-nerd.com/libsndfile/>
+ * Microhttpd webserver library <http://www.gnu.org/software/libmicrohttpd/>
+
+
+### Compiling on Ubuntu (tested on 11.10 and 12.04) ###
 
   This requires the latest versions of libfuse and libzita convolver to compile.
   .. and a couple of other libs:
 
-  $ sudo aptitude install libsndfile-dev libflac-dev libzita-convolver-dev \
+	$ sudo aptitude install libsndfile-dev libflac-dev libzita-convolver-dev \
                           libfuse-dev libboost-dev libmicrohttpd-dev
-  $ make
+	$ make
 
 (TODO: make install; debian package)
 
-=== Run ===
+### Run ###
  Since there is no 'make install' yet, let's run it from the local directory.
 
  Folve requires at least two parameters: the directory where your original
@@ -70,14 +75,14 @@ Microhttpd webserver library    http://www.gnu.org/software/libmicrohttpd/
  with the -c <config-dir> option. Very useful is the -p <port> that starts
  an HTTP server.
 
-  ./folve -c /filter/dir -p 17322 /path/to/original/files /mnt/mountpoint
+     ./folve -c /filter/dir -p 17322 /path/to/original/files /mnt/mountpoint
 
 The configuration directory should contain configuration files as they're
 found in jconvolver, with the following naming scheme:
 
-       filter-<samplerate>-<channels>-<bits>.conf   OR
-       filter-<samplerate>-<channels>.conf          OR
-       filter-<samplerate>.conf
+     filter-<samplerate>-<channels>-<bits>.conf   OR
+     filter-<samplerate>-<channels>.conf          OR
+     filter-<samplerate>.conf
 
 So if you have flac files with 44.1kHz, 16 bits and 2 channel stero,
 you need a filter configuration named one of these (in matching sequence):
@@ -88,11 +93,12 @@ you need a filter configuration named one of these (in matching sequence):
 
 The files are searched from the most specific to the least specific type.
 
-(See README.CONFIG in the jconvolver project how these look like)
+(See README.CONFIG in the [jconvolver](http://apps.linuxaudio.org/apps/all/jconvolver) project how these look like)
 
-General usage:
-usage: ./folve [options] <original-dir> <mount-point>
-Options: (in sequence of usefulness)
+### General usage: ###
+
+    usage: ./folve [options] <original-dir> <mount-point>
+    Options: (in sequence of usefulness)
         -c <cfg-dir> : Convolver configuration directory.
                        You can supply this option multiple times:
                        you'll get a drop-down select on the HTTP status page.
@@ -105,13 +111,15 @@ Options: (in sequence of usefulness)
         -d           : High volume fuse debug log. Implies -f.
 
 Now you can access the fileystem under that mount point, e.g.
-  mplayer /mnt/mountpoint/foo.flac
+
+    mplayer /mnt/mountpoint/foo.flac
 
 The fuse-convolve filesystem will determine the samplerate/bits/channels and
 attempt to find the right filter in the filter directory. If there is a filter,
 the output is filtered on-the-fly, otherwise the original file is returned.
 
 If you gave Folve the flag -p with an status port, it will serve current
-status information on a http server; e.g. With ./folve ... -p 17322 have a look
-on
+status information on a http server; e.g. With `./folve ... -p 17322`
+have a look on
+
   http://localhost:17322/
