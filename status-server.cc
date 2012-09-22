@@ -15,6 +15,7 @@
 
 #include <arpa/inet.h>
 #include <fcntl.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/select.h>
@@ -186,10 +187,10 @@ static void AppendFileInfo(std::string *result, const char *progress_style,
   } else {
     result->append("<td colspan='3'>-</td>");
   }
-  if (stats.max_output_value > 0.0) {
+  if (stats.max_output_value > 1e-6) {
     Appendf(result, sDecibelColumn,
             stats.max_output_value > 1.0 ? "#FF0505" : "white",
-            20 * log(stats.max_output_value));
+            20 * logf(stats.max_output_value));
   } else {
     result->append("<td>-</td>");
   }
@@ -292,7 +293,7 @@ const std::string &StatusServer::CreatePage() {
   if (filesystem_->gapless_processing()) {
     content_.append("<br/>&rarr; : denotes gapless transfers\n");
   }
-  content_.append("<table cellspacing='10'>\n");
+  content_.append("<table>\n");
   Appendf(&content_, "<tr><th>Stat</th><td><!--gapless in--></td>"
           "<th width='%dpx'>Progress</th>"  // progress bar.
           "<td><!-- gapless out --></td>"
