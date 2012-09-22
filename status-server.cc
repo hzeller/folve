@@ -205,7 +205,7 @@ static void AppendFileInfo(std::string *result, const char *progress_style,
 }
 
 void StatusServer::AppendFilterOptions(std::string *result) {
-  Appendf(result, "<form action='%s'>\n"
+  Appendf(result, "<form id='settings-form' action='%s'>\n"
           "<label for='cfg_sel'>Config directory </label>", kSettingsUrl);
   Appendf(result, "<select id='cfg_sel' name='f' "
           "onchange='this.form.submit();'>\n");
@@ -233,6 +233,7 @@ void StatusServer::AppendFilterOptions(std::string *result) {
             folve::IsDebugLogEnabled() ? " checked" : "");
   }
   result->append("</form>");
+  result->append("<script>document.forms['settings-form'].reset();</script>");
 }
 
 struct CompareStats {
