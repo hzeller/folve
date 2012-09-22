@@ -19,6 +19,14 @@
 #include <assert.h>
 #include <string.h>
 
+#include <boost/thread/mutex.hpp>
+#include <boost/thread/locks.hpp>
+
+// There seems to be a bug somewhere inside the fftwf library or the use
+// within Convproc::configure()
+// It creates a double-delete somewhere if accessed with multiple threads.
+static boost::mutex fftw_mutex;
+
 SoundProcessor *SoundProcessor::Create(const std::string &config_file,
                                        int samplerate, int channels) {
   ZitaConfig zita;
@@ -27,10 +35,13 @@ SoundProcessor *SoundProcessor::Create(const std::string &config_file,
   zita.ninp = channels;
   zita.nout = channels;
   zita.convproc = new Convproc();
-  if ((config(&zita, config_file.c_str()) != 0)
-      || zita.convproc->inpdata(channels - 1) == NULL
-      || zita.convproc->outdata(channels - 1) == NULL) {
-    return NULL;
+  { // fftw threading bug workaround, see above.
+    boost::lock_guard<boost::mutex> l(fftw_mutex);
+    if ((config(&zita, config_file.c_str()) != 0)
+        || zita.convproc->inpdata(channels - 1) == NULL
+        || zita.convproc->outdata(channels - 1) == NULL) {
+      return NULL;
+    }
   }
   return new SoundProcessor(zita);
 }
