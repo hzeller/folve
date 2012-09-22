@@ -102,6 +102,7 @@ The files are searched from the most specific to the least specific type.
                        You can supply this option multiple times:
                        you'll get a drop-down select on the HTTP status page.
         -p <port>    : Port to run the HTTP status server on.
+        -r <refresh> : If > 0: seconds between refresh of status page.
         -g           : Gapless convolving alphabetically adjacent files.
         -D           : Moderate volume Folve debug messages to syslog.
                        Can then also be toggled in the UI.

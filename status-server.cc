@@ -47,16 +47,13 @@ static const char kSettingsUrl[] = "/settings";
 // Sneak in a favicon without another resource access.
 // TODO: make a nice icon, recognizable as something that has to do with "
 // files and music ...
-static const char kHtmlHeader[] = "<html><head>"
+static const char kStartHtmlHeader[] = "<html><head>"
   "<title>Folve</title>\n"
   "<link rel='icon' type='image/png' "
   "href='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2"
   "AAAAAXNSR0IArs4c6QAAAAlwSFlzAAALEwAACxMBAJqcGAAAAAd0SU1FB9wJDwUlEA/UBrsA"
   "AABSSURBVCjPrZIxDgAgDAKh8f9froOTirU1ssKFYqS7Q4mktAxFRQDJcsPORMDYsDCXhn331"
-  "9GPwHJVuaFl3l4D1+h0UjIdbTh9SpP2KQ2AgSfVAdEQGx23tOopAAAAAElFTkSuQmCC'/>\n"
-  // TODO: make refresh configurable.
-  "<meta http-equiv='refresh' content='1'>\n"
-  "</head>\n";
+  "9GPwHJVuaFl3l4D1+h0UjIdbTh9SpP2KQ2AgSfVAdEQGx23tOopAAAAAElFTkSuQmCC'/>\n";
 
 // Callback function called by micro http daemon. Gets the StatusServer pointer
 // in the user_argument.
@@ -97,6 +94,7 @@ int StatusServer::HandleHttp(void* user_argument,
 StatusServer::StatusServer(FolveFilesystem *fs)
   : expunged_retired_(0), total_seconds_filtered_(0),
     total_seconds_music_seen_(0),
+    meta_refresh_time_(-1),
     filesystem_(fs), daemon_(NULL), filter_switched_(false) {
   fs->handler_cache()->SetObserver(this);
 }
@@ -287,7 +285,13 @@ const std::string &StatusServer::CreatePage() {
   // a page. Since we run with MHD_USE_SELECT_INTERNALLY, this is only accessed
   // by one thread.
   content_.clear();
-  content_.append(kHtmlHeader);
+  content_.append(kStartHtmlHeader);
+  if (meta_refresh_time_ > 0) {
+    Appendf(&content_, "<meta http-equiv='refresh' content='%d'>\n",
+            meta_refresh_time_);
+  }
+  content_.append("</head>\n");
+
   content_.append("<body style='font-family:Sans-Serif;'>\n");
   Appendf(&content_, "<center style='background-color:#A0FFA0;'>"
           "Welcome to "

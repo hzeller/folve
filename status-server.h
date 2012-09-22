@@ -37,6 +37,9 @@ public:
   // Start server, listing on given port.
   bool Start(int port);
 
+  // Set browser meta-refresh time. < 0 to disable.
+  void set_meta_refresh(int seconds) { meta_refresh_time_ = seconds; }
+
   // Shut down daemon.
   virtual ~StatusServer();
 
@@ -52,8 +55,8 @@ private:
   void PrepareConfigDirectoriesForUI();
 
   // Set filter or debug mode from http-request. Gracefully handles garbage.
-  void SetFilter(const char *filter);
-  void SetDebug(const char *filter);
+  void SetFilter(const char *value);
+  void SetDebug(const char *value);
 
   // -- interface FileHandlerCache::Observer
   virtual void InsertHandlerEvent(FileHandler *handler) {}
@@ -69,6 +72,7 @@ private:
 
   double total_seconds_filtered_;
   double total_seconds_music_seen_;
+  int meta_refresh_time_;
   FolveFilesystem *filesystem_;
   struct MHD_Daemon *daemon_;
   std::string content_;

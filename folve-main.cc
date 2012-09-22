@@ -35,10 +35,12 @@
 
 // Compilation unit variables to communicate with the fuse callbacks.
 static struct FolveRuntime {
-  FolveRuntime() : fs(NULL), mount_point(NULL), status_port(-1) {}
+  FolveRuntime() : fs(NULL), mount_point(NULL),
+                   status_port(-1), refresh_time(-1) {}
   FolveFilesystem *fs;
   const char *mount_point;
   int status_port;
+  int refresh_time;
 } folve_rt;
 
 static char *concat_path(char *buf, const char *a, const char *b) {
@@ -155,8 +157,9 @@ static void *folve_init(struct fuse_conn_info *conn) {
     // Need to start status server after we're daemonized.
     StatusServer *status_server = new StatusServer(folve_rt.fs);
     if (status_server->Start(folve_rt.status_port)) {
-      syslog(LOG_INFO, "HTTP status server on port %d",
-             folve_rt.status_port);
+      syslog(LOG_INFO, "HTTP status server on port %d; refresh=%d",
+             folve_rt.status_port, folve_rt.refresh_time);
+      status_server->set_meta_refresh(folve_rt.refresh_time);
     } else {
       syslog(LOG_ERR, "Couldn't start HTTP server on port %d\n",
              folve_rt.status_port);
@@ -188,6 +191,7 @@ static int usage(const char *prg) {
          "\t               you'll get a drop-down select on the HTTP "
          "status page.\n"
          "\t-p <port>    : Port to run the HTTP status server on.\n"
+         "\t-r <refresh> : If > 0: seconds between refresh of status page.\n"
          "\t-g           : Gapless convolving alphabetically adjacent files.\n"
          "\t-D           : Moderate volume Folve debug messages to syslog.\n"
          "\t               Can then also be toggled in the UI.\n"
@@ -207,6 +211,7 @@ struct FolveConfig {
 
 enum {
   FOLVE_OPT_PORT = 42,
+  FOLVE_OPT_REFRESH_TIME,
   FOLVE_OPT_CONFIG,
   FOLVE_OPT_DEBUG,
   FOLVE_OPT_GAPLESS,
@@ -227,6 +232,9 @@ int FolveOptionHandling(void *data, const char *arg, int key,
     }
   case FOLVE_OPT_PORT:
     rt->status_port = atoi(arg + 2);  // strip "-p"
+    return 0;
+  case FOLVE_OPT_REFRESH_TIME:
+    rt->refresh_time = atoi(arg + 2);  // strip "-r"
     return 0;
   case FOLVE_OPT_CONFIG:
     rt->fs->add_config_dir(arg + 2);  // strip "-c"
@@ -252,6 +260,7 @@ int main(int argc, char *argv[]) {
 
   static struct fuse_opt folve_options[] = {
     FUSE_OPT_KEY("-p ", FOLVE_OPT_PORT),
+    FUSE_OPT_KEY("-r ", FOLVE_OPT_REFRESH_TIME),
     FUSE_OPT_KEY("-c ", FOLVE_OPT_CONFIG),
     FUSE_OPT_KEY("-D",  FOLVE_OPT_DEBUG),
     FUSE_OPT_KEY("-g",  FOLVE_OPT_GAPLESS),
