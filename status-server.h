@@ -48,7 +48,8 @@ private:
                         const char *, const char *, const char *,
                         const char *, size_t *, void **);
 
-  void AppendFilterOptions(std::string *result);
+  void AppendSettingsForm();
+  void PrepareConfigDirectoriesForUI();
 
   // Set filter or debug mode from http-request. Gracefully handles garbage.
   void SetFilter(const char *filter);
@@ -62,6 +63,9 @@ private:
   RetiredList retired_;
   int expunged_retired_;
   boost::mutex retired_mutex_;
+
+  // Config directories with common prefix removed to have them concise.
+  std::vector<std::string> ui_config_directories_;
 
   double total_seconds_filtered_;
   double total_seconds_music_seen_;

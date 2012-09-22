@@ -34,7 +34,8 @@
 using folve::Appendf;
 
 // TODO: someone with a bit more stylesheet-fu can attempt to make this
-// more pretty and the HTML more compact.
+// more pretty and the HTML more compact. Maybe even with some Ajax-y inline
+// update of progress bars ?
 
 static const size_t kMaxRetired = 20;
 static const int kProgressWidth = 300;
@@ -53,6 +54,8 @@ static const char kHtmlHeader[] = "<html><head>"
   "AAAAAXNSR0IArs4c6QAAAAlwSFlzAAALEwAACxMBAJqcGAAAAAd0SU1FB9wJDwUlEA/UBrsA"
   "AABSSURBVCjPrZIxDgAgDAKh8f9froOTirU1ssKFYqS7Q4mktAxFRQDJcsPORMDYsDCXhn331"
   "9GPwHJVuaFl3l4D1+h0UjIdbTh9SpP2KQ2AgSfVAdEQGx23tOopAAAAAElFTkSuQmCC'/>\n"
+  // TODO: make refresh configurable.
+  "<meta http-equiv='refresh' content='1'>\n"
   "</head>\n";
 
 // Callback function called by micro http daemon. Gets the StatusServer pointer
@@ -204,36 +207,71 @@ static void AppendFileInfo(std::string *result, const char *progress_style,
   result->append("</tr>\n");
 }
 
-void StatusServer::AppendFilterOptions(std::string *result) {
-  Appendf(result, "<form id='settings-form' action='%s'>\n"
-          "<label for='cfg_sel'>Config directory </label>", kSettingsUrl);
-  Appendf(result, "<select id='cfg_sel' name='f' "
-          "onchange='this.form.submit();'>\n");
-  for (size_t i = 0; i < filesystem_->config_dirs().size(); ++i) {
-    const std::string &c = filesystem_->config_dirs()[i];
-    Appendf(result, "  <option value='%zd'%s>%s</option>\n", i,
-            ((int) i == filesystem_->current_cfg_index())
-            ? " selected='selected'" : "",
-            (i == 0) ? "[No convolver - just pass through]" : c.c_str());
+void StatusServer::PrepareConfigDirectoriesForUI() {
+  // Essentially only keep the directory name.
+  if (!ui_config_directories_.empty()) return;
+  ui_config_directories_.push_back("[None : Pass Through]");
+  for (size_t i = 1; i < filesystem_->config_dirs().size(); ++i) {
+    std::string d = filesystem_->config_dirs()[i];
+    while (d.length() > 0 && d[d.length() - 1] == '/') {
+      d.resize(d.length() - 1);   // trim trailing slashes.
+    }
+    const std::string::size_type slash_pos = d.find_last_of('/');
+    if (slash_pos != std::string::npos) {
+      d = d.substr(slash_pos + 1);
+    }
+    d[0] = toupper(d[0]);
+    ui_config_directories_.push_back(d);
   }
-  result->append("</select>");
+}
+
+static void CreateSelection(std::string *result,
+                            const std::vector<std::string> &options,
+                            int selected) {
+  if (options.size() == 1) {
+    result->append(options[0]);   // no reason to make this a form :)
+    return;
+  }
+  result->append("<b>");
+  for (size_t i = 0; i < options.size(); ++i) {
+    const std::string &c = options[i];
+    if (i != 0 ) result->append("&nbsp;|&nbsp;");
+    const bool active = (int) i == selected;
+    if (active) result->append("<span style='background:#a0a0ff'>");
+    Appendf(result, "<input type='radio' onchange='this.form.submit();' "
+            "id='f%zd' name='f' value='%zd'%s>"
+            "<label for='f%zd'>%s</label>\n",
+            i, i, active ? " checked='checked'" : "",
+            i, c.c_str());
+    if (active) result->append("</span>");
+  }
+  result->append("</b>");
+}
+
+void StatusServer::AppendSettingsForm() {
+  Appendf(&content_, "<form id='settings-form' action='%s'>\n"
+          "<label for='cfg_sel'>Config directory </label>", kSettingsUrl);
+  PrepareConfigDirectoriesForUI();
+  CreateSelection(&content_, ui_config_directories_,
+                  filesystem_->current_cfg_index());
   if (filesystem_->config_dirs().size() == 1) {
-    result->append(" (This is a boring configuration, add filter directories "
+    content_.append(" (This is a boring configuration, add filter directories "
                    "with -c &lt;dir&gt; [-c &lt;another-dir&gt; ...] :-) )");
   } else if (filter_switched_) {
-    result->append(" <span style='font-size:small;'>Affects re- or newly opened "
-                   "files.</span>");
+    content_.append("&nbsp;<span style='font-size:small;background:#FFFFa0;'>"
+                    " (Affects re- or newly opened files.) </span>");
     filter_switched_ = false;  // only show once.
   }
   if (filesystem_->is_debug_ui_enabled()) {
-    Appendf(result, "<span style='float:right;font-size:small;'>"
+    Appendf(&content_, "<span style='float:right;font-size:small;'>"
             "<label for='dbg_sel'>Folve debug to syslog</label>"
             "<input id='dbg_sel' onchange='this.form.submit();' "
             "type='checkbox' name='d' value='1'%s/></span>",
             folve::IsDebugLogEnabled() ? " checked" : "");
   }
-  result->append("</form>");
-  result->append("<script>document.forms['settings-form'].reset();</script>");
+  content_.append("</form>");
+  content_.append("<script>document.forms['settings-form'].reset();</script>");
+  content_.append("<hr/>");
 }
 
 struct CompareStats {
@@ -259,7 +297,7 @@ const std::string &StatusServer::CreatePage() {
           "Convolving audio files from <code>%s</code>\n",
           filesystem_->underlying_dir().c_str());
 
-  AppendFilterOptions(&content_);
+  AppendSettingsForm();
 
   std::vector<HandlerStats> stat_list;
   filesystem_->handler_cache()->GetStats(&stat_list);
