@@ -1,7 +1,6 @@
-<center>Folve - Fuse Convolve</center>
-===
-
-<center>A fuse filesystem for on-the-fly convolving of audio files.</center>
+Folve - Fuse Convolve
+=====================
+A fuse filesystem for on-the-fly convolving of audio files.
 
 Overview
 --------
@@ -61,7 +60,7 @@ This project is notably based on
   .. and a couple of other libs:
 
 	$ sudo aptitude install libsndfile-dev libflac-dev libzita-convolver-dev \
-                          libfuse-dev libboost-dev libmicrohttpd-dev
+                            libfuse-dev libboost-dev libmicrohttpd-dev
 	$ make
 
 (TODO: make install; debian package)
@@ -73,7 +72,7 @@ This project is notably based on
  *.flac files reside and the mount point of this filesystem.
  Also, do be useful, you need to supply at least one configuration directory
  with the -c <config-dir> option. Very useful is the -p <port> that starts
- an HTTP server.
+ an HTTP status server.
 
      ./folve -c /filter/dir -p 17322 /path/to/original/files /mnt/mountpoint
 
