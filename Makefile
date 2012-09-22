@@ -13,5 +13,8 @@ OBJECTS = folve-main.o folve-filesystem.o conversion-buffer.o \
 folve: $(OBJECTS)
 	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
 
+install: folve
+	install folve /usr/local/bin
+
 clean:
 	rm -f folve $(OBJECTS)

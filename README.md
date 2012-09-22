@@ -61,22 +61,21 @@ This project is notably based on
   This requires the latest versions of libfuse and libzita convolver to compile.
   .. and a couple of other libs:
 
-	$ sudo aptitude install libsndfile-dev libflac-dev libzita-convolver-dev \
+    $ sudo aptitude install libsndfile-dev libflac-dev libzita-convolver-dev \
                             libfuse-dev libboost-dev libmicrohttpd-dev
-	$ make
+    $ make
+    $ sudo make install
 
-(TODO: make install; debian package)
+(TODO: debian package)
 
 ### Run ###
- Since there is no 'make install' yet, let's run it from the local directory.
-
  Folve requires at least two parameters: the directory where your original
  *.flac files reside and the mount point of this filesystem.
  Also, do be useful, you need to supply at least one configuration directory
  with the -c <config-dir> option. Very useful is the -p <port> that starts
  an HTTP status server.
 
-     ./folve -c /filter/dir -p 17322 /path/to/original/files /mnt/mountpoint
+     folve -c /filter/dir -p 17322 /path/to/original/files /mnt/mountpoint
 
 The configuration directory should contain configuration files as they're
 found in jconvolver, with the following naming scheme:
@@ -98,7 +97,7 @@ The files are searched from the most specific to the least specific type.
 
 ### General usage: ###
 
-    usage: ./folve [options] <original-dir> <mount-point>
+    usage: folve [options] <original-dir> <mount-point>
     Options: (in sequence of usefulness)
       -c <cfg-dir> : Convolver configuration directory.
                      You can supply this option multiple times:
