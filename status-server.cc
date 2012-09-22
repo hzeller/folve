@@ -179,7 +179,7 @@ static void AppendFileInfo(std::string *result, const char *progress_style,
   }
   const int secs = stats.duration_seconds;
   const int fract_sec = stats.progress * secs;
-  if (secs > 0 && fract_sec > 0) {
+  if (secs >= 0 && fract_sec >= 0) {
     Appendf(result, sTimeColumns, 
             fract_sec / 60, fract_sec % 60,
             secs / 60, secs % 60);
