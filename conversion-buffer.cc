@@ -25,15 +25,28 @@
 
 #include <boost/thread/locks.hpp>
 
+// Annoyingly, mkstemp() does not do TMPDIR trickery and tempnam() is obsolete.
+static char *TempNameAllocated(const char *pattern) {
+  const char *tmp_path = getenv("TMPDIR");
+  if (tmp_path == NULL || strlen(tmp_path) == 0) tmp_path = getenv("TMP");
+  if (tmp_path == NULL || strlen(tmp_path) == 0) tmp_path = "/tmp";
+  char *result = (char*) malloc(strlen(tmp_path) + 1 + strlen(pattern) + 1);
+  strcpy(result, tmp_path);
+  strcat(result, "/");
+  strcat(result, pattern);
+  return result;
+}
+
 ConversionBuffer::ConversionBuffer(SoundSource *source, const SF_INFO &info)
   : source_(source), out_filedes_(-1), snd_writing_enabled_(true),
     total_written_(0), header_end_(0) {
-  const char *filename = tempnam(NULL, "folve");
-  out_filedes_ = open(filename, O_RDWR|O_CREAT|O_NOATIME, S_IRUSR|S_IWUSR);
+  char *filename = TempNameAllocated("folve-XXXXXX");
+  out_filedes_ = mkstemp(filename);
   if (out_filedes_ < 0) {
     perror("Problem opening buffer file");
   }
   unlink(filename);
+  free(filename);
 
   // After file-open: SetOutputSoundfile() already might attempt to write data.
   source_->SetOutputSoundfile(this, CreateOutputSoundfile(info));
