@@ -121,7 +121,7 @@ attempt to find the right filter in the filter directory. If there is a filter,
 the output is filtered on-the-fly, otherwise the original file is returned.
 
 If you gave Folve the flag -p with an status port, it will serve current
-status information on a http server; e.g. With `./folve ... -p 17322`
+status information on a http server; e.g. With `folve ... -p 17322`
 have a look on
 
   http://localhost:17322/
