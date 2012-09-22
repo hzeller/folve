@@ -45,14 +45,14 @@ static const char kSettingsUrl[] = "/settings";
 // Sneak in a favicon without another resource access.
 // TODO: make a nice icon, recognizable as something that has to do with "
 // files and music ...
-static const char kHtmlHeader[] = "<header>"
+static const char kHtmlHeader[] = "<html><head>"
   "<title>Folve</title>\n"
-  "<link rel='icon' type='image/png'"
+  "<link rel='icon' type='image/png' "
   "href='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2"
   "AAAAAXNSR0IArs4c6QAAAAlwSFlzAAALEwAACxMBAJqcGAAAAAd0SU1FB9wJDwUlEA/UBrsA"
   "AABSSURBVCjPrZIxDgAgDAKh8f9froOTirU1ssKFYqS7Q4mktAxFRQDJcsPORMDYsDCXhn331"
   "9GPwHJVuaFl3l4D1+h0UjIdbTh9SpP2KQ2AgSfVAdEQGx23tOopAAAAAElFTkSuQmCC'/>\n"
-  "</header>";
+  "</head>\n";
 
 // Callback function called by micro http daemon. Gets the StatusServer pointer
 // in the user_argument.
@@ -63,21 +63,29 @@ int StatusServer::HandleHttp(void* user_argument,
                              const char *upload_data, size_t *upload_size,
                              void**) {
   StatusServer* server = (StatusServer*) user_argument;
-  
+  struct MHD_Response *response;
+  int ret;
+
   if (strcmp(url, kSettingsUrl) == 0) {
     server->SetFilter(MHD_lookup_connection_value(connection,
                                                   MHD_GET_ARGUMENT_KIND, "f"));
     server->SetDebug(MHD_lookup_connection_value(connection,
                                                  MHD_GET_ARGUMENT_KIND, "d"));
+    // We redirect to slash after this, to remove parameters from the GET-URL
+    response = MHD_create_response_from_data(0, (void*)"", MHD_NO, MHD_NO);
+    MHD_add_response_header(response, "Location", "/");
+    ret = MHD_queue_response(connection, 302, response);    
+  } else {
+    const std::string &page = server->CreatePage();
+    response = MHD_create_response_from_data(page.length(), (void*) page.data(),
+                                             MHD_NO, MHD_NO);
+    MHD_add_response_header(response, "Content-Type",
+                            "text/html; charset=utf-8");
+    ret = MHD_queue_response(connection, MHD_HTTP_OK, response);
   }
-
-  struct MHD_Response *response;
-  int ret;
-  const std::string &page = server->CreatePage();
-  response = MHD_create_response_from_data(page.length(), (void*) page.data(),
-                                           MHD_NO, MHD_NO);
-  MHD_add_response_header(response, "Content-Type", "text/html; charset=utf-8");
-  ret = MHD_queue_response(connection, MHD_HTTP_OK, response);
+  // Tell aggressive cachers not to do so.
+  MHD_add_response_header(response, "Cache-Control", "no-cache");
+  MHD_add_response_header(response, "Expires", "24 Nov 1972 23:42:42 GMT");
   MHD_destroy_response(response);
   return ret;
 }
@@ -176,14 +184,15 @@ static void AppendFileInfo(std::string *result, const char *progress_style,
 }
 
 void StatusServer::AppendFilterOptions(std::string *result) {
-  Appendf(result, "<form action='%s'>"
-          "<label for='cfg_sel'>Config directory</label> ", kSettingsUrl);
-  result->append("<select id='cfg_sel' name='f' "
-                 "onchange='this.form.submit();'>\n");
+  Appendf(result, "<form action='%s'>\n"
+          "<label for='cfg_sel'>Config directory </label>", kSettingsUrl);
+  Appendf(result, "<select id='cfg_sel' name='f' "
+          "onchange='this.form.submit();'>\n");
   for (size_t i = 0; i < filesystem_->config_dirs().size(); ++i) {
     const std::string &c = filesystem_->config_dirs()[i];
-    Appendf(result, "<option value='%zd'%s>%s</option>\n",
-            i, ((int) i == filesystem_->current_cfg_index()) ? " selected" : "",
+    Appendf(result, "  <option value='%zd'%s>%s</option>\n", i,
+            ((int) i == filesystem_->current_cfg_index())
+            ? " selected='selected'" : "",
             (i == 0) ? "[No convolver - just pass through]" : c.c_str());
   }
   result->append("</select>");
@@ -193,6 +202,7 @@ void StatusServer::AppendFilterOptions(std::string *result) {
   } else if (filter_switched_) {
     result->append(" <span style='font-size:small;'>Affects re- or newly opened "
                    "files.</span>");
+    filter_switched_ = false;  // only show once.
   }
   if (filesystem_->is_debug_ui_enabled()) {
     Appendf(result, "<span style='float:right;font-size:small;'>"
@@ -295,6 +305,6 @@ const std::string &StatusServer::CreatePage() {
   Appendf(&content_,
           "<span style='float:left;font-size:small;'>page-gen %.2fms</span>"
           "<span style='float:right;font-size:small;'>HZ</span>"
-          "</body>", duration * 1000.0);
+          "</body></html>\n", duration * 1000.0);
   return content_;
 }
