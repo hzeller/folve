@@ -180,7 +180,6 @@ public:
   
   virtual ~SndFileHandler() {
     Close();
-    delete processor_;
     delete output_buffer_;
   }
 
@@ -357,9 +356,10 @@ private:
       return false;  // We already have one.
     }
     // TODO: check that other parameters such as sampling rate and channels
-    // match (should be a are problem).
+    // match (should be a rare problem as files in one dir typically match).
     processor_ = processor;
     if (!processor_->is_input_buffer_complete()) {
+      // Fill with our beginning so that the donor can finish its processing.
       input_frames_left_ -= processor_->FillBuffer(snd_in_);
     }
     base_stats_.in_gapless = true;
@@ -430,7 +430,7 @@ private:
       processor_->WriteProcessed(snd_out_, r);
       if (passed_processor) {
         base_stats_.out_gapless = true;
-        ExtractOutputValues();
+        SaveOutputValues();
         processor_ = NULL;   // we handed over ownership.
       }
       if (next_file) fs_->Close(found->c_str(), next_file);
@@ -513,7 +513,7 @@ private:
     }
   }
 
-  void ExtractOutputValues() {
+  void SaveOutputValues() {
     if (processor_) {
       base_stats_.max_output_value = processor_->max_output_value();
       processor_->ResetMaxValues();
@@ -522,13 +522,15 @@ private:
 
   void Close() {
     if (snd_out_ == NULL) return;  // done.
-    ExtractOutputValues();
+    SaveOutputValues();
     if (base_stats_.max_output_value > 1.0) {
       syslog(LOG_ERR, "Observed output clipping in '%s': "
              "Max=%.3f; Multiply gain with <= %.5f in %s",
              base_stats_.filename.c_str(), base_stats_.max_output_value,
              1.0 / base_stats_.max_output_value, config_path_.c_str());
     }
+    delete processor_;
+    processor_ = NULL;
     // We can't disable buffer writes here, because outfile closing will flush
     // the last couple of sound samples.
     if (snd_in_) sf_close(snd_in_);

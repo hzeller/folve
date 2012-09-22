@@ -7,7 +7,7 @@ Overview
 
 This fuse filesystem takes an original path to a directory with flac-files
 and provides these files at the mount point. Accessing audio files will
-automatically convolve these on-the-fly using the zita convolver by
+automatically convolve these on-the-fly using the FIR zita convolver by
 Fons Adriaensen. You can directly use filter configuration files that you have
 for jconvolver/fconvolver (files in this directory starting with zita-* are
 imported from his jconvolver project to parse the same configuration files).

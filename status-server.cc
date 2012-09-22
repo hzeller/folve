@@ -190,7 +190,7 @@ static void AppendFileInfo(std::string *result, const char *progress_style,
   if (stats.max_output_value > 1e-6) {
     Appendf(result, sDecibelColumn,
             stats.max_output_value > 1.0 ? "#FF0505" : "white",
-            20 * logf(stats.max_output_value));
+            20 * log10f(stats.max_output_value));
   } else {
     result->append("<td>-</td>");
   }
