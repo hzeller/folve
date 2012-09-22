@@ -36,6 +36,7 @@ struct HandlerStats {
   float max_output_value;       // Clipping ? Should be [0 .. 1]
   bool in_gapless;              // Were we handed a processor to continue.
   bool out_gapless;             // Did we pass on our processor.
+  int  filter_id;               // which filter-id is in use.
 };
 
 class SoundProcessor;

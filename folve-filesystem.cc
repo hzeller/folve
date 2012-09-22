@@ -584,6 +584,7 @@ FileHandler *FolveFilesystem::CreateFromDescriptor(
      const std::string &underlying_file) {
   HandlerStats file_info;
   file_info.filename = fs_path;
+  file_info.filter_id = cfg_idx;
   if (cfg_idx != 0) {
     FileHandler *filter = SndFileHandler::Create(this, filedes, fs_path,
                                                  underlying_file,

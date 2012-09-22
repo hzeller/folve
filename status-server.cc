@@ -114,6 +114,7 @@ void StatusServer::SetDebug(const char *dbg) {
 }
 
 bool StatusServer::Start(int port) {
+  PrepareConfigDirectoriesForUI();
   daemon_ = MHD_start_daemon(MHD_USE_SELECT_INTERNALLY, port, NULL, NULL, 
                              &HandleHttp, this,
                              MHD_OPTION_END);
@@ -158,9 +159,9 @@ void StatusServer::RetireHandlerEvent(FileHandler *handler) {
 #define sDecibelColumn \
   "<td align='right' style='background:%s;'>%.1f dB</td>"
 
-static void AppendFileInfo(std::string *result, const char *progress_style,
-                           const HandlerStats &stats) {
-  result->append("<tr style='text-wrap:none;white-space:nowrap;'>");
+void StatusServer::AppendFileInfo(const char *progress_style,
+                                  const HandlerStats &stats) {
+  content_.append("<tr style='text-wrap:none;white-space:nowrap;'>");
   const char *status = "";
   switch (stats.status) {
   case HandlerStats::OPEN:    status = "open"; break;
@@ -170,11 +171,11 @@ static void AppendFileInfo(std::string *result, const char *progress_style,
   }
 
   if (!stats.message.empty()) {
-    Appendf(result, sMessageRowHtml, status, stats.message.c_str());
+    Appendf(&content_, sMessageRowHtml, status, stats.message.c_str());
   } else if (stats.progress == 0) {
-    Appendf(result, sMessageRowHtml, status, "Only header accessed");
+    Appendf(&content_, sMessageRowHtml, status, "Only header accessed");
   } else {
-    Appendf(result, sProgressRowHtml, status,
+    Appendf(&content_, sProgressRowHtml, status,
             stats.in_gapless ? "&rarr;" : "",
             kProgressWidth, (int) (100 * stats.progress), progress_style,
             stats.out_gapless ? "&rarr;" : "");
@@ -182,33 +183,33 @@ static void AppendFileInfo(std::string *result, const char *progress_style,
   const int secs = stats.duration_seconds;
   const int fract_sec = stats.progress * secs;
   if (secs >= 0 && fract_sec >= 0) {
-    Appendf(result, sTimeColumns, 
+    Appendf(&content_, sTimeColumns, 
             fract_sec / 60, fract_sec % 60,
             secs / 60, secs % 60);
   } else {
-    result->append("<td colspan='3'>-</td>");
+    content_.append("<td colspan='3'>-</td>");
   }
 
   if (stats.max_output_value > 1e-6) {
-    Appendf(result, sDecibelColumn,
+    Appendf(&content_, sDecibelColumn,
             stats.max_output_value > 1.0 ? "#FF0505" : "white",
             20 * log10f(stats.max_output_value));
   } else {
-    result->append("<td>-</td>");
+    content_.append("<td>-</td>");
   }
 
-  Appendf(result, "<td bgcolor='#c0c0c0'>&nbsp;%s&nbsp;</td>",
-          stats.format.c_str());
-  Appendf(result,"<td "
+  Appendf(&content_, "<td bgcolor='#c0c0c0'>&nbsp;%s (%s)&nbsp;</td>",
+          stats.format.c_str(), ui_config_directories_[stats.filter_id].c_str());
+  Appendf(&content_,"<td "
           "style='font-size:small;text-wrap:none;white-space:nowrap'>%s</td>",
           stats.filename.c_str());
-  result->append("</tr>\n");
+  content_.append("</tr>\n");
 }
 
 void StatusServer::PrepareConfigDirectoriesForUI() {
   // Essentially only keep the directory name.
   if (!ui_config_directories_.empty()) return;
-  ui_config_directories_.push_back("[None : Pass Through]");
+  ui_config_directories_.push_back("None : Pass Through");
   for (size_t i = 1; i < filesystem_->config_dirs().size(); ++i) {
     std::string d = filesystem_->config_dirs()[i];
     while (d.length() > 0 && d[d.length() - 1] == '/') {
@@ -248,7 +249,6 @@ static void CreateSelection(std::string *result,
 void StatusServer::AppendSettingsForm() {
   Appendf(&content_, "<form id='settings-form' action='%s'>\n"
           "<label for='cfg_sel'>Config directory </label>", kSettingsUrl);
-  PrepareConfigDirectoriesForUI();
   CreateSelection(&content_, ui_config_directories_,
                   filesystem_->current_cfg_index());
   if (filesystem_->config_dirs().size() == 1) {
@@ -340,12 +340,12 @@ const std::string &StatusServer::CreatePage() {
   Appendf(&content_, "<tr><th>Stat</th><td><!--gapless in--></td>"
           "<th width='%dpx'>Progress</th>"  // progress bar.
           "<td><!-- gapless out --></td>"
-          "<th>Pos</th><td></td><th>Len</th><th>Max out</th><th>Format</th>"
+          "<th>Pos</th><td></td><th>Len</th><th>Max&nbsp;out</th><th>Format</th>"
           "<th align='left'>File</th></tr>\n", kProgressWidth);
   CompareStats comparator;
   std::sort(stat_list.begin(), stat_list.end(), comparator);
   for (size_t i = 0; i < stat_list.size(); ++i) {
-    AppendFileInfo(&content_, kActiveProgress, stat_list[i]);
+    AppendFileInfo(kActiveProgress, stat_list[i]);
   }
   content_.append("</table><hr/>\n");
 
@@ -355,7 +355,7 @@ const std::string &StatusServer::CreatePage() {
     boost::lock_guard<boost::mutex> l(retired_mutex_);
     for (RetiredList::const_iterator it = retired_.begin(); 
          it != retired_.end(); ++it) {
-      AppendFileInfo(&content_, kRetiredProgress, *it);
+      AppendFileInfo(kRetiredProgress, *it);
     }
     content_.append("</table>\n");
     if (expunged_retired_ > 0) {

@@ -44,15 +44,16 @@ public:
   virtual ~StatusServer();
 
 private:
-  const std::string &CreatePage();
-
   static int HandleHttp(void* user_argument,
                         struct MHD_Connection *,
                         const char *, const char *, const char *,
                         const char *, size_t *, void **);
 
+  const std::string &CreatePage();
+  // Some helper functions to create the page:
   void AppendSettingsForm();
   void PrepareConfigDirectoriesForUI();
+  void AppendFileInfo(const char *progress_style, const HandlerStats &stats);
 
   // Set filter or debug mode from http-request. Gracefully handles garbage.
   void SetFilter(const char *value);
