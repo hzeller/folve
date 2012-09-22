@@ -33,6 +33,9 @@
 #include <string>
 #include <zita-convolver.h>
 
+#include <boost/thread/locks.hpp>
+#include <boost/thread/mutex.hpp>
+
 #include "conversion-buffer.h"
 #include "file-handler-cache.h"
 #include "file-handler.h"
@@ -199,15 +202,17 @@ public:
   }
 
   virtual void GetHandlerStatus(struct HandlerStats *stats) {
+    boost::lock_guard<boost::mutex> l(stats_mutex_);
+    if (processor_ != NULL) {
+      base_stats_.max_output_value = processor_->max_output_value();
+    }
     *stats = base_stats_;
     const int frames_done = in_info_.frames - input_frames_left_;
     if (frames_done == 0 || in_info_.frames == 0)
       stats->progress = 0.0;
     else
       stats->progress = 1.0 * frames_done / in_info_.frames;
-    if (processor_ != NULL) {
-      base_stats_.max_output_value = processor_->max_output_value();
-    }
+
     if (base_stats_.max_output_value > 1.0) {
       // TODO: the status server could inspect this value and make better
       // rendering.
@@ -370,6 +375,8 @@ private:
   }
 
   virtual bool AddMoreSoundData() {
+    // We're changing some stats here such as frames_left and max level.
+    boost::lock_guard<boost::mutex> l(stats_mutex_);
     if (processor_ && processor_->pending_writes() > 0) {
       processor_->WriteProcessed(snd_out_, processor_->pending_writes());
       return input_frames_left_;
@@ -547,6 +554,7 @@ private:
   const SF_INFO in_info_;
   const std::string config_path_;
 
+  boost::mutex stats_mutex_;
   HandlerStats base_stats_;      // UI information about current file.
 
   struct stat file_stat_;        // we dynamically report a changing size.

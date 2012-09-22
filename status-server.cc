@@ -187,6 +187,7 @@ static void AppendFileInfo(std::string *result, const char *progress_style,
   } else {
     result->append("<td colspan='3'>-</td>");
   }
+
   if (stats.max_output_value > 1e-6) {
     Appendf(result, sDecibelColumn,
             stats.max_output_value > 1.0 ? "#FF0505" : "white",
