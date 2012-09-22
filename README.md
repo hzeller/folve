@@ -25,8 +25,10 @@ you don't need the full file. Simply playing a file in real-time will use very
 little CPU (on my notebook ~3% on one core). So this should work as well on
 low-CPU machines (like NAS servers; haven't tried that yet).
 
-Of course, skipping forward requires to convolve everything up to the point (the
-zita convolver is pretty fast though, so you'll hardly notice).
+Because input and output files are compressed, we can't predict what the
+relationship between file-offset and sample-number is; so skipping forward
+requires to convolve everything up to the point (the zita convolver is
+pretty fast though, so you'll hardly notice).
 
 While indexing, some media servers try to skip to the end of the file (don't
 know why, to check if the end is there ?), so there is code that detects this
