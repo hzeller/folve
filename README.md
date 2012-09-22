@@ -126,9 +126,11 @@ have a look on
 
   http://localhost:17322/
 
-To manually switch the configuration from the command line, you can use wget:
+To manually switch the configuration from the command line, you can use `wget`
+or `curl`, whatever you prefer:
 
     wget -q -O/dev/null http://localhost:17322/settings?f=2
+    curl http://localhost:17322/settings?f=2
 
 The parameter given to `f=` is the configuration in the same sequence you
 supplied on startup, starting to count from 1. Configuration 0 means
