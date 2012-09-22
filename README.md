@@ -100,18 +100,18 @@ The files are searched from the most specific to the least specific type.
 
     usage: ./folve [options] <original-dir> <mount-point>
     Options: (in sequence of usefulness)
-        -c <cfg-dir> : Convolver configuration directory.
-                       You can supply this option multiple times:
-                       you'll get a drop-down select on the HTTP status page.
-        -p <port>    : Port to run the HTTP status server on.
-        -r <refresh> : Seconds between refresh of status page.
-	               Default is 10. Switch off with -1
-        -g           : Gapless convolving alphabetically adjacent files.
-        -D           : Moderate volume Folve debug messages to syslog.
-                       Can then also be toggled in the UI.
-        -f           : Operate in foreground; useful for debugging.
-        -o <mnt-opt> : other generic mount parameters passed to fuse.
-        -d           : High volume fuse debug log. Implies -f.
+      -c <cfg-dir> : Convolver configuration directory.
+                     You can supply this option multiple times:
+                     you'll get a drop-down select on the HTTP status page.
+      -p <port>    : Port to run the HTTP status server on.
+      -r <refresh> : Seconds between refresh of status page;
+                     Default is 10 seconds; switch off with -1.
+      -g           : Gapless convolving alphabetically adjacent files.
+      -D           : Moderate volume Folve debug messages to syslog.
+                     Can then also be toggled in the UI.
+      -f           : Operate in foreground; useful for debugging.
+      -o <mnt-opt> : other generic mount parameters passed to fuse.
+      -d           : High volume fuse debug log. Implies -f.
 
 Now you can access the fileystem under that mount point, e.g.
 
