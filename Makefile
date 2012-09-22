@@ -1,6 +1,6 @@
 CC=gcc
 CXX=g++
-F_VERSION=$(shell git log -n1 --date=short --format="%cd (id=%h)" 2>/dev/null || echo "[unknown version - compile from git]")
+F_VERSION=$(shell git log -n1 --date=short --format="%cd (commit=%h)" 2>/dev/null || echo "[unknown version - compile from git]")
 CFLAGS=-D_FILE_OFFSET_BITS=64 -Wall -O2 -DFOLVE_VERSION='"$(F_VERSION)"'
 #CFLAGS=-D_FILE_OFFSET_BITS=64 -Wall -g -O0
 CXXFLAGS=$(CFLAGS)
