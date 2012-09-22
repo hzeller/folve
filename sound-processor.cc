@@ -43,11 +43,11 @@ SoundProcessor *SoundProcessor::Create(const std::string &config_file,
       return NULL;
     }
   }
-  return new SoundProcessor(zita);
+  return new SoundProcessor(zita, config_file);
 }
 
-SoundProcessor::SoundProcessor(const ZitaConfig &config)
-  : zita_config_(config),
+SoundProcessor::SoundProcessor(const ZitaConfig &config, const std::string &cfg)
+  : zita_config_(config), config_file_(cfg),
     buffer_(new float[config.fragm * config.ninp]),
     channels_(config.ninp),
     input_pos_(0), output_pos_(0),

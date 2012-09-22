@@ -57,11 +57,15 @@ public:
   float max_output_value() const { return max_out_value_observed_; }
   void ResetMaxValues();
 
+  // Config file used to create this processor.
+  const std::string &config_file() const { return config_file_; }
+
 private:
-  SoundProcessor(const ZitaConfig &config);
+  SoundProcessor(const ZitaConfig &config, const std::string &cfg_file);
   void Process();
 
   const ZitaConfig zita_config_;
+  const std::string config_file_;
   float *const buffer_;
   const int channels_;
   // TODO: instead of two positions, better have one position and two states

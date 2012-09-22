@@ -349,15 +349,19 @@ private:
     out_buffer->HeaderFinished();
   }
 
-  virtual bool AcceptProcessor(SoundProcessor *processor) {
+  virtual bool AcceptProcessor(SoundProcessor *new_processor) {
     if (processor_ != NULL || !input_frames_left_) {
       DebugLogf("Gapless attempt: Cannot bridge gap to alrady open file %s",
                 base_stats_.filename.c_str());
       return false;  // We already have one.
     }
+    if (new_processor->config_file() != config_path_) {
+      DebugLogf("Gapless: Configuration changed; can't join gapless");
+      return false;
+    }
     // TODO: check that other parameters such as sampling rate and channels
     // match (should be a rare problem as files in one dir typically match).
-    processor_ = processor;
+    processor_ = new_processor;
     if (!processor_->is_input_buffer_complete()) {
       // Fill with our beginning so that the donor can finish its processing.
       input_frames_left_ -= processor_->FillBuffer(snd_in_);
