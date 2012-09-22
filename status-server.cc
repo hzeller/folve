@@ -340,7 +340,7 @@ const std::string &StatusServer::CreatePage() {
   Appendf(&content_, "<tr><th>Stat</th><td><!--gapless in--></td>"
           "<th width='%dpx'>Progress</th>"  // progress bar.
           "<td><!-- gapless out --></td>"
-          "<th>Pos</th><td></td><th>Len</th><th>Max&nbsp;out</th><th>Format</th>"
+          "<th>Pos</th><td></td><th>Len</th><th>Max&nbsp;out</th><th>Format&nbsp;(used&nbsp;filter)</th>"
           "<th align='left'>File</th></tr>\n", kProgressWidth);
   CompareStats comparator;
   std::sort(stat_list.begin(), stat_list.end(), comparator);
