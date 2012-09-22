@@ -62,6 +62,7 @@ public:
     DLogf("Creating PassThrough filter for '%s'", known_stats.filename.c_str());
     struct stat st;
     file_size_ = (Stat(&st) == 0) ? st.st_size : -1;
+    info_stats_.filter_id = 0;  // pass through.
   }
   ~PassThroughHandler() { close(filedes_); }
 
