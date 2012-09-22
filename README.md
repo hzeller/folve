@@ -102,7 +102,8 @@ The files are searched from the most specific to the least specific type.
                        You can supply this option multiple times:
                        you'll get a drop-down select on the HTTP status page.
         -p <port>    : Port to run the HTTP status server on.
-        -r <refresh> : If > 0: seconds between refresh of status page.
+        -r <refresh> : Seconds between refresh of status page.
+	               Default is 10. Switch off with -1
         -g           : Gapless convolving alphabetically adjacent files.
         -D           : Moderate volume Folve debug messages to syslog.
                        Can then also be toggled in the UI.
@@ -123,3 +124,13 @@ status information on a http server; e.g. With `./folve ... -p 17322`
 have a look on
 
   http://localhost:17322/
+
+To manually switch the configuration in use from the command line,
+you can use wget
+
+    wget -q -O/dev/null http://localhost:17322/settings?f=2
+
+The parameter given to `f=` is the configuration in the same sequence you
+supplied on startup, starting to count from 1. Configuration 0 means
+'no filter' (And no, there is no security built in. If you want people from
+messing with the configuration of your folve-daemon, don't use -p).

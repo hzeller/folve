@@ -36,7 +36,7 @@
 // Compilation unit variables to communicate with the fuse callbacks.
 static struct FolveRuntime {
   FolveRuntime() : fs(NULL), mount_point(NULL),
-                   status_port(-1), refresh_time(-1) {}
+                   status_port(-1), refresh_time(10) {}
   FolveFilesystem *fs;
   const char *mount_point;
   int status_port;
@@ -191,13 +191,15 @@ static int usage(const char *prg) {
          "\t               you'll get a drop-down select on the HTTP "
          "status page.\n"
          "\t-p <port>    : Port to run the HTTP status server on.\n"
-         "\t-r <refresh> : If > 0: seconds between refresh of status page.\n"
+         "\t-r <refresh> : Seconds between refresh of status page;\n"
+         "\t               Default is %d seconds; switch off with -1.\n"
          "\t-g           : Gapless convolving alphabetically adjacent files.\n"
          "\t-D           : Moderate volume Folve debug messages to syslog.\n"
          "\t               Can then also be toggled in the UI.\n"
          "\t-f           : Operate in foreground; useful for debugging.\n"
          "\t-o <mnt-opt> : other generic mount parameters passed to fuse.\n"
-         "\t-d           : High volume fuse debug log. Implies -f.\n");
+         "\t-d           : High volume fuse debug log. Implies -f.\n",
+         folve_rt.refresh_time);
   return 1;
 }
 
