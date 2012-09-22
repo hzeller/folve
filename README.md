@@ -101,7 +101,7 @@ The files are searched from the most specific to the least specific type.
     Options: (in sequence of usefulness)
       -c <cfg-dir> : Convolver configuration directory.
                      You can supply this option multiple times:
-                     you'll get a drop-down select on the HTTP status page.
+                     Select with radio-buttons on the HTTP status page.
       -p <port>    : Port to run the HTTP status server on.
       -r <refresh> : Seconds between refresh of status page;
                      Default is 10 seconds; switch off with -1.
