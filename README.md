@@ -127,12 +127,11 @@ have a look on
 
   http://localhost:17322/
 
-To manually switch the configuration in use from the command line,
-you can use wget
+To manually switch the configuration from the command line, you can use wget
 
     wget -q -O/dev/null http://localhost:17322/settings?f=2
 
 The parameter given to `f=` is the configuration in the same sequence you
 supplied on startup, starting to count from 1. Configuration 0 means
-'no filter' (And no, there is no security built in. If you want people from
-messing with the configuration of your folve-daemon, don't use -p).
+'no filter' (And no, there is no security built-in. If you want people from
+messing with the configuration of your folve-daemon, don't use -p :)).
