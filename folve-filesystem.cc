@@ -61,18 +61,22 @@ namespace {
 
 // Very simple filter that just passes the original file through. Used for
 // everything that is not a sound-file.
-class PassThroughFilter : public FileHandler {
+class PassThroughHandler : public FileHandler {
 public:
-  PassThroughFilter(int filedes, int filter_id,
+  PassThroughHandler(int filedes, int filter_id,
                     const HandlerStats &known_stats)
-    : FileHandler(filter_id), filedes_(filedes), info_stats_(known_stats) {
+    : FileHandler(filter_id), filedes_(filedes),
+      file_size_(-1), max_accessed_(0), info_stats_(known_stats) {
     info_stats_.message.append("; pass through.");
     DebugLogf("Creating PassThrough filter for '%s'",
               known_stats.filename.c_str());
+    struct stat st;
+    file_size_ = (Stat(&st) == 0) ? st.st_size : -1;
   }
-  ~PassThroughFilter() { close(filedes_); }
+  ~PassThroughHandler() { close(filedes_); }
 
   virtual int Read(char *buf, size_t size, off_t offset) {
+    max_accessed_ = std::max(max_accessed_, (long unsigned int) offset + size);
     const int result = pread(filedes_, buf, size, offset);
     return result == -1 ? -errno : result;
   }
@@ -81,10 +85,15 @@ public:
   }
   virtual void GetHandlerStatus(struct HandlerStats *stats) {
     *stats = info_stats_;
+    if (file_size_ > 0) {
+      stats->progress = 1.0 * max_accessed_ / file_size_;
+    }
   }
   
 private:
   const int filedes_;
+  size_t file_size_;
+  long unsigned int max_accessed_;
   HandlerStats info_stats_;
 };
 
@@ -210,6 +219,9 @@ public:
       stats->progress = 0.0;
     else
       stats->progress = 1.0 * frames_done / in_info_.frames;
+    if (processor_ != NULL) {
+      base_stats_.max_output_value = processor_->max_output_value();
+    }
     if (base_stats_.max_output_value > 1.0) {
       // TODO: the status server could inspect this value and make better
       // rendering.
@@ -583,7 +595,7 @@ FileHandler *FolveFilesystem::CreateFromDescriptor(
   }
 
   // Every other file-type is just passed through as is.
-  return new PassThroughFilter(filedes, cfg_idx, file_info);
+  return new PassThroughHandler(filedes, cfg_idx, file_info);
 }
 
 std::string FolveFilesystem::CacheKey(int config_idx, const char *fs_path) {

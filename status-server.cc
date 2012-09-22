@@ -35,7 +35,7 @@ using folve::Appendf;
 // TODO: someone with a bit more stylesheet-fu can attempt to make this
 // more pretty and the HTML more compact.
 
-static const size_t kMaxRetired = 200;
+static const size_t kMaxRetired = 20;
 static const int kProgressWidth = 300;
 static const char kActiveProgress[]  = "#7070ff";
 static const char kRetiredProgress[] = "#d0d0d0";
@@ -140,17 +140,21 @@ void StatusServer::RetireHandlerEvent(FileHandler *handler) {
   }
 }
                
-static const char sMessageRowHtml[] =
+// As ugly #defines, so that gcc can warn about printf() format problems.
+#define sMessageRowHtml \
   "<td>%s</td><td colspan='3' style='font-size:small;'>%s</td>"
-  "<td colspan='3' align='center'>-</td>";
 
-static const char sProgressRowHtml[] =
+#define sProgressRowHtml \
+  "<td>%s</td>"  \
+  "<td>%s</td>"  \
+  "<td><div style='background:white;width:%dpx;border:1px solid black;'>\n" \
+  "  <div style='width:%d%%;background:%s;'>&nbsp;</div>\n</div></td>" \
   "<td>%s</td>"
-  "<td>%s</td>"  // gapless marker
-  "<td><div style='width:%dpx; border:1px solid black;'>\n"
-  "  <div style='width:%d%%;background:%s;'>&nbsp;</div>\n</div></td>"
-  "<td>%s</td>"  // gapless
-  "<td align='right'>%2d:%02d</td><td>/</td><td align='right'>%2d:%02d</td>";
+
+#define sTimeColumns \
+  "<td align='right'>%2d:%02d</td><td>/</td><td align='right'>%2d:%02d</td>"
+#define sDecibelColumn \
+  "<td align='right' style='background:%s;'>%.1f dB</td>"
 
 static void AppendFileInfo(std::string *result, const char *progress_style,
                            const HandlerStats &stats) {
@@ -162,19 +166,34 @@ static void AppendFileInfo(std::string *result, const char *progress_style,
   case HandlerStats::RETIRED: status = "&nbsp;----&nbsp;"; break;
     // no default to let the compiler detect new values.
   }
+
   if (!stats.message.empty()) {
     Appendf(result, sMessageRowHtml, status, stats.message.c_str());
   } else if (stats.progress == 0) {
     Appendf(result, sMessageRowHtml, status, "Only header accessed");
   } else {
-    const int secs = stats.duration_seconds;
-    const int fract_sec = stats.progress * secs;
     Appendf(result, sProgressRowHtml, status,
             stats.in_gapless ? "&rarr;" : "",
             kProgressWidth, (int) (100 * stats.progress), progress_style,
-            stats.out_gapless ? "&rarr;" : "",
-            fract_sec / 60, fract_sec % 60, secs / 60, secs % 60);
+            stats.out_gapless ? "&rarr;" : "");
   }
+  const int secs = stats.duration_seconds;
+  const int fract_sec = stats.progress * secs;
+  if (secs > 0 && fract_sec > 0) {
+    Appendf(result, sTimeColumns, 
+            fract_sec / 60, fract_sec % 60,
+            secs / 60, secs % 60);
+  } else {
+    result->append("<td colspan='3'>-</td>");
+  }
+  if (stats.max_output_value > 0.0) {
+    Appendf(result, sDecibelColumn,
+            stats.max_output_value > 1.0 ? "#FF0505" : "white",
+            20 * log(stats.max_output_value));
+  } else {
+    result->append("<td>-</td>");
+  }
+
   Appendf(result, "<td bgcolor='#c0c0c0'>&nbsp;%s&nbsp;</td>",
           stats.format.c_str());
   Appendf(result,"<td "
@@ -273,11 +292,11 @@ const std::string &StatusServer::CreatePage() {
   if (filesystem_->gapless_processing()) {
     content_.append("<br/>&rarr; : denotes gapless transfers\n");
   }
-  content_.append("<table>\n");
+  content_.append("<table cellspacing='10'>\n");
   Appendf(&content_, "<tr><th>Stat</th><td><!--gapless in--></td>"
           "<th width='%dpx'>Progress</th>"  // progress bar.
           "<td><!-- gapless out --></td>"
-          "<th>Pos</th><td></td><th>Len</th><th>Format</th>"
+          "<th>Pos</th><td></td><th>Len</th><th>Max out</th><th>Format</th>"
           "<th align='left'>File</th></tr>\n", kProgressWidth);
   CompareStats comparator;
   std::sort(stat_list.begin(), stat_list.end(), comparator);
