@@ -17,7 +17,8 @@ Folve solves the problem that many media servers don't provide a convolving
 option and their only interface to the outside world is to access a file
 system. So here we provide a filesystem, convolving files while they read them :)
 In general the beauty of simply accessing audio files that are transparently
-convolved is very useful and powerful in other contexts too.
+convolved is very useful and powerful in other contexts too (you can just
+copy a readily convolved file from it).
 
 Filesystem accesses are optimized for streaming. If files are read sequentially,
 we only need to convolve whatever is requested, which minimizes CPU use if
@@ -73,8 +74,8 @@ Folve requires at least two parameters: the directory where your original
 *.flac files reside and the mount point of this filesystem.
 
 Also, do be useful, you need to supply at least one configuration directory
-with the -c <config-dir> option. Very useful is the -p <port> that starts
-an HTTP status server. Let's use some example filters from this distribution;
+with the `-c <config-dir>` option. Very useful is the `-p <port>` that starts
+a HTTP status server. Let's use some example filters from this distribution;
 if you are in the Folve source directory, you find the directory `demo-filters/`
 that contains subdirectories with filters.
 Let's choose the lowpass and highpass filter to play with:
@@ -84,7 +85,7 @@ Let's choose the lowpass and highpass filter to play with:
          /path/to/your/directory/with/flacs /tmp/test-mount
 
 Now you can access the fileystem under that mount point; it has the same
-structure as under your `/path/to/your/directory/with/flacs`
+structure as your original directory.
 
     $ mplayer /tmp/test-mount/foo.flac
 
@@ -98,14 +99,30 @@ you'll hear the difference.
 
 To terminate this instance of folve, you can just press CTRL-C as we've run it
 in the foreground (the `-f` option did this). In real life, you'd run it as
-daemon (without `-f` option), so then you can unmount with the `fusermount`
-command:
+daemon (without `-f` option), so then you can stop the daemon and unmount the
+directory with the `fusermount` command:
 
     $ fusermount -u /tmp/test-mount
 
 ### Filter Configuration ###
-The configuration directory should contain configuration files as they're
-found in jconvolver, with the following naming scheme:
+Filters are essentially *.wav files containing an impulse response (IR). This is
+used by jconvolver's convolution engine to create a
+[Finite Impulse Response](http://en.wikipedia.org/wiki/Finite_impulse_response)
+(FIR) filter and process your audio.
+
+Text configuration files refer to these *.wav files and add parameters such as
+filter gain and channel mapping. These configuration files are read by Folve.
+The README.CONFIG in the
+[jconvolver](http://apps.linuxaudio.org/apps/all/jconvolver)
+project describes the details of the configuration format.
+
+Since the filter is dependent on the sampling rate, we need to choose the right
+filter depending on the input file we see. This is why you give Folve a whole
+configuration directory: it can contain multipe configuration text files
+depending on sample rate.
+
+The files in the configuration directory need to follow a naming scheme to
+be found by Folve. Their naming is:
 
      filter-<samplerate>-<channels>-<bits>.conf   OR
      filter-<samplerate>-<channels>.conf          OR
@@ -120,7 +137,8 @@ you need a filter configuration named one of these (in matching sequence):
 
 The files are searched from the most specific to the least specific type.
 
-(See README.CONFIG in the [jconvolver](http://apps.linuxaudio.org/apps/all/jconvolver) project how these look like)
+(I am looking for good filter construction tools on Linux; if you know some,
+please let me know.)
 
 ### General usage: ###
 
@@ -142,8 +160,11 @@ The Folve filesystem will determine the samplerate/bits/channels and
 attempt to find the right filter in the filter directory. If there is a filter,
 the output is filtered on-the-fly, otherwise the original file is returned.
 
-If you're listening to classical music, opera or live-recording, then you
-certainly want to switch on gapless convolving with `-g` (it can't harm anyway).
+If you're listening to classical music, opera or live-recordings, then you
+certainly want to switch on gapless convolving with `-g`. If a file ends with
+not enough samples to fill the FIR filter input, the gap is bridged by
+including the first samples of the alphabetically next file in that directory
+- and the result is split between these two files.
 
 ### Misc ###
 To manually switch the configuration from the command line, you can use `wget`

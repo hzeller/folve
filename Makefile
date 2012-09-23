@@ -18,3 +18,6 @@ install: folve
 
 clean:
 	rm -f folve $(OBJECTS)
+
+README.html : README.md
+	markdown < $^ > $@
