@@ -376,8 +376,6 @@ private:
   }
 
   virtual bool AddMoreSoundData() {
-    // We're changing some stats here such as frames_left and max level.
-    boost::lock_guard<boost::mutex> l(stats_mutex_);
     if (processor_ && processor_->pending_writes() > 0) {
       processor_->WriteProcessed(snd_out_, processor_->pending_writes());
       return input_frames_left_;
@@ -408,7 +406,9 @@ private:
       Close();
       return false;
     }
+    stats_mutex_.lock();
     input_frames_left_ -= r;
+    stats_mutex_.unlock();
     if (!input_frames_left_ && !processor_->is_input_buffer_complete()
         && fs_->gapless_processing()) {
       typedef std::set<std::string> DirSet;
@@ -426,7 +426,9 @@ private:
         DLogf("Gapless pass-on from '%s' to alphabetically next '%s'",
               base_stats_.filename.c_str(), found->c_str());
       }
+      stats_mutex_.lock();
       processor_->WriteProcessed(snd_out_, r);
+      stats_mutex_.unlock();
       if (passed_processor) {
         base_stats_.out_gapless = true;
         SaveOutputValues();
@@ -434,7 +436,9 @@ private:
       }
       if (next_file) fs_->Close(found->c_str(), next_file);
     } else {
+      stats_mutex_.lock();
       processor_->WriteProcessed(snd_out_, r);
+      stats_mutex_.unlock();
     }
     if (input_frames_left_ == 0) {
       Close();
