@@ -36,11 +36,12 @@
 // Compilation unit variables to communicate with the fuse callbacks.
 static struct FolveRuntime {
   FolveRuntime() : fs(NULL), mount_point(NULL),
-                   status_port(-1), refresh_time(10) {}
+                   status_port(-1), refresh_time(10), parameter_error(false) {}
   FolveFilesystem *fs;
   const char *mount_point;
   int status_port;
   int refresh_time;
+  bool parameter_error;
 } folve_rt;
 
 static char *concat_path(char *buf, const char *a, const char *b) {
@@ -232,6 +233,7 @@ int FolveOptionHandling(void *data, const char *arg, int key,
       } else {
         fprintf(stderr, "Invalid base path '%s': %s\n",
                 arg, strerror(errno));
+        rt->parameter_error = true;
       }
       return 0;   // we consumed this.
     } else {
@@ -251,6 +253,7 @@ int FolveOptionHandling(void *data, const char *arg, int key,
     } else {
       fprintf(stderr, "Invalid config dir '%s': %s\n", 
               arg + 2, strerror(errno));
+      rt->parameter_error = true;
     }
     return 0;
   }
@@ -284,7 +287,7 @@ int main(int argc, char *argv[]) {
   struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
   fuse_opt_parse(&args, &folve_rt, folve_options, FolveOptionHandling);
 
-  if (!folve_rt.fs->CheckInitialized()) {
+  if (folve_rt.parameter_error || !folve_rt.fs->CheckInitialized()) {
     return usage(progname);
   }
 
