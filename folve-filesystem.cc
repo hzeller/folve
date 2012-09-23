@@ -58,7 +58,6 @@ public:
                     const HandlerStats &known_stats)
     : FileHandler(filter_id), filedes_(filedes),
       file_size_(-1), max_accessed_(0), info_stats_(known_stats) {
-    info_stats_.message.append("; pass through.");
     DLogf("Creating PassThrough filter for '%s'", known_stats.filename.c_str());
     struct stat st;
     file_size_ = (Stat(&st) == 0) ? st.st_size : -1;
@@ -67,8 +66,8 @@ public:
   ~PassThroughHandler() { close(filedes_); }
 
   virtual int Read(char *buf, size_t size, off_t offset) {
-    max_accessed_ = std::max(max_accessed_, (long unsigned int) offset + size);
     const int result = pread(filedes_, buf, size, offset);
+    max_accessed_ = std::max(max_accessed_, (long unsigned int) offset + result);
     return result == -1 ? -errno : result;
   }
   virtual int Stat(struct stat *st) {
@@ -597,10 +596,7 @@ FileHandler *FolveFilesystem::CreateFromDescriptor(
                                                  config_dirs()[cfg_idx],
                                                  &file_info);
     if (filter != NULL) return filter;
-  } else {
-    file_info.message = "No filter config selected.";
   }
-
   // Every other file-type is just passed through as is.
   return new PassThroughHandler(filedes, cfg_idx, file_info);
 }
