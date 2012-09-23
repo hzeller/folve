@@ -1,0 +1,14 @@
+The result of this filter sounds like the music is playing in a big church.
+
+This filter is created from an actual impulse response measurement
+in the Santa Lucia Basilica in Bologna, Italy. Measurement is (C) Angelo Farina.
+
+To use this filter, you need to get the IR file from the jconvolver
+sample distribution. Issue the following commands in this directory
+(which is demo-filters/SantaLucia in Folve)
+
+    wget http://kokkinizita.linuxaudio.org/linuxaudio/downloads/jconvolver-reverbs.tar.bz2
+    tar xvjf jconvolver-reverbs.tar.bz2
+
+Now you can add this filter to your Folve invocation with:
+  -c demo-filters/SantaLucia
