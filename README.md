@@ -104,6 +104,10 @@ directory with the `fusermount` command:
 
     $ fusermount -u /tmp/test-mount
 
+(If you want some church-like reverb example, check out
+`demo-filters/SantaLucia/` - follow the README there how to get the necessary
+IR wav).
+
 ### Filter Configuration ###
 Filters are essentially *.wav files containing an impulse response (IR). This is
 used by jconvolver's convolution engine to create a
