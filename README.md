@@ -71,27 +71,36 @@ This project is notably based on
 ### Run ###
 Folve requires at least two parameters: the directory where your original
 *.flac files reside and the mount point of this filesystem.
+
 Also, do be useful, you need to supply at least one configuration directory
 with the -c <config-dir> option. Very useful is the -p <port> that starts
 an HTTP status server. Let's use some example filters from this distribution;
 if you are in the folve source directory, you find the directory `demo-filters/`
-that contains subdirectories with filters. Let's choose the lowpass and highpass
-filter to play with:
+that contains subdirectories with filters.
+Let's choose the lowpass and highpass filter to play with:
 
-     $ mkdir /tmp/test-mount
-     $ folve -c demo-filters/lowpass -c demo-filters/highpass  -p 17322 \
+    $ mkdir /tmp/test-mount
+    $ ./folve -c demo-filters/lowpass -c demo-filters/highpass -p 17322 -f \
          /path/to/your/directory/with/flacs /tmp/test-mount
 
 Now you can access the fileystem under that mount point; it has the same
 structure as under your `/path/to/your/directory/with/flacs`
 
-    mplayer /tmp/test-mount/foo.flac
+    $ mplayer /tmp/test-mount/foo.flac
 
 Folve provides a HTTP status page; have a look at
 
     http://localhost:17322/
 
 (or whatever port you chose)
+There you can switch the filter - change it and re-open the same flac file:
+you'll hear the difference.
+
+To finish this instance of folve, you can just press CTRL-C as we've run it in
+the foreground (the `-f` option did this). In real life, you'd run it as daemon
+(without `-f` option), so then you can unmount with the `fusermount` command:
+
+    $ fusermount -u /tmp/test-mount
 
 ### Filter Configuration ###
 The configuration directory should contain configuration files as they're

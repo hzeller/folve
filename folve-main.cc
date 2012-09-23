@@ -226,7 +226,13 @@ int FolveOptionHandling(void *data, const char *arg, int key,
   case FUSE_OPT_KEY_NONOPT:
     // First non-opt: our underlying dir.
     if (rt->fs->underlying_dir().empty()) {
-      rt->fs->set_underlying_dir(realpath(arg, realpath_buf));
+      const char *base_dir = realpath(arg, realpath_buf);
+      if (base_dir != NULL) {
+        rt->fs->set_underlying_dir(base_dir);
+      } else {
+        fprintf(stderr, "Invalid base path '%s': %s\n",
+                arg, strerror(errno));
+      }
       return 0;   // we consumed this.
     } else {
       rt->mount_point = strdup(arg);  // remmber as FYI
@@ -238,9 +244,16 @@ int FolveOptionHandling(void *data, const char *arg, int key,
   case FOLVE_OPT_REFRESH_TIME:
     rt->refresh_time = atoi(arg + 2);  // strip "-r"
     return 0;
-  case FOLVE_OPT_CONFIG:
-    rt->fs->add_config_dir(realpath(arg + 2, realpath_buf));  // strip "-c"
+  case FOLVE_OPT_CONFIG: {
+    const char *config_dir = realpath(arg + 2, realpath_buf);  // strip "-c"
+    if (config_dir != NULL) {
+      rt->fs->add_config_dir(config_dir);
+    } else {
+      fprintf(stderr, "Invalid config dir '%s': %s\n", 
+              arg + 2, strerror(errno));
+    }
     return 0;
+  }
   case FOLVE_OPT_DEBUG:
     rt->fs->set_debug_ui_enabled(true);
     folve::EnableDebugLog(true);
