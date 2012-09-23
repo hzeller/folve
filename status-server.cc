@@ -151,7 +151,7 @@ void StatusServer::RetireHandlerEvent(FileHandler *handler) {
   "<td>%s</td>"  \
   "<td>%s</td>"  \
   "<td><div style='background:white;width:%dpx;border:1px solid black;'>\n" \
-  "  <div style='width:%d%%;background:%s;'>&nbsp;</div>\n</div></td>" \
+  "  <div style='width:%dpx;background:%s;'>&nbsp;</div>\n</div></td>" \
   "<td>%s</td>"
 
 #define sTimeColumns \
@@ -177,7 +177,8 @@ void StatusServer::AppendFileInfo(const char *progress_style,
   } else {
     Appendf(&content_, sProgressRowHtml, status,
             stats.in_gapless ? "&rarr;" : "",
-            kProgressWidth, (int) (100 * stats.progress), progress_style,
+            kProgressWidth, (int) (kProgressWidth * stats.progress),
+            progress_style,
             stats.out_gapless ? "&rarr;" : "");
   }
   const int secs = stats.duration_seconds;
