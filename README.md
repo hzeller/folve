@@ -17,7 +17,7 @@ Folve solves the problem that many media servers don't provide a convolving
 option and their only interface to the outside world is to access a file
 system. So here we provide a filesystem, convolving files while they read them :)
 In general the beauty of simply accessing audio files that are transparently
-convolved is very useful and powerful in other contexts too (you can just
+convolved is very useful and powerful in other contexts too (e.g. you can just
 copy a readily convolved file from it).
 
 Filesystem accesses are optimized for streaming. If files are read sequentially,
@@ -94,8 +94,8 @@ Folve provides a HTTP status page; have a look at
     http://localhost:17322/
 
 (or whatever port you chose with the `-p 17322` option)
-There you can switch the filter - change it and re-open the same flac file:
-you'll hear the difference.
+There you can switch the filter; after you changed it in the UI, re-open
+the same flac file with your media player: you'll hear the difference.
 
 To terminate this instance of folve, you can just press CTRL-C as we've run it
 in the foreground (the `-f` option did this). In real life, you'd run it as
@@ -136,7 +136,11 @@ you need a filter configuration named one of these (in matching sequence):
 
 The files are searched from the most specific to the least specific type.
 
-(I am looking for good filter construction tools on Linux; if you know some,
+The Folve filesystem will determine the samplerate/bits/channels and
+attempt to find the right filter in the filter directory. If there is a filter,
+the output is filtered on-the-fly, otherwise the original file is returned.
+
+(I am looking for filter construction tools on Linux; if you know some,
 please let me know.)
 
 ### General usage: ###
@@ -154,10 +158,6 @@ please let me know.)
       -f           : Operate in foreground; useful for debugging.
       -o <mnt-opt> : other generic mount parameters passed to fuse.
       -d           : High volume fuse debug log. Implies -f.
-
-The Folve filesystem will determine the samplerate/bits/channels and
-attempt to find the right filter in the filter directory. If there is a filter,
-the output is filtered on-the-fly, otherwise the original file is returned.
 
 If you're listening to classical music, opera or live-recordings, then you
 certainly want to switch on gapless convolving with `-g`. If a file ends with
