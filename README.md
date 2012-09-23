@@ -112,14 +112,13 @@ used by jconvolver's convolution engine to create a
 
 Text configuration files refer to these *.wav files and add parameters such as
 filter gain and channel mapping. These configuration files are read by Folve.
-The README.CONFIG in the
+See the samples in the `demo-filters/` directory. The README.CONFIG in the
 [jconvolver](http://apps.linuxaudio.org/apps/all/jconvolver)
 project describes the details of the configuration format.
 
 Since the filter is dependent on the sampling rate, we need to choose the right
 filter depending on the input file we see. This is why you give Folve a whole
-configuration directory: it can contain multipe configuration text files
-depending on sample rate.
+configuration directory: it can contain multipe files depending on sample rate.
 
 The files in the configuration directory need to follow a naming scheme to
 be found by Folve. Their naming is:
