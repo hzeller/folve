@@ -78,11 +78,12 @@ with the `-c <config-dir>` option. Very useful is the `-p <port>` that starts
 a HTTP status server. Let's use some example filters from this distribution;
 if you are in the Folve source directory, you find the directory `demo-filters/`
 that contains subdirectories with filters.
-Let's choose the lowpass and highpass filter to play with:
+Let's choose some filters to play with:
 
     $ mkdir /tmp/test-mount
-    $ ./folve -c demo-filters/lowpass -c demo-filters/highpass -p 17322 -f \
-         /path/to/your/directory/with/flacs /tmp/test-mount
+    $ ./folve -c demo-filters/SantaLucia -c demo-filters/lowpass \
+              -c demo-filters/highpass -p 17322 -f \
+              /path/to/your/directory/with/flacs /tmp/test-mount
 
 Now you can access the fileystem under that mount point; it has the same
 structure as your original directory.
@@ -103,10 +104,6 @@ daemon (without `-f` option), so then you can stop the daemon and unmount the
 directory with the `fusermount` command:
 
     $ fusermount -u /tmp/test-mount
-
-(If you want some church-like reverb example, check out
-`demo-filters/SantaLucia/` - follow the README there how to get the necessary
-IR wav).
 
 ### Filter Configuration ###
 Filters are essentially *.wav files containing an impulse response (IR). This is
