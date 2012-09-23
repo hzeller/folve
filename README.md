@@ -69,14 +69,31 @@ This project is notably based on
 (TODO: debian package)
 
 ### Run ###
- Folve requires at least two parameters: the directory where your original
- *.flac files reside and the mount point of this filesystem.
- Also, do be useful, you need to supply at least one configuration directory
- with the -c <config-dir> option. Very useful is the -p <port> that starts
- an HTTP status server.
+Folve requires at least two parameters: the directory where your original
+*.flac files reside and the mount point of this filesystem.
+Also, do be useful, you need to supply at least one configuration directory
+with the -c <config-dir> option. Very useful is the -p <port> that starts
+an HTTP status server. Let's use some example filters from this distribution;
+if you are in the folve source directory, you find the directory `demo-filters/`
+that contains subdirectories with filters. Let's choose the lowpass and highpass
+filter to play with:
 
-     folve -c /filter/dir -p 17322 /path/to/original/files /mnt/mountpoint
+     $ mkdir /tmp/test-mount
+     $ folve -c demo-filters/lowpass -c demo-filters/highpass  -p 17322 \
+         /path/to/your/directory/with/flacs /tmp/test-mount
 
+Now you can access the fileystem under that mount point; it has the same
+structure as under your `/path/to/your/directory/with/flacs`
+
+    mplayer /tmp/test-mount/foo.flac
+
+Folve provides a HTTP status page; have a look at
+
+    http://localhost:17322/
+
+(or whatever port you chose)
+
+### Filter Configuration ###
 The configuration directory should contain configuration files as they're
 found in jconvolver, with the following naming scheme:
 
@@ -112,20 +129,11 @@ The files are searched from the most specific to the least specific type.
       -o <mnt-opt> : other generic mount parameters passed to fuse.
       -d           : High volume fuse debug log. Implies -f.
 
-Now you can access the fileystem under that mount point, e.g.
-
-    mplayer /mnt/mountpoint/foo.flac
-
 The Folve filesystem will determine the samplerate/bits/channels and
 attempt to find the right filter in the filter directory. If there is a filter,
 the output is filtered on-the-fly, otherwise the original file is returned.
 
-If you gave Folve the flag -p with an status port, it will serve current
-status information on a http server; e.g. With `folve ... -p 17322`
-have a look on
-
-  http://localhost:17322/
-
+### Misc ###
 To manually switch the configuration from the command line, you can use `wget`
 or `curl`, whatever you prefer:
 
