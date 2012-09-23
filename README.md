@@ -162,8 +162,8 @@ the output is filtered on-the-fly, otherwise the original file is returned.
 If you're listening to classical music, opera or live-recordings, then you
 certainly want to switch on gapless convolving with `-g`. If a file ends with
 not enough samples to fill the FIR filter input, the gap is bridged by
-including the first samples of the alphabetically next file in that directory
-- and the result is split between these two files.
+including the first samples of the alphabetically next file in that
+directory -- and the result is split between these two files.
 
 ### Misc ###
 To manually switch the configuration from the command line, you can use `wget`
