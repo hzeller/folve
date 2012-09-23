@@ -33,10 +33,6 @@
 
 using folve::Appendf;
 
-// TODO: someone with a bit more stylesheet-fu can attempt to make this
-// more pretty and the HTML more compact. Maybe even with some Ajax-y inline
-// update of progress bars ?
-
 static const size_t kMaxRetired = 20;
 static const int kProgressWidth = 300;
 static const char kActiveProgress[]  = "#7070ff";
@@ -55,13 +51,30 @@ static const char kStartHtmlHeader[] = "<html><head>"
   "AABSSURBVCjPrZIxDgAgDAKh8f9froOTirU1ssKFYqS7Q4mktAxFRQDJcsPORMDYsDCXhn331"
   "9GPwHJVuaFl3l4D1+h0UjIdbTh9SpP2KQ2AgSfVAdEQGx23tOopAAAAAElFTkSuQmCC'/>\n";
 
-// TODO put all css information here.
+// TODO: someone with a bit more stylesheet-fu can attempt to make this
+// more pretty and the HTML more compact.
+// First step: extract all css used below in style='xx' here. here.
+// Also, maybe move to external file, makes editing much faster, then compile
+// that into a C-string that we can include it in the binary.
+#define SELECT_COLOR "#a0a0ff"
+#define PRE_SELECT_COLOR "#e0e0ff"
 static const char kCSS[] =
-  "\n<style type='text/css'>"
-  " a:link {text-decoration:none;}\n"
-  " a:visited {text-decoration:none;}\n"
-  " a:hover {text-decoration:underline;}\n"
-  " a:active {text-decoration:underline;}\n"
+  "<style type='text/css'>"
+  " a:link { text-decoration:none; }\n"
+  " a:visited { text-decoration:none; }\n"
+  " a:hover { text-decoration:underline; }\n"
+  " a:active { text-decoration:underline; }\n"
+  " .filter_sel { font-weight:bold; \n"
+  "                padding: 5px 15px;\n"
+  "                border-radius: 5px;\n"
+  "                -moz-border-radius: 5px; }\n"
+  " .active { background-color:" SELECT_COLOR "; }\n"
+  " .inactive { background-color:#e0e0e0; }\n"
+  " .inactive:hover { background-color:" PRE_SELECT_COLOR ";\n"
+  "                   color: #000000;\n"
+  "                   text-decoration:none;}\n"
+  " .inactive:link { color: #000000;text-decoration:none;}\n"
+  " .inactive:visited { color: #000000;text-decoration:none;}\n"
   "</style>";
 
 // Callback function called by micro http daemon. Gets the StatusServer pointer
@@ -240,22 +253,21 @@ static void CreateSelection(std::string *result,
     result->append(options[0]);   // no reason to make this a form :)
     return;
   }
-  result->append("<b>[ ");
   for (size_t i = 0; i < options.size(); ++i) {
     const std::string &c = options[i];
-    if (i != 0 ) result->append("&nbsp;|&nbsp;");
+    result->append("&nbsp;");
     const bool active = (int) i == selected;
     if (active) {
-      Appendf(result, "<span style='background:#a0a0ff'>%s</span>\n", c.c_str());
+      Appendf(result, "<span class='filter_sel active'>%s</span>\n", c.c_str());
     } else {
-      Appendf(result, "<a href='%s?f=%zd'>%s</a>\n", kSettingsUrl, i, c.c_str());
+      Appendf(result, "<a class='filter_sel inactive' href='%s?f=%zd'>%s</a>\n",
+              kSettingsUrl, i, c.c_str());
     }
   }
-  result->append(" ]</b>");
 }
 
 void StatusServer::AppendSettingsForm() {
-  content_.append("<br/>Config directory: ");
+  content_.append("<p>Config directory: ");
   CreateSelection(&content_, ui_config_directories_,
                   filesystem_->current_cfg_index());
   if (filesystem_->config_dirs().size() == 1) {
@@ -267,7 +279,7 @@ void StatusServer::AppendSettingsForm() {
     filter_switched_ = false;  // only show once.
   }
   // TODO: re-add something for filesystem_->is_debug_ui_enabled()
-  content_.append("<hr/>");
+  content_.append("</p><hr/>");
 }
 
 struct CompareStats {
