@@ -195,7 +195,6 @@ static int usage(const char *prg) {
          "\t               Default is %d seconds; switch off with -1.\n"
          "\t-g           : Gapless convolving alphabetically adjacent files.\n"
          "\t-D           : Moderate volume Folve debug messages to syslog.\n"
-         "\t               Can then also be toggled in the UI.\n"
          "\t-f           : Operate in foreground; useful for debugging.\n"
          "\t-o <mnt-opt> : other generic mount parameters passed to fuse.\n"
          "\t-d           : High volume fuse debug log. Implies -f.\n",
@@ -258,7 +257,7 @@ int FolveOptionHandling(void *data, const char *arg, int key,
     return 0;
   }
   case FOLVE_OPT_DEBUG:
-    rt->fs->set_debug_ui_enabled(true);
+    // rt->fs->set_debug_ui_enabled(true); // Disabled in status-server.
     folve::EnableDebugLog(true);
     return 0;
   case FOLVE_OPT_GAPLESS:

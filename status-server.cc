@@ -55,6 +55,15 @@ static const char kStartHtmlHeader[] = "<html><head>"
   "AABSSURBVCjPrZIxDgAgDAKh8f9froOTirU1ssKFYqS7Q4mktAxFRQDJcsPORMDYsDCXhn331"
   "9GPwHJVuaFl3l4D1+h0UjIdbTh9SpP2KQ2AgSfVAdEQGx23tOopAAAAAElFTkSuQmCC'/>\n";
 
+// TODO put all css information here.
+static const char kCSS[] =
+  "\n<style type='text/css'>"
+  " a:link {text-decoration:none;}\n"
+  " a:visited {text-decoration:none;}\n"
+  " a:hover {text-decoration:underline;}\n"
+  " a:active {text-decoration:underline;}\n"
+  "</style>";
+
 // Callback function called by micro http daemon. Gets the StatusServer pointer
 // in the user_argument.
 int StatusServer::HandleHttp(void* user_argument,
@@ -231,44 +240,33 @@ static void CreateSelection(std::string *result,
     result->append(options[0]);   // no reason to make this a form :)
     return;
   }
-  result->append("<b>");
+  result->append("<b>[ ");
   for (size_t i = 0; i < options.size(); ++i) {
     const std::string &c = options[i];
     if (i != 0 ) result->append("&nbsp;|&nbsp;");
     const bool active = (int) i == selected;
-    if (active) result->append("<span style='background:#a0a0ff'>");
-    Appendf(result, "<input type='radio' onchange='this.form.submit();' "
-            "id='f%zd' name='f' value='%zd'%s>"
-            "<label for='f%zd'>%s</label>\n",
-            i, i, active ? " checked='checked'" : "",
-            i, c.c_str());
-    if (active) result->append("</span>");
+    if (active) {
+      Appendf(result, "<span style='background:#a0a0ff'>%s</span>\n", c.c_str());
+    } else {
+      Appendf(result, "<a href='%s?f=%zd'>%s</a>\n", kSettingsUrl, i, c.c_str());
+    }
   }
-  result->append("</b>");
+  result->append(" ]</b>");
 }
 
 void StatusServer::AppendSettingsForm() {
-  Appendf(&content_, "<form id='settings-form' action='%s'>\n"
-          "<label for='cfg_sel'>Config directory </label>", kSettingsUrl);
+  content_.append("<br/>Config directory: ");
   CreateSelection(&content_, ui_config_directories_,
                   filesystem_->current_cfg_index());
   if (filesystem_->config_dirs().size() == 1) {
     content_.append(" (This is a boring configuration, add filter directories "
-                   "with -c &lt;dir&gt; [-c &lt;another-dir&gt; ...] :-) )");
+                    "with -c &lt;dir&gt; [-c &lt;another-dir&gt; ...] :-) )");
   } else if (filter_switched_) {
     content_.append("&nbsp;<span style='font-size:small;background:#FFFFa0;'>"
                     " (Affects re- or newly opened files.) </span>");
     filter_switched_ = false;  // only show once.
   }
-  if (filesystem_->is_debug_ui_enabled()) {
-    Appendf(&content_, "<span style='float:right;font-size:small;'>"
-            "<label for='dbg_sel'>Folve debug to syslog</label>"
-            "<input id='dbg_sel' onchange='this.form.submit();' "
-            "type='checkbox' name='d' value='1'%s/></span>",
-            folve::IsDebugLogEnabled() ? " checked" : "");
-  }
-  content_.append("</form>");
-  content_.append("<script>document.forms['settings-form'].reset();</script>");
+  // TODO: re-add something for filesystem_->is_debug_ui_enabled()
   content_.append("<hr/>");
 }
 
@@ -291,6 +289,7 @@ const std::string &StatusServer::CreatePage() {
     Appendf(&content_, "<meta http-equiv='refresh' content='%d'>\n",
             meta_refresh_time_);
   }
+  content_.append(kCSS);
   content_.append("</head>\n");
 
   content_.append("<body style='font-family:Sans-Serif;'>\n");

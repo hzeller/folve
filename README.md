@@ -134,7 +134,6 @@ The files are searched from the most specific to the least specific type.
                      Default is 10 seconds; switch off with -1.
       -g           : Gapless convolving alphabetically adjacent files.
       -D           : Moderate volume Folve debug messages to syslog.
-                     Can then also be toggled in the UI.
       -f           : Operate in foreground; useful for debugging.
       -o <mnt-opt> : other generic mount parameters passed to fuse.
       -d           : High volume fuse debug log. Implies -f.
