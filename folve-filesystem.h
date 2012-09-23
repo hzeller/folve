@@ -41,7 +41,7 @@ public:
   const std::string &underlying_dir() const { return underlying_dir_; }
 
   // Config directories contain the filter configurations.
-  void add_config_dir(const char *config_dir) {
+  void add_config_dir(const std::string &config_dir) {
     config_dirs_.push_back(config_dir);
   }
   const std::vector<std::string> &config_dirs() const { return config_dirs_; }

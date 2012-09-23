@@ -220,12 +220,13 @@ enum {
 
 int FolveOptionHandling(void *data, const char *arg, int key,
                         struct fuse_args *outargs) {
+  char realpath_buf[PATH_MAX];  // running as daemon, need absolute names.
   FolveRuntime *rt = (FolveRuntime*) data;
   switch (key) {
   case FUSE_OPT_KEY_NONOPT:
     // First non-opt: our underlying dir.
     if (rt->fs->underlying_dir().empty()) {
-      rt->fs->set_underlying_dir(arg);
+      rt->fs->set_underlying_dir(realpath(arg, realpath_buf));
       return 0;   // we consumed this.
     } else {
       rt->mount_point = strdup(arg);  // remmber as FYI
@@ -238,7 +239,7 @@ int FolveOptionHandling(void *data, const char *arg, int key,
     rt->refresh_time = atoi(arg + 2);  // strip "-r"
     return 0;
   case FOLVE_OPT_CONFIG:
-    rt->fs->add_config_dir(arg + 2);  // strip "-c"
+    rt->fs->add_config_dir(realpath(arg + 2, realpath_buf));  // strip "-c"
     return 0;
   case FOLVE_OPT_DEBUG:
     rt->fs->set_debug_ui_enabled(true);
