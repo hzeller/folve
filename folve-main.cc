@@ -1,3 +1,5 @@
+//  Folve - A fuse filesystem that convolves audio files on-the-fly.
+//
 //  Copyright (C) 2012 Henner Zeller <h.zeller@acm.org>
 //    
 //  This program is free software; you can redistribute it and/or modify
