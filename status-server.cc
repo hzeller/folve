@@ -267,7 +267,7 @@ static void CreateSelection(std::string *result,
 }
 
 void StatusServer::AppendSettingsForm() {
-  content_.append("<p>Config directory: ");
+  content_.append("<p>Active filter: ");
   CreateSelection(&content_, ui_config_directories_,
                   filesystem_->current_cfg_index());
   if (filesystem_->config_dirs().size() == 1) {
