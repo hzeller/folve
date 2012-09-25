@@ -6,18 +6,22 @@ Overview
 --------
 
 The Folve FUSE filesystem takes a path to a directory of FLAC files, and provides
-these files at a mount point.
+these files at a mount point. Other file formats than FLAC should work as well,
+but not all are working well for streaming yet (and before you ask: MP3 is not
+supported. Use Ogg/Vorbis as it is patent free and provides better quality
+than MP3).
 
 When a FLAC file is accessed through the mount point, Folve automatically
-convolves its original counterpart on-the-fly with a Finite Impulse Response (FIR)
-filter. The FIR filter is based on the jconvolver convolution engine.
+convolves its original counterpart on-the-fly with a Finite Impulse
+Response (FIR) filter. The FIR filter is based on the jconvolver convolution
+engine.
 
 Folve can use the same filter configuration files that jconvolver uses. Folve
-requires a naming scheme, which is described later, for these configuration files.
+requires a naming scheme, described later, for these files.
 
-Folve provides a filesystem that convolves files as a media server or application
-reads them; many media servers or applications do not provide an independent
-convolve option, but they all can read files.
+In essence, Folve provides a filesystem that convolves files as a media server
+or application reads them; many media servers or applications do not provide
+an independent convolve option, but they all can read files.
 
 Filesystem accesses are optimized for streaming. If files are read sequentially,
 we only need to convolve whatever is requested, which minimizes CPU use if
@@ -27,8 +31,8 @@ low-CPU machines (like NAS servers; have not tried that yet).
 
 Because input and output files are compressed, we cannot predict what the
 relationship between file-offset and sample-number is; so skipping forward
-requires to convolve everything up to the point (the zita convolver is
-pretty fast though, so you'll hardly notice).
+requires to convolve everything up to the point (the convolver is pretty fast
+though, so you'll hardly notice).
 
 While indexing, some media servers try to skip to the end of the file (do not
 know why, to check if the end is there ?), so there is code that detects this
@@ -71,7 +75,7 @@ This project is notably based on
 
 (TODO: debian package)
 
-### Run ###
+### Let's test it! ###
 Folve requires at least two parameters: the directory where your original
 FLAC files reside and the mount point of this filesystem.
 
@@ -108,12 +112,12 @@ directory with the `fusermount` command:
     $ fusermount -u /tmp/test-mount
 
 ### Filter Configuration ###
-Filters are essentially *.wav files containing an impulse response (IR). This is
+Filters are WAV files containing an impulse response (IR). This is
 used by jconvolver's convolution engine to create a
 [Finite Impulse Response](http://en.wikipedia.org/wiki/Finite_impulse_response)
 (FIR) filter and process your audio.
 
-Text configuration files refer to these *.wav files and add parameters such as
+Text configuration files refer to these WAV files and add parameters such as
 filter gain and channel mapping. These configuration files are read by Folve.
 See the samples in the `demo-filters/` directory. The README.CONFIG in the
 [jconvolver](http://apps.linuxaudio.org/apps/all/jconvolver)
