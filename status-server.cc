@@ -367,17 +367,18 @@ const std::string &StatusServer::CreatePage() {
 	    (t_seen == 0) ? 0.0 : (100.0 * t_filtered / t_seen));
   }
 
-  Appendf(&content_, "<h3>Accessed Recently</h3>\n%zd in recency cache\n",
+  Appendf(&content_, "<h3>Accessed Recently</h3>\n%zd in recency cache.\n",
           stat_list.size());
 
   if (filesystem_->gapless_processing()) {
-    content_.append("<br/>&rarr; : denotes gapless transfers\n");
+    content_.append("Gapless transfers indicated with '&rarr;'.\n");
   }
   content_.append("<table>\n");
   Appendf(&content_, "<tr><th>Stat</th><td><!--gapless in--></td>"
           "<th width='%dpx'>Progress</th>"  // progress bar.
           "<td><!-- gapless out --></td>"
-          "<th>Pos</th><td></td><th>Len</th><th>Max&nbsp;out</th><th>Format&nbsp;(used&nbsp;filter)</th>"
+          "<th>Pos</th><td></td><th>Len</th><th>Max&nbsp;out</th>"
+          "<th>Format&nbsp;(used&nbsp;filter)</th>"
           "<th align='left'>File</th></tr>\n", kProgressWidth);
   CompareStats comparator;
   std::sort(stat_list.begin(), stat_list.end(), comparator);
