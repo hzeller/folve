@@ -297,7 +297,7 @@ void StatusServer::AppendSettingsForm() {
   } else if (filter_switched_) {
     content_.append("&nbsp;<span class='rounded_box' "
                     "style='font-size:small;background:#FFFFa0;'>"
-                    " (Affects re- or newly opened files.) </span>");
+                    "Affects re- or newly opened files.</span>");
     filter_switched_ = false;  // only show once.
   }
   // TODO: re-add something for filesystem_->is_debug_ui_enabled()
