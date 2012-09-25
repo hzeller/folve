@@ -62,8 +62,8 @@ This project is notably based on
   This requires the latest versions of libfuse and libzita convolver to compile.
   .. and a couple of other libs:
 
-    $ sudo aptitude install libsndfile-dev libflac-dev libzita-convolver-dev \
-                            libfuse-dev libboost-dev libmicrohttpd-dev
+    $ sudo apt-get install libsndfile-dev libflac-dev libzita-convolver-dev \
+                           libfuse-dev libboost-dev libmicrohttpd-dev
     $ make
     $ sudo make install
 

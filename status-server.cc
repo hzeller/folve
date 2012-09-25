@@ -1,7 +1,7 @@
 //  Folve - A fuse filesystem that convolves audio files on-the-fly.
 //
 //  Copyright (C) 2012 Henner Zeller <h.zeller@acm.org>
-//    
+//
 //  This program is free software; you can redistribute it and/or modify
 //  it under the terms of the GNU General Public License as published by
 //  the Free Software Foundation; either version 3 of the License, or
@@ -20,11 +20,14 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
 
+// Microhttpd's headers (at least v0.4.4) are broken and don't include stdarg.h
+#include <stdarg.h>
 #include <microhttpd.h>
 
 #include <boost/thread/locks.hpp>
@@ -99,7 +102,7 @@ int StatusServer::HandleHttp(void* user_argument,
     // We redirect to slash after this, to remove parameters from the GET-URL
     response = MHD_create_response_from_data(0, (void*)"", MHD_NO, MHD_NO);
     MHD_add_response_header(response, "Location", "/");
-    ret = MHD_queue_response(connection, 302, response);    
+    ret = MHD_queue_response(connection, 302, response);
   } else {
     const std::string &page = server->CreatePage();
     response = MHD_create_response_from_data(page.length(), (void*) page.data(),
@@ -139,7 +142,7 @@ void StatusServer::SetDebug(const char *dbg) {
 
 bool StatusServer::Start(int port) {
   PrepareConfigDirectoriesForUI();
-  daemon_ = MHD_start_daemon(MHD_USE_SELECT_INTERNALLY, port, NULL, NULL, 
+  daemon_ = MHD_start_daemon(MHD_USE_SELECT_INTERNALLY, port, NULL, NULL,
                              &HandleHttp, this,
                              MHD_OPTION_END);
   return daemon_ != NULL;
@@ -166,7 +169,7 @@ void StatusServer::RetireHandlerEvent(FileHandler *handler) {
     retired_.pop_back();
   }
 }
-               
+
 // As ugly #defines, so that gcc can warn about printf() format problems.
 #define sMessageRowHtml \
   "<td>%s</td><td colspan='3' style='font-size:small;'>%s</td>"
@@ -208,7 +211,7 @@ void StatusServer::AppendFileInfo(const char *progress_style,
   const int secs = stats.duration_seconds;
   const int fract_sec = stats.progress * secs;
   if (secs >= 0 && fract_sec >= 0) {
-    Appendf(&content_, sTimeColumns, 
+    Appendf(&content_, sTimeColumns,
             fract_sec / 60, fract_sec % 60,
             secs / 60, secs % 60);
   } else {
@@ -329,20 +332,22 @@ const std::string &StatusServer::CreatePage() {
       active_filtered += stats.duration_seconds * stats.progress;
     }
   }
-  const int t_seen = total_seconds_music_seen_ + active_music_seen;
-  const int t_filtered = total_seconds_filtered_ + active_filtered;
-  Appendf(&content_, "Total opening files <b>%d</b> "
-          ".. and re-opened from recency cache <b>%d</b><br/>",
-          filesystem_->total_file_openings(),
-          filesystem_->total_file_reopen());
-  Appendf(&content_, "Total music seen <b>%dd %d:%02d:%02d</b> ",
-          t_seen / 86400, (t_seen % 86400) / 3600,
-          (t_seen % 3600) / 60, t_seen % 60);
-  Appendf(&content_, ".. and convolved <b>%dd %d:%02d:%02d</b> ",
-          t_filtered / 86400, (t_filtered % 86400) / 3600,
-          (t_filtered % 3600) / 60, t_filtered % 60);
-  Appendf(&content_, "(%.1f%%)<br/>", 
-          (t_seen == 0) ? 0.0 : (100.0 * t_filtered / t_seen));
+  if (folve::IsDebugLogEnabled()) {
+    const int t_seen = total_seconds_music_seen_ + active_music_seen;
+    const int t_filtered = total_seconds_filtered_ + active_filtered;
+    Appendf(&content_, "Total opening files <b>%d</b> "
+	    ".. and re-opened from recency cache <b>%d</b><br/>",
+	    filesystem_->total_file_openings(),
+	    filesystem_->total_file_reopen());
+    Appendf(&content_, "Total music seen <b>%dd %d:%02d:%02d</b> ",
+	    t_seen / 86400, (t_seen % 86400) / 3600,
+	    (t_seen % 3600) / 60, t_seen % 60);
+    Appendf(&content_, ".. and convolved <b>%dd %d:%02d:%02d</b> ",
+	    t_filtered / 86400, (t_filtered % 86400) / 3600,
+	    (t_filtered % 3600) / 60, t_filtered % 60);
+    Appendf(&content_, "(%.1f%%)<br/>",
+	    (t_seen == 0) ? 0.0 : (100.0 * t_filtered / t_seen));
+  }
 
   Appendf(&content_, "<h3>Accessed Recently</h3>\n%zd in recency cache\n",
           stat_list.size());
@@ -367,7 +372,7 @@ const std::string &StatusServer::CreatePage() {
     content_.append("<h3>Retired</h3>\n");
     content_.append("<table>\n");
     boost::lock_guard<boost::mutex> l(retired_mutex_);
-    for (RetiredList::const_iterator it = retired_.begin(); 
+    for (RetiredList::const_iterator it = retired_.begin();
          it != retired_.end(); ++it) {
       AppendFileInfo(kRetiredProgress, *it);
     }
