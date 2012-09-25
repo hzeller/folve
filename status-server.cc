@@ -69,10 +69,11 @@ static const char kCSS[] =
   " a:visited { text-decoration:none; }\n"
   " a:hover { text-decoration:underline; }\n"
   " a:active { text-decoration:underline; }\n"
-  " .filter_sel { font-weight:bold; \n"
-  "                padding: 5px 15px;\n"
-  "                border-radius: 5px;\n"
-  "                -moz-border-radius: 5px; }\n"
+  " .rounded_box, .filter_sel {\n"
+  "        padding: 5px 15px;\n"
+  "        border-radius: 5px;\n"
+  "        -moz-border-radius: 5px; }\n"
+  " .filter_sel { font-weight:bold; }\n"
   " .active { background-color:" SELECT_COLOR "; }\n"
   " .inactive { background-color:#e0e0e0; }\n"
   " .inactive:hover { background-color:" PRE_SELECT_COLOR ";\n"
@@ -294,7 +295,8 @@ void StatusServer::AppendSettingsForm() {
     content_.append(" (This is a boring configuration, add filter directories "
                     "with -c &lt;dir&gt; [-c &lt;another-dir&gt; ...] :-) )");
   } else if (filter_switched_) {
-    content_.append("&nbsp;<span style='font-size:small;background:#FFFFa0;'>"
+    content_.append("&nbsp;<span class='rounded_box' "
+                    "style='font-size:small;background:#FFFFa0;'>"
                     " (Affects re- or newly opened files.) </span>");
     filter_switched_ = false;  // only show once.
   }
