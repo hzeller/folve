@@ -283,7 +283,7 @@ int main(int argc, char *argv[]) {
     FUSE_OPT_KEY("-c ", FOLVE_OPT_CONFIG),
     FUSE_OPT_KEY("-D",  FOLVE_OPT_DEBUG),
     FUSE_OPT_KEY("-g",  FOLVE_OPT_GAPLESS),
-    FUSE_OPT_END
+    FUSE_OPT_END   // This fails to compile for fuse <= 2.8.1; get >= 2.8.4
   };
   struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
   fuse_opt_parse(&args, &folve_rt, folve_options, FolveOptionHandling);
