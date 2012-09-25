@@ -187,7 +187,7 @@ static void folve_destroy(void *) {
 }
 
 static int usage(const char *prg) {
-  printf("usage: %s [options] <original-dir> <mount-point>\n", prg);
+  printf("usage: %s [options] <original-dir> <mount-point-dir>\n", prg);
   printf("Options: (in sequence of usefulness)\n"
          "\t-c <cfg-dir> : Convolver configuration directory.\n"
          "\t               You can supply this option multiple times:\n"
@@ -199,8 +199,8 @@ static int usage(const char *prg) {
          "\t-D           : Moderate volume Folve debug messages to syslog,\n"
          "\t               and some more detailed configuration info in UI\n"
          "\t-f           : Operate in foreground; useful for debugging.\n"
-         "\t-o <mnt-opt> : other generic mount parameters passed to fuse.\n"
-         "\t-d           : High volume fuse debug log. Implies -f.\n",
+         "\t-o <mnt-opt> : other generic mount parameters passed to FUSE.\n"
+         "\t-d           : High volume FUSE debug log. Implies -f.\n",
          folve_rt.refresh_time);
   return 1;
 }
