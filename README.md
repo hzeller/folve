@@ -50,7 +50,8 @@ before continuing with the convolved audio stream.
 Folve has been tested with some players and media servers (and
 works around bugs in these). Still, this is the first version made public, so
 expect rough edges. Please report observations with particular media servers
-or send patches to <h.zeller@acm.org>.
+or provide patches through github
+<https://github.com/hzeller/folve>.
 
 This project is notably based on
 
