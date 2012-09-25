@@ -196,7 +196,8 @@ static int usage(const char *prg) {
          "\t-r <refresh> : Seconds between refresh of status page;\n"
          "\t               Default is %d seconds; switch off with -1.\n"
          "\t-g           : Gapless convolving alphabetically adjacent files.\n"
-         "\t-D           : Moderate volume Folve debug messages to syslog.\n"
+         "\t-D           : Moderate volume Folve debug messages to syslog,\n"
+         "\t               and some more detailed configuration info in UI\n"
          "\t-f           : Operate in foreground; useful for debugging.\n"
          "\t-o <mnt-opt> : other generic mount parameters passed to fuse.\n"
          "\t-d           : High volume fuse debug log. Implies -f.\n",

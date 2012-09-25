@@ -152,6 +152,12 @@ StatusServer::~StatusServer() {
   if (daemon_) MHD_stop_daemon(daemon_);
 }
 
+bool StatusServer::show_details() {
+  // Right now, we just make this dependent on debug output. Could be a separate
+  // option.
+  return folve::IsDebugLogEnabled();
+}
+
 // FileHandlerCache::Observer interface.
 void StatusServer::RetireHandlerEvent(FileHandler *handler) {
   HandlerStats stats;
@@ -265,18 +271,24 @@ static void CreateSelection(std::string *result,
     const bool active = (int) i == selected;
     if (active) {
       Appendf(result, "<span title='%s' class='filter_sel active'>%s</span>\n",
-              option_titles[i].c_str(), c.c_str());
+              (option_titles.size() > i) ? option_titles[i].c_str() : "",
+              c.c_str());
     } else {
       Appendf(result, "<a title='%s' class='filter_sel inactive' "
               "href='%s?f=%zd'>%s</a>\n",
-              option_titles[i].c_str(), kSettingsUrl, i, c.c_str());
+              (option_titles.size() > i) ? option_titles[i].c_str() : "",
+              kSettingsUrl, i, c.c_str());
     }
   }
 }
 
 void StatusServer::AppendSettingsForm() {
   content_.append("<p>Active filter: ");
-  CreateSelection(&content_, filesystem_->config_dirs(), ui_config_directories_,
+  CreateSelection(&content_,
+                  show_details()
+                  ? filesystem_->config_dirs()
+                  : std::vector<std::string>(),
+                  ui_config_directories_,
                   filesystem_->current_cfg_index());
   if (filesystem_->config_dirs().size() == 1) {
     content_.append(" (This is a boring configuration, add filter directories "
@@ -316,10 +328,11 @@ const std::string &StatusServer::CreatePage() {
   Appendf(&content_, "<center style='background-color:#A0FFA0;'>"
           "Welcome to "
           "<a href='https://github.com/hzeller/folve#readme'>Folve</a> "
-          FOLVE_VERSION "</center>\n"
-          "Convolving audio files from <code>%s</code>\n",
-          filesystem_->underlying_dir().c_str());
-
+          FOLVE_VERSION "</center>\n");
+  if (show_details()) {
+    Appendf(&content_, "Convolving audio files from <code>%s</code>\n",
+            filesystem_->underlying_dir().c_str());
+  }
   AppendSettingsForm();
 
   std::vector<HandlerStats> stat_list;
@@ -335,7 +348,7 @@ const std::string &StatusServer::CreatePage() {
       active_filtered += stats.duration_seconds * stats.progress;
     }
   }
-  if (folve::IsDebugLogEnabled()) {
+  if (show_details()) {
     const int t_seen = total_seconds_music_seen_ + active_music_seen;
     const int t_filtered = total_seconds_filtered_ + active_filtered;
     Appendf(&content_, "Total opening files <b>%d</b> "

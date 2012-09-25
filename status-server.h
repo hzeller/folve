@@ -61,6 +61,9 @@ private:
   void SetFilter(const char *value);
   void SetDebug(const char *value);
 
+  // Show details that might only be interesting while setting up things.
+  bool show_details();
+
   // -- interface FileHandlerCache::Observer
   virtual void InsertHandlerEvent(FileHandler *handler) {}
   virtual void RetireHandlerEvent(FileHandler *handler);
