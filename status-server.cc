@@ -252,6 +252,7 @@ void StatusServer::PrepareConfigDirectoriesForUI() {
 }
 
 static void CreateSelection(std::string *result,
+                            const std::vector<std::string> &option_titles,
                             const std::vector<std::string> &options,
                             int selected) {
   if (options.size() == 1) {
@@ -263,17 +264,19 @@ static void CreateSelection(std::string *result,
     result->append("&nbsp;");
     const bool active = (int) i == selected;
     if (active) {
-      Appendf(result, "<span class='filter_sel active'>%s</span>\n", c.c_str());
+      Appendf(result, "<span title='%s' class='filter_sel active'>%s</span>\n",
+              option_titles[i].c_str(), c.c_str());
     } else {
-      Appendf(result, "<a class='filter_sel inactive' href='%s?f=%zd'>%s</a>\n",
-              kSettingsUrl, i, c.c_str());
+      Appendf(result, "<a title='%s' class='filter_sel inactive' "
+              "href='%s?f=%zd'>%s</a>\n",
+              option_titles[i].c_str(), kSettingsUrl, i, c.c_str());
     }
   }
 }
 
 void StatusServer::AppendSettingsForm() {
   content_.append("<p>Active filter: ");
-  CreateSelection(&content_, ui_config_directories_,
+  CreateSelection(&content_, filesystem_->config_dirs(), ui_config_directories_,
                   filesystem_->current_cfg_index());
   if (filesystem_->config_dirs().size() == 1) {
     content_.append(" (This is a boring configuration, add filter directories "
