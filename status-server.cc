@@ -403,7 +403,7 @@ const std::string &StatusServer::CreatePage() {
 
   const double duration = folve::CurrentTime() - start;
   Appendf(&content_,
-          "<span style='float:left;font-size:small;'>page-gen %.2fms</span>"
+          "<span style='float:left;font-size:x-small;'>%.2fms</span>"
           "<span style='float:right;font-size:x-small;'>"
           "&copy; 2012 Henner Zeller"
           " | Folve is free software and comes with no warranty. "
