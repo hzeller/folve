@@ -89,15 +89,15 @@ if you are in the Folve source directory, you find the directory `demo-filters/`
 that contains subdirectories with filters.
 Let's choose some filters to play with:
 
-    $ mkdir /tmp/test-mount
-    $ ./folve -c demo-filters/SantaLucia -c demo-filters/lowpass \
-              -c demo-filters/highpass -p 17322 -f \
-              /path/to/your/directory/with/flacs /tmp/test-mount
+    mkdir /tmp/test-mount
+    ./folve -c demo-filters/SantaLucia -c demo-filters/lowpass \
+            -c demo-filters/highpass -p 17322 -f \
+            /path/to/your/directory/with/flacs /tmp/test-mount
 
 Now you can access the fileystem under that mount point; it has the same
 structure as your original directory.
 
-    $ mplayer /tmp/test-mount/foo.flac
+    mplayer /tmp/test-mount/foo.flac
 
 Folve provides a HTTP status page; have a look at
 
@@ -112,7 +112,7 @@ in the foreground (the `-f` option did this). In real life, you'd run it as
 daemon (without `-f` option), so then you can stop the daemon and unmount the
 directory with the `fusermount` command:
 
-    $ fusermount -u /tmp/test-mount
+    fusermount -u /tmp/test-mount
 
 ### Filter Configuration ###
 Filters are WAV files containing an impulse response (IR). This is
