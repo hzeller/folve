@@ -17,7 +17,12 @@ To install in the default location /usr/local/bin, just do
 
 ## Older Systems ##
 Older systems, e.g. Ubuntu 10.04 lack sufficiently recent libraries for FUSE
-and the zita convolver. You've compile these yourself:
+and the zita convolver. In that case, don't install these; better remove them
+to avoid confusion:
+
+    sudo apt-get remove libzita-convolver-dev libfuse-dev
+
+.. and compile the latest versions yourself:
 
     # The FUSE library
     cd /tmp
@@ -38,4 +43,4 @@ also
     make
     sudo make LIBDIR=lib install
 
-Now, the compilation step in 'Typical installation' should succeed.
+Now, the compilation step described in *Typical installation* should succeed.
