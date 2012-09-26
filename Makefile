@@ -9,12 +9,19 @@ CFLAGS=-D_FILE_OFFSET_BITS=64 -Wall -O2 -DFOLVE_VERSION='"$(F_VERSION)"'
 CXXFLAGS=$(CFLAGS)
 LDFLAGS=-lfuse -lsndfile -lzita-convolver -lmicrohttpd -lboost_thread-mt
 
+ifdef LINK_STATIC
+# static linking requires us to be much more explicit when linking
+LDFLAGS+=-lFLAC -lvorbisenc -lvorbis -logg -lfftw3f \
+         -lstdc++ -lm -lpthread -lrt -ldl
+LD_STATIC=-static
+endif
+
 OBJECTS = folve-main.o folve-filesystem.o conversion-buffer.o \
           sound-processor.o file-handler-cache.o status-server.o util.o \
           zita-audiofile.o zita-config.o zita-fconfig.o zita-sstring.o
 
 folve: $(OBJECTS)
-	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
+	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS) $(LD_STATIC)
 
 install: folve
 	install folve $(DESTDIR)/bin
