@@ -2,7 +2,7 @@
 //  Folve - A fuse filesystem that convolves audio files on-the-fly.
 //
 //  Copyright (C) 2012 Henner Zeller <h.zeller@acm.org>
-//    
+//
 //  This program is free software; you can redistribute it and/or modify
 //  it under the terms of the GNU General Public License as published by
 //  the Free Software Foundation; either version 3 of the License, or
@@ -57,11 +57,11 @@ public:
   // If there was already an object stored under that key, the existing one
   // is returned instead and the passed object discarded.
   FileHandler *InsertPinned(const std::string &key, FileHandler *handler);
-  
+
   // Find an object in this map and pin it down so that it is not evicted.
   // You've to Unpin() it after use.
   FileHandler *FindAndPin(const std::string &key);
-  
+
   // Unpin object. If the last object is unpinned, the PinnedMap may decide
   // to delete it later (though typically will keep it around for a while).
   void Unpin(const std::string &key);
@@ -70,7 +70,7 @@ public:
   void GetStats(std::vector<HandlerStats> *stats);
 
  private:
-  class Entry;
+  struct Entry;
   struct CompareAge;
   typedef std::map<std::string, Entry*> CacheMap;
 
