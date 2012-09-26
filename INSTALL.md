@@ -8,9 +8,11 @@ straightforward. To compile, this is what you need to do:
     make
 
 To install in the default location /usr/local/bin, just do
+
     sudo make install
 
 .. otherwise specify the alternative location with DESTDIR
+
     sudo make DESTDIR=/usr install
 
 ## Older Systems ##
