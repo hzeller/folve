@@ -70,7 +70,7 @@ This project is notably based on
   .. and a couple of other libs:
 
     $ sudo apt-get install libsndfile-dev libflac-dev libzita-convolver-dev \
-                           libfuse-dev libboost-dev libmicrohttpd-dev
+                           libfuse-dev libboost-thread-dev libmicrohttpd-dev
     $ make
     $ sudo make install
 
