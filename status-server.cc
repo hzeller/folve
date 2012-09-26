@@ -38,8 +38,11 @@
 
 using folve::Appendf;
 
-static const size_t kMaxRetired = 20;
+// To be used in CSS constant.
+#define PROGRESS_WIDTH "300"
 static const int kProgressWidth = 300;
+
+static const size_t kMaxRetired = 20;
 static const char kActiveProgress[]  = "#7070ff";
 static const char kRetiredProgress[] = "#d0d0d0";
 static const char kSettingsUrl[] = "/settings";
@@ -58,11 +61,8 @@ static const char kStartHtmlHeader[] = "<html><head>"
 
 // TODO: someone with a bit more stylesheet-fu can attempt to make this
 // more pretty and the HTML more compact.
-// First step: extract all css used below in style='xx' here. here.
 // Also, maybe move to external file, makes editing much faster, then compile
 // that into a C-string that we can include it in the binary.
-#define SELECT_COLOR "#a0a0ff"
-#define PRE_SELECT_COLOR "#e0e0ff"
 static const char kCSS[] =
   "<style type='text/css'>"
   " a:link { text-decoration:none; }\n"
@@ -74,13 +74,22 @@ static const char kCSS[] =
   "        border-radius: 5px;\n"
   "        -moz-border-radius: 5px; }\n"
   " .filter_sel { font-weight:bold; }\n"
-  " .active { background-color:" SELECT_COLOR "; }\n"
+  " .active { background-color:#a0a0ff; }\n"
   " .inactive { background-color:#e0e0e0; }\n"
-  " .inactive:hover { background-color:" PRE_SELECT_COLOR ";\n"
+  " .inactive:hover { background-color:#e0e0ff;\n"
   "                   color: #000000;\n"
   "                   text-decoration:none;}\n"
   " .inactive:link { color: #000000;text-decoration:none;}\n"
   " .inactive:visited { color: #000000;text-decoration:none;}\n"
+  // CSS classes used in the file-listin. Keep things compact.
+  " td { text-wrap:none; white-space:nowrap; }\n"
+  " .fn { font-size:small; text-wrap:none; white-space:nowrap; }\n"  // filename
+  " .pf { width:" PROGRESS_WIDTH "px;\n"     // progress-
+  "       background: white; border:1px solid black; }\n"   // frame
+  " .nf { text-align:right; }\n"                          // number formatting.
+  " .fb { background-color:#c0c0c0;"
+  "        border-radius: 3px;\n"
+  "        -moz-border-radius: 3px; }\n"                  // format box
   "</style>";
 
 // Callback function called by micro http daemon. Gets the StatusServer pointer
@@ -184,18 +193,18 @@ void StatusServer::RetireHandlerEvent(FileHandler *handler) {
 #define sProgressRowHtml \
   "<td>%s</td>"  \
   "<td>%s</td>"  \
-  "<td><div style='background:white;width:%dpx;border:1px solid black;'>\n" \
-  "  <div style='width:%dpx;background:%s;'>&nbsp;</div>\n</div></td>" \
+  "<td><div class='pf'>" \
+  "<div style='width:%dpx;background:%s;'>&nbsp;</div>\n</div></td>" \
   "<td>%s</td>"
 
 #define sTimeColumns \
-  "<td align='right'>%2d:%02d</td><td>/</td><td align='right'>%2d:%02d</td>"
+  "<td class='nf'>%2d:%02d</td><td>/</td><td class='nf'>%2d:%02d</td>"
 #define sDecibelColumn \
-  "<td align='right' style='background:%s;'>%.1f dB</td>"
+  "<td class='nf'%s>%.1f dB</td>"
 
 void StatusServer::AppendFileInfo(const char *progress_style,
                                   const HandlerStats &stats) {
-  content_.append("<tr style='text-wrap:none;white-space:nowrap;'>");
+  content_.append("<tr>");
   const char *status = "";
   switch (stats.status) {
   case HandlerStats::OPEN:    status = "open"; break;
@@ -211,7 +220,7 @@ void StatusServer::AppendFileInfo(const char *progress_style,
   } else {
     Appendf(&content_, sProgressRowHtml, status,
             stats.in_gapless ? "&rarr;" : "",
-            kProgressWidth, (int) (kProgressWidth * stats.progress),
+            (int) (kProgressWidth * stats.progress),
             progress_style,
             stats.out_gapless ? "&rarr;" : "");
   }
@@ -227,17 +236,15 @@ void StatusServer::AppendFileInfo(const char *progress_style,
 
   if (stats.max_output_value > 1e-6) {
     Appendf(&content_, sDecibelColumn,
-            stats.max_output_value > 1.0 ? "#FF0505" : "white",
+            stats.max_output_value > 1.0 ? " style='background:#FF8080;'" : "",
             20 * log10f(stats.max_output_value));
   } else {
     content_.append("<td>-</td>");
   }
 
-  Appendf(&content_, "<td bgcolor='#c0c0c0'>&nbsp;%s (%s)&nbsp;</td>",
+  Appendf(&content_, "<td class='fb'>&nbsp;%s (%s)&nbsp;</td>",
           stats.format.c_str(), ui_config_directories_[stats.filter_id].c_str());
-  Appendf(&content_,"<td "
-          "style='font-size:small;text-wrap:none;white-space:nowrap'>%s</td>",
-          stats.filename.c_str());
+  Appendf(&content_,"<td class='fn'>%s</td>", stats.filename.c_str());
   content_.append("</tr>\n");
 }
 
