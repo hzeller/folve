@@ -44,3 +44,24 @@ also
     sudo make LIBDIR=lib install
 
 Now, the compilation step described in *Typical installation* should succeed.
+
+## Linking statically ##
+To install Folve on some embedded systems, you might want to link it statically.
+This depends a lot on your system, but let's get to the basic steps.
+
+First, you need go create a static library of the zita-convolver. The default
+installation does not provide this, so let's do it.
+First, start with compiling the zita-convolver yourself, as described in the
+*Older Systems* section.
+
+Then run the following commands:
+
+     cd /tmp/zita-convolver-3.1.0/libs
+     ar rcs libzita-convolver.a zita-convolver.o
+     ranlib libzita-convolver.a
+     sudo install -m 644 libzita-convolver.a /usr/local/lib
+
+Now we can compile folve statically; go into the folve source directory and
+type
+
+     make LINK_STATIC=y
