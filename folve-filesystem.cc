@@ -323,9 +323,9 @@ private:
     if (copy_flac_header_verbatim_) {
       out_buffer->WriteCharAt((1152 & 0xFF00) >> 8,  8);
       out_buffer->WriteCharAt((1152 & 0x00FF)     ,  9);
-      out_buffer->WriteCharAt((32768 & 0xFF00) >> 8, 10);
-      out_buffer->WriteCharAt((32768 & 0x00FF)     , 11);
-      for (int i = 12; i < 18; ++i) out_buffer->WriteCharAt(0, i);  // MD5
+      out_buffer->WriteCharAt((1152 & 0xFF00) >> 8, 10);
+      out_buffer->WriteCharAt((1152 & 0x00FF)     , 11);
+      for (int i = 12; i < 18; ++i) out_buffer->WriteCharAt(0, i); // framesize
     } else {
       // .. and if SNDFILE writes the header, it misses out in writing the
       // number of samples to be expected. So let's fill that in.
