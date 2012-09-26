@@ -57,10 +57,10 @@ This project is notably based on
 
  * FUSE: Filesystem in Userspace   <http://fuse.sourceforge.net/>
  * Zita Convolver <http://kokkinizita.linuxaudio.org/linuxaudio/downloads/zita-convolver-3.1.0.tar.bz2>
- * JConvolver audio convolver <http://apps.linuxaudio.org/apps/all/jconvolver>
-     * Program files in the Folve the project named zita-* are derivatives of
-       files found in the jconvolver project. They implement the configuration
-       file parsing.
+ * JConvolver <http://apps.linuxaudio.org/apps/all/jconvolver>
+     * Program files in the Folve project named zita-*.{h,cc} are derivatives of
+       files found in the jconvolver project. They implement the compatible
+       configuration file parsing.
  * LibSndfile r/w audio files <http://www.mega-nerd.com/libsndfile/>
  * Microhttpd webserver library <http://www.gnu.org/software/libmicrohttpd/>
 
@@ -133,16 +133,16 @@ configuration directory: it can contain multipe files depending on sample rate.
 The files in the configuration directory need to follow a naming scheme to
 be found by Folve. Their naming is:
 
-     filter-<samplerate>-<channels>-<bits>.conf   OR
-     filter-<samplerate>-<channels>.conf          OR
-     filter-<samplerate>.conf
+    filter-<samplerate>-<channels>-<bits>.conf   OR
+    filter-<samplerate>-<channels>.conf          OR
+    filter-<samplerate>.conf
 
 So if you have FLAC files with 44.1kHz, 16 bits and 2 channel stero,
 you need a filter configuration named one of these (in matching sequence):
 
-     /filter/dir/filter-44100-2-16.conf            OR
-     /filter/dir/filter-44100-2.conf               OR
-     /filter/dir/filter-44100.conf
+    /filter/dir/filter-44100-2-16.conf            OR
+    /filter/dir/filter-44100-2.conf               OR
+    /filter/dir/filter-44100.conf
 
 The files are searched from the most specific to the least specific type.
 
