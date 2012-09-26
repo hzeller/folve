@@ -16,11 +16,12 @@ To install in the default location /usr/local/bin, just do
     sudo make DESTDIR=/usr install
 
 
+
 ## Older Systems ##
 
 Older systems, e.g. Ubuntu 10.04 lack sufficiently recent libraries for FUSE
-and the zita convolver. In that case, don't install these; better remove them
-to avoid confusion:
+and the zita convolver. In that case, don't install these with `apt-get`; in
+fact, better remove the old versions to avoid confusion:
 
     sudo apt-get remove libzita-convolver-dev libfuse-dev
 
@@ -48,15 +49,16 @@ also
 Now, the compilation step described in *Typical installation* should succeed.
 
 
+
 ## Linking statically ##
 
 To install Folve on some embedded systems, you might need to link it statically.
 This depends a lot on your system, so it might require some twiddeling, but
 let's see the basic steps.
 
-First, you need create a static library of the zita-convolver. The default
-installation does not provide this, so let's do it manually here.
-First, start with compiling the zita-convolver yourself, as described in the
+First, you need create a static verssion of the zita-convolver libray; the
+default installation does not provide this. To do so, start first
+with compiling the zita-convolver yourself, as described in the
 *Older Systems* section.
 
 Then run the following commands:
