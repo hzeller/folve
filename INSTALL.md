@@ -16,8 +16,8 @@ To install in the default location /usr/local/bin, just do
     sudo make DESTDIR=/usr install
 
 ## Older Systems ##
-Older systems, e.g. Ubuntu 10.04 lack sufficiently, recent libraries for fuse
-and the zita convolver. You've compile these yourself.
+Older systems, e.g. Ubuntu 10.04 lack sufficiently recent libraries for FUSE
+and the zita convolver. You've compile these yourself:
 
     # The FUSE library
     cd /tmp
