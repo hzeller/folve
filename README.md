@@ -56,6 +56,7 @@ or provide patches through github
 This project is notably based on
 
  * FUSE: Filesystem in Userspace   <http://fuse.sourceforge.net/>
+ * Zita Convolver <http://kokkinizita.linuxaudio.org/linuxaudio/downloads/zita-convolver-3.1.0.tar.bz2>
  * JConvolver audio convolver <http://apps.linuxaudio.org/apps/all/jconvolver>
      * Program files in the Folve the project named zita-* are derivatives of
        files found in the jconvolver project. They implement the configuration
@@ -66,13 +67,14 @@ This project is notably based on
 
 ### Compiling on Ubuntu (tested on 11.10 and 12.04) ###
 
-  This requires the latest versions of libfuse and libzita convolver to compile.
-  .. and a couple of other libs:
+  This requires the latest versions of some development libraries.
 
-    $ sudo apt-get install libsndfile-dev libflac-dev libzita-convolver-dev \
-                           libfuse-dev libboost-thread-dev libmicrohttpd-dev
-    $ make
-    $ sudo make install
+    sudo apt-get install libsndfile-dev libflac-dev libzita-convolver-dev \
+                         libfuse-dev libboost-thread-dev libmicrohttpd-dev
+    make
+    sudo make install
+
+For hints on how to compile on older systems see INSTALL.md.
 
 (TODO: debian package)
 

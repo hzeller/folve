@@ -1,8 +1,11 @@
-CC=gcc
 CXX=g++
+DESTDIR=/usr/local
+
 F_VERSION=$(shell git log -n1 --date=short --format="%cd (commit=%h)" 2>/dev/null || echo "[unknown version - compile from git]")
+
 CFLAGS=-D_FILE_OFFSET_BITS=64 -Wall -O2 -DFOLVE_VERSION='"$(F_VERSION)"'
 #CFLAGS=-D_FILE_OFFSET_BITS=64 -Wall -g -O0
+
 CXXFLAGS=$(CFLAGS)
 LDFLAGS=-lfuse -lsndfile -lzita-convolver -lmicrohttpd -lboost_thread-mt
 
@@ -14,10 +17,12 @@ folve: $(OBJECTS)
 	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
 
 install: folve
-	install folve /usr/local/bin
+	install folve $(DESTDIR)/bin
 
 clean:
 	rm -f folve $(OBJECTS)
 
-README.html : README.md
+html : README.html INSTALL.html
+
+%.html : %.md
 	markdown < $^ > $@
