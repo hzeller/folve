@@ -6,11 +6,11 @@ F_VERSION=$(shell git log -n1 --date=short --format="%cd (commit=%h)" 2>/dev/nul
 CFLAGS=-D_FILE_OFFSET_BITS=64 -Wall -O2 -DFOLVE_VERSION='"$(F_VERSION)"'
 
 CXXFLAGS=$(CFLAGS)
-LDFLAGS=-lfuse -lsndfile -lzita-convolver -lmicrohttpd -lboost_thread-mt
+LDFLAGS=-lfuse -lsndfile -lzita-convolver -lmicrohttpd -lboost_thread-mt -lfftw3f
 
 ifdef LINK_STATIC
 # static linking requires us to be much more explicit when linking
-LDFLAGS+=-lFLAC -lvorbisenc -lvorbis -logg -lfftw3f \
+LDFLAGS+=-lFLAC -lvorbisenc -lvorbis -logg \
          -lstdc++ -lm -lpthread -lrt -ldl
 LD_STATIC=-static
 endif
