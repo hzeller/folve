@@ -2,7 +2,7 @@
 //  Folve - A fuse filesystem that convolves audio files on-the-fly.
 //
 //  Copyright (C) 2012 Henner Zeller <h.zeller@acm.org>
-//    
+//
 //  This program is free software; you can redistribute it and/or modify
 //  it under the terms of the GNU General Public License as published by
 //  the Free Software Foundation; either version 3 of the License, or
@@ -24,8 +24,7 @@
 
 #include "file-handler-cache.h"
 #include "file-handler.h"
-
-#include <boost/thread/mutex.hpp>
+#include "util.h"
 
 class FolveFilesystem;
 struct MHD_Daemon;
@@ -67,11 +66,11 @@ private:
   // -- interface FileHandlerCache::Observer
   virtual void InsertHandlerEvent(FileHandler *handler) {}
   virtual void RetireHandlerEvent(FileHandler *handler);
-  
+
   typedef std::deque<HandlerStats> RetiredList;
   RetiredList retired_;
   int expunged_retired_;
-  boost::mutex retired_mutex_;
+  folve::Mutex retired_mutex_;
 
   // Config directories with common prefix removed to have them concise.
   std::vector<std::string> ui_config_directories_;

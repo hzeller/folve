@@ -20,6 +20,7 @@
 #define FOLVE_UTIL_H
 
 #include <string>
+#include <pthread.h>
 
   // Define this with empty, if you're not using gcc.
 #define PRINTF_FMT_CHECK(fmt_pos, args_pos) \
@@ -45,6 +46,30 @@ namespace folve {
   void DLogf(const char *format, ...) PRINTF_FMT_CHECK(1, 2);
   void EnableDebugLog(bool b);
   bool IsDebugLogEnabled();
+
+  // Importing boost::mutex posed too many dependencies on some embedded systems
+  // with insufficient library support.
+  // So we have our own little wrapper around the pthread mutex.
+  // Non-recursive.
+  class Mutex {
+  public:
+    Mutex() { pthread_mutex_init(&mutex_, NULL); }
+    ~Mutex() { pthread_mutex_destroy(&mutex_); }
+    void Lock() { pthread_mutex_lock(&mutex_); }
+    void Unlock() { pthread_mutex_unlock(&mutex_); }
+
+  private:
+    pthread_mutex_t mutex_;
+  };
+
+  class MutexLock {
+  public:
+    MutexLock(Mutex *m) : mutex_(m) { mutex_->Lock(); }
+    ~MutexLock() { mutex_->Unlock(); }
+  private:
+    Mutex *const mutex_;
+  };
+
 }  // namespece folve
 
 #undef PRINTF_FMT_CHECK

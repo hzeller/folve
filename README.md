@@ -70,7 +70,7 @@ This project is notably based on
   This requires the latest versions of some development libraries.
 
     sudo apt-get install libsndfile-dev libflac-dev libzita-convolver-dev \
-                         libfuse-dev libboost-thread-dev libmicrohttpd-dev
+                         libfuse-dev libmicrohttpd-dev
     make
     sudo make install
 

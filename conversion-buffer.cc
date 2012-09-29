@@ -1,7 +1,7 @@
 //  Folve - A fuse filesystem that convolves audio files on-the-fly.
 //
 //  Copyright (C) 2012 Henner Zeller <h.zeller@acm.org>
-//    
+//
 //  This program is free software; you can redistribute it and/or modify
 //  it under the terms of the GNU General Public License as published by
 //  the Free Software Foundation; either version 3 of the License, or
@@ -20,12 +20,11 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
-
-#include <boost/thread/locks.hpp>
 
 // Annoyingly, mkstemp() does not do TMPDIR trickery and tempnam() is obsolete.
 static char *TempNameAllocated(const char *pattern) {
@@ -140,15 +139,14 @@ ssize_t ConversionBuffer::Read(char *buf, size_t size, off_t offset) {
   const off_t required_min_written = offset + (offset >= header_end_ ? size : 1);
 
   // As soon as someone tries to read beyond of what we already have, we call
-  // our WriteToSoundfile() callback that fills more of it.
+  // the callback that fills more of it.
   // We are shared between potentially several open files. Serialize threads.
-  {
-    boost::lock_guard<boost::mutex> l(mutex_);
-    while (total_written_ < required_min_written) {
-      if (!source_->AddMoreSoundData())
-        break;
-    }
+  mutex_.Lock();
+  while (total_written_ < required_min_written) {
+    if (!source_->AddMoreSoundData())
+      break;
   }
+  mutex_.Unlock();
 
   return pread(out_filedes_, buf, size, offset);
 }

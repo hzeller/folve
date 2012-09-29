@@ -30,7 +30,7 @@
 #include <stdarg.h>
 #include <microhttpd.h>
 
-#include <boost/thread/locks.hpp>
+#include <algorithm>
 
 #include "folve-filesystem.h"
 #include "status-server.h"
@@ -178,7 +178,7 @@ void StatusServer::RetireHandlerEvent(FileHandler *handler) {
   }
   stats.last_access = folve::CurrentTime();
   stats.status = HandlerStats::RETIRED;
-  boost::lock_guard<boost::mutex> l(retired_mutex_);
+  folve::MutexLock l(&retired_mutex_);
   retired_.push_front(stats);
   while (retired_.size() > kMaxRetired) {
     ++expunged_retired_;
@@ -402,7 +402,7 @@ const std::string &StatusServer::CreatePage() {
   if (retired_.size() > 0) {
     content_.append("<h3>Retired</h3>\n");
     content_.append("<table>\n");
-    boost::lock_guard<boost::mutex> l(retired_mutex_);
+    folve::MutexLock l(&retired_mutex_);
     for (RetiredList::const_iterator it = retired_.begin();
          it != retired_.end(); ++it) {
       AppendFileInfo(kRetiredProgress, *it);

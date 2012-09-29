@@ -20,8 +20,7 @@
 
 #include <map>
 #include <vector>
-#include <boost/thread/locks.hpp>
-#include <boost/thread/mutex.hpp>
+#include <algorithm>
 
 #include "file-handler.h"
 #include "file-handler-cache.h"
@@ -36,7 +35,7 @@ struct FileHandlerCache::Entry {
 
 FileHandler *FileHandlerCache::InsertPinned(const std::string &key,
                                             FileHandler *handler) {
-  boost::lock_guard<boost::mutex> l(mutex_);
+  folve::MutexLock l(&mutex_);
   CacheMap::iterator ins
     = cache_.insert(std::make_pair(key, (Entry*)NULL)).first;
   if (ins->second == NULL) {
@@ -54,7 +53,7 @@ FileHandler *FileHandlerCache::InsertPinned(const std::string &key,
 }
 
 FileHandler *FileHandlerCache::FindAndPin(const std::string &key) {
-  boost::lock_guard<boost::mutex> l(mutex_);
+  folve::MutexLock l(&mutex_);
   CacheMap::iterator found = cache_.find(key);
   if (found == cache_.end())
     return NULL;
@@ -64,7 +63,7 @@ FileHandler *FileHandlerCache::FindAndPin(const std::string &key) {
 }
 
 void FileHandlerCache::Unpin(const std::string &key) {
-  boost::lock_guard<boost::mutex> l(mutex_);
+  folve::MutexLock l(&mutex_);
   CacheMap::iterator found = cache_.find(key);
   assert(found != cache_.end());
   --found->second->references;
@@ -81,7 +80,7 @@ void FileHandlerCache::SetObserver(Observer *observer) {
 
 void FileHandlerCache::GetStats(std::vector<HandlerStats> *stats) {
   HandlerStats s;
-  boost::lock_guard<boost::mutex> l(mutex_);
+  folve::MutexLock l(&mutex_);
   for (CacheMap::iterator it = cache_.begin(); it != cache_.end(); ++it) {
     it->second->handler->GetHandlerStatus(&s);
     s.status = ((it->second->references == 0)
@@ -123,4 +122,4 @@ void FileHandlerCache::CleanupOldestUnreferenced_Locked() {
     Erase_Locked(for_removal[i]);
   }
 }
-  
+

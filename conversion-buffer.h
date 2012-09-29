@@ -2,7 +2,7 @@
 //  Folve - A fuse filesystem that convolves audio files on-the-fly.
 //
 //  Copyright (C) 2012 Henner Zeller <h.zeller@acm.org>
-//    
+//
 //  This program is free software; you can redistribute it and/or modify
 //  it under the terms of the GNU General Public License as published by
 //  the Free Software Foundation; either version 3 of the License, or
@@ -20,7 +20,7 @@
 #define FOLVE_CONVERSION_BUFFER_H
 
 #include <sndfile.h>
-#include <boost/thread/mutex.hpp>
+#include "util.h"
 
 // A file-backed buffer for a SNDFILE, that is only filled on demand via
 // a SoundSource.
@@ -38,11 +38,11 @@ public:
     // requested. There can be an error in opening the sound-file, in that
     // case SetOutputSoundfile() will be called with NULL.
     // Ask sf_strerror() to find out why.
-    // Ownership is passed to the SoundSource, receiver needs to 
+    // Ownership is passed to the SoundSource, receiver needs to
     // sf_close() the file.
     virtual void SetOutputSoundfile(ConversionBuffer *parent,
                                     SNDFILE *sndfile) = 0;
-      
+
     // This callback is called by the ConversionBuffer if it needs more data.
     // Rerturns 'true' if there is more, 'false' if that was the last available
     // data.
@@ -102,7 +102,7 @@ private:
   bool snd_writing_enabled_;
   off_t total_written_;
   off_t header_end_;
-  boost::mutex mutex_;
+  folve::Mutex mutex_;
 };
 
 #endif  // FOLVE_CONVERSION_BUFFER_H

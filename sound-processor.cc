@@ -1,7 +1,7 @@
 //  Folve - A fuse filesystem that convolves audio files on-the-fly.
 //
 //  Copyright (C) 2012 Henner Zeller <h.zeller@acm.org>
-//    
+//
 //  This program is free software; you can redistribute it and/or modify
 //  it under the terms of the GNU General Public License as published by
 //  the Free Software Foundation; either version 3 of the License, or
@@ -20,13 +20,12 @@
 #include <assert.h>
 #include <string.h>
 
-#include <boost/thread/mutex.hpp>
-#include <boost/thread/locks.hpp>
+#include "util.h"
 
 // There seems to be a bug somewhere inside the fftwf library or the use
 // within Convproc::configure()
 // It creates a double-delete somewhere if accessed with multiple threads.
-static boost::mutex fftw_mutex;
+static folve::Mutex fftw_mutex;
 
 SoundProcessor *SoundProcessor::Create(const std::string &config_file,
                                        int samplerate, int channels) {
@@ -37,7 +36,7 @@ SoundProcessor *SoundProcessor::Create(const std::string &config_file,
   zita.nout = channels;
   zita.convproc = new Convproc();
   { // fftw threading bug workaround, see above.
-    boost::lock_guard<boost::mutex> l(fftw_mutex);
+    folve::MutexLock l(&fftw_mutex);
     if ((config(&zita, config_file.c_str()) != 0)
         || zita.convproc->inpdata(channels - 1) == NULL
         || zita.convproc->outdata(channels - 1) == NULL) {

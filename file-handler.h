@@ -31,17 +31,6 @@ public:
     : duration_seconds(-1), progress(-1), status(OPEN), last_access(0),
       max_output_value(0), in_gapless(false), out_gapless(false) {}
 
-  // Copy constructor: test to work around some gcc 2.7.1 seen in the field.
-  // To be removed after test.
-  HandlerStats(const HandlerStats &other)
-    : filename(other.filename), format(other.format), message(other.message),
-      duration_seconds(other.duration_seconds), progress(other.progress),
-      status(other.status), last_access(other.last_access),
-      max_output_value(other.max_output_value),
-      in_gapless(other.in_gapless), out_gapless(other.out_gapless),
-      filter_id(other.filter_id) {
-  }
-
   std::string filename;         // filesystem name.
   std::string format;           // File format info if recognized.
   std::string message;          // Per file (error) message if any.
