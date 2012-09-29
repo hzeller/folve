@@ -312,10 +312,10 @@ void StatusServer::AppendSettingsForm() {
 }
 
 struct CompareStats {
-  bool operator() (const HandlerStats &a, const HandlerStats &b) {
-    if (a.status < b.status) return true;   // open before idle.
-    else if (a.status > b.status) return false;
-    return b.last_access < a.last_access;   // reverse time.
+  bool operator() (const HandlerStats *a, const HandlerStats *b) {
+    if (a->status < b->status) return true;   // open before idle.
+    else if (a->status > b->status) return false;
+    return b->last_access < a->last_access;   // reverse time.
   }
 };
 
@@ -387,10 +387,15 @@ const std::string &StatusServer::CreatePage() {
           "<th>Pos</th><td></td><th>Len</th><th>Max&nbsp;out</th>"
           "<th>Format&nbsp;(used&nbsp;filter)</th>"
           "<th align='left'>File</th></tr>\n", kProgressWidth);
-  CompareStats comparator;
-  std::sort(stat_list.begin(), stat_list.end(), comparator);
+  // ICE in arm 2.7.1 compiler if we sort values.
+  std::vector<HandlerStats *> stat_ptrs;
   for (size_t i = 0; i < stat_list.size(); ++i) {
-    AppendFileInfo(kActiveProgress, stat_list[i]);
+    stat_ptrs.push_back(&stat_list[i]);
+  }
+  CompareStats comparator;
+  std::sort(stat_ptrs.begin(), stat_ptrs.end(), comparator);
+  for (size_t i = 0; i < stat_ptrs.size(); ++i) {
+    AppendFileInfo(kActiveProgress, *stat_ptrs[i]);
   }
   content_.append("</table><hr/>\n");
 
