@@ -86,7 +86,11 @@ static int folve_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
   if (dp == NULL)
     return -errno;
 
-  while ((de = readdir(dp)) != NULL) {
+  // Entry size is a bit shaky to calculate, but this should be the upper bound.
+  const size_t entry_size = sizeof(struct dirent) + PATH_MAX;
+  struct dirent *entry_buf = (struct dirent *) malloc(entry_size);
+
+  while (readdir_r(dp, entry_buf, &de) == 0 && de != NULL) {
     struct stat st;
     memset(&st, 0, sizeof(st));
     st.st_ino = de->d_ino;
@@ -95,6 +99,7 @@ static int folve_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     if (filler(buf, entry_name, &st, 0))
       break;
   }
+  free(entry_buf);
 
   closedir(dp);
   return 0;
