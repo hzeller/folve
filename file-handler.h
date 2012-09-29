@@ -2,7 +2,7 @@
 //  Folve - A fuse filesystem that convolves audio files on-the-fly.
 //
 //  Copyright (C) 2012 Henner Zeller <h.zeller@acm.org>
-//    
+//
 //  This program is free software; you can redistribute it and/or modify
 //  it under the terms of the GNU General Public License as published by
 //  the Free Software Foundation; either version 3 of the License, or
@@ -22,10 +22,26 @@
 #include <string>
 
 // Status about some handler, filled in by various subsystem.
-struct HandlerStats {
+// This is mostly used to be displayed in the HTTP server. And to survive
+// after the FileHandler is long gone, to show 'retired' elements in the
+// status server.
+class HandlerStats {
+public:
   HandlerStats()
     : duration_seconds(-1), progress(-1), status(OPEN), last_access(0),
       max_output_value(0), in_gapless(false), out_gapless(false) {}
+
+  // Copy constructor: test to work around some gcc 2.7.1 seen in the field.
+  // To be removed after test.
+  HandlerStats(const HandlerStats &other)
+    : filename(other.filename), format(other.format), message(other.message),
+      duration_seconds(other.duration_seconds), progress(other.progress),
+      status(other.status), last_access(other.last_access),
+      max_output_value(other.max_output_value),
+      in_gapless(other.in_gapless), out_gapless(other.out_gapless),
+      filter_id(other.filter_id) {
+  }
+
   std::string filename;         // filesystem name.
   std::string format;           // File format info if recognized.
   std::string message;          // Per file (error) message if any.
@@ -59,7 +75,7 @@ public:
   virtual int Stat(struct stat *st) = 0;
 
   // Get handler status.
-  virtual void GetHandlerStatus(struct HandlerStats *s) = 0;
+  virtual void GetHandlerStatus(HandlerStats *s) = 0;
   virtual bool AcceptProcessor(SoundProcessor *s) { return false; }
 
 private:

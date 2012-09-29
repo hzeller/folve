@@ -75,13 +75,13 @@ public:
   virtual int Stat(struct stat *st) {
     return fstat(filedes_, st);
   }
-  virtual void GetHandlerStatus(struct HandlerStats *stats) {
+  virtual void GetHandlerStatus(HandlerStats *stats) {
     *stats = info_stats_;
     if (file_size_ > 0) {
       stats->progress = 1.0 * max_accessed_ / file_size_;
     }
   }
-  
+
 private:
   const int filedes_;
   size_t file_size_;
@@ -203,7 +203,7 @@ public:
     return output_buffer_->Read(buf, size, offset);
   }
 
-  virtual void GetHandlerStatus(struct HandlerStats *stats) {
+  virtual void GetHandlerStatus(HandlerStats *stats) {
     boost::lock_guard<boost::mutex> l(stats_mutex_);
     if (processor_ != NULL) {
       base_stats_.max_output_value = processor_->max_output_value();
