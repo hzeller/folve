@@ -34,6 +34,7 @@ class StatusServer : protected FileHandlerCache::Observer {
 public:
   // Does not take over ownership of the filesystem.
   StatusServer(FolveFilesystem *fs);
+  virtual ~StatusServer();    // Shut down daemon.
 
   // Start server, listing on given port.
   bool Start(int port);
@@ -41,16 +42,15 @@ public:
   // Set browser meta-refresh time. < 0 to disable.
   void set_meta_refresh(int seconds) { meta_refresh_time_ = seconds; }
 
-  // Shut down daemon.
-  virtual ~StatusServer();
-
 private:
+  // micro-httpd callback
   static int HandleHttp(void* user_argument,
                         struct MHD_Connection *,
                         const char *, const char *, const char *,
                         const char *, size_t *, void **);
 
   const std::string &CreatePage();
+
   // Some helper functions to create the page:
   void AppendSettingsForm();
   void PrepareConfigDirectoriesForUI();
