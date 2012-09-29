@@ -387,7 +387,8 @@ const std::string &StatusServer::CreatePage() {
           "<th>Pos</th><td></td><th>Len</th><th>Max&nbsp;out</th>"
           "<th>Format&nbsp;(used&nbsp;filter)</th>"
           "<th align='left'>File</th></tr>\n", kProgressWidth);
-  // ICE in arm 2.7.1 compiler if we sort values.
+  // ICE in arm 2.7.1 compiler if we sort values. So sort pointers
+  // to the values instead.
   std::vector<HandlerStats *> stat_ptrs;
   for (size_t i = 0; i < stat_list.size(); ++i) {
     stat_ptrs.push_back(&stat_list[i]);
