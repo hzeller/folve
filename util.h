@@ -62,10 +62,12 @@ namespace folve {
     pthread_mutex_t mutex_;
   };
 
+  // Useful RAII wrapper around mutex.
   class MutexLock {
   public:
     MutexLock(Mutex *m) : mutex_(m) { mutex_->Lock(); }
     ~MutexLock() { mutex_->Unlock(); }
+
   private:
     Mutex *const mutex_;
   };
