@@ -22,11 +22,10 @@
 #include <string>
 
 // Status about some handler, filled in by various subsystem.
-// This is mostly used to be displayed in the HTTP server. And to survive
-// after the FileHandler is long gone, to show 'retired' elements in the
-// status server.
-class HandlerStats {
-public:
+// This is mostly used to be displayed in the UI.
+// Data collected in this struct will survive after the FileHandler is long
+// gone, to show 'retired' elements in the status server.
+struct HandlerStats {
   HandlerStats()
     : duration_seconds(-1), progress(-1), status(OPEN), last_access(0),
       max_output_value(0), in_gapless(false), out_gapless(false) {}
@@ -35,15 +34,15 @@ public:
   std::string format;           // File format info if recognized.
   std::string message;          // Per file (error) message if any.
   int duration_seconds;         // Audio file length if known; -1 otherwise.
-  float progress;               // Convolving progress if known; -1 otherwise.
+  float progress;               // File access rogress if known; -1 otherwise.
 
   enum Status { OPEN, IDLE, RETIRED };
   Status status;                // Status of this file handler.
   double last_access;           // Last access in hi-res seconds since epoch.
-  float max_output_value;       // Clipping ? Should be [0 .. 1]
-  bool in_gapless;              // Were we handed a processor to continue.
-  bool out_gapless;             // Did we pass on our processor.
-  int  filter_id;               // which filter-id is in use.
+  float max_output_value;       // Clipping ? Absolute value, should be [0 .. 1].
+  bool in_gapless;              // We were handed a processor to continue.
+  bool out_gapless;             // We passed on our processor to the next.
+  int  filter_id;               // The filter-id is in use. 0 for pass-through.
 };
 
 class SoundProcessor;
@@ -65,6 +64,9 @@ public:
 
   // Get handler status.
   virtual void GetHandlerStatus(HandlerStats *s) = 0;
+
+  // Accept processor passed on from the previous file. Can return false
+  // if this FileHandler cannot use it (e.g. it alrady started convolving).
   virtual bool AcceptProcessor(SoundProcessor *s) { return false; }
 
 private:
