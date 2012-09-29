@@ -4,7 +4,7 @@ On a reasonably fresh system (e.g. Ubuntu 11.10 and 12.04), installation is
 straightforward. To compile, this is what you need to do:
 
         sudo apt-get install libsndfile-dev libflac-dev libzita-convolver-dev \
-                             libfuse-dev libboost-thread-dev libmicrohttpd-dev
+                             libfuse-dev libmicrohttpd-dev
         make
 
 To install in the default location /usr/local/bin, just do

@@ -35,9 +35,6 @@
 #include <string>
 #include <zita-convolver.h>
 
-#include <boost/thread/locks.hpp>
-#include <boost/thread/mutex.hpp>
-
 #include "conversion-buffer.h"
 #include "file-handler-cache.h"
 #include "file-handler.h"
@@ -75,13 +72,13 @@ public:
   virtual int Stat(struct stat *st) {
     return fstat(filedes_, st);
   }
-  virtual void GetHandlerStatus(struct HandlerStats *stats) {
+  virtual void GetHandlerStatus(HandlerStats *stats) {
     *stats = info_stats_;
     if (file_size_ > 0) {
       stats->progress = 1.0 * max_accessed_ / file_size_;
     }
   }
-  
+
 private:
   const int filedes_;
   size_t file_size_;
@@ -203,8 +200,8 @@ public:
     return output_buffer_->Read(buf, size, offset);
   }
 
-  virtual void GetHandlerStatus(struct HandlerStats *stats) {
-    boost::lock_guard<boost::mutex> l(stats_mutex_);
+  virtual void GetHandlerStatus(HandlerStats *stats) {
+    folve::MutexLock l(&stats_mutex_);
     if (processor_ != NULL) {
       base_stats_.max_output_value = processor_->max_output_value();
     }
@@ -407,9 +404,9 @@ private:
       Close();
       return false;
     }
-    stats_mutex_.lock();
+    stats_mutex_.Lock();
     input_frames_left_ -= r;
-    stats_mutex_.unlock();
+    stats_mutex_.Unlock();
     if (!input_frames_left_ && !processor_->is_input_buffer_complete()
         && fs_->gapless_processing()) {
       typedef std::set<std::string> DirSet;
@@ -427,9 +424,9 @@ private:
         DLogf("Gapless pass-on from '%s' to alphabetically next '%s'",
               base_stats_.filename.c_str(), found->c_str());
       }
-      stats_mutex_.lock();
+      stats_mutex_.Lock();
       processor_->WriteProcessed(snd_out_, r);
-      stats_mutex_.unlock();
+      stats_mutex_.Unlock();
       if (passed_processor) {
         base_stats_.out_gapless = true;
         SaveOutputValues();
@@ -437,9 +434,9 @@ private:
       }
       if (next_file) fs_->Close(found->c_str(), next_file);
     } else {
-      stats_mutex_.lock();
+      stats_mutex_.Lock();
       processor_->WriteProcessed(snd_out_, r);
-      stats_mutex_.unlock();
+      stats_mutex_.Unlock();
     }
     if (input_frames_left_ == 0) {
       Close();
@@ -560,7 +557,7 @@ private:
   const SF_INFO in_info_;
   const std::string config_path_;
 
-  boost::mutex stats_mutex_;
+  folve::Mutex stats_mutex_;
   HandlerStats base_stats_;      // UI information about current file.
 
   struct stat file_stat_;        // we dynamically report a changing size.

@@ -30,7 +30,7 @@
 #include <stdarg.h>
 #include <microhttpd.h>
 
-#include <boost/thread/locks.hpp>
+#include <algorithm>
 
 #include "folve-filesystem.h"
 #include "status-server.h"
@@ -178,7 +178,7 @@ void StatusServer::RetireHandlerEvent(FileHandler *handler) {
   }
   stats.last_access = folve::CurrentTime();
   stats.status = HandlerStats::RETIRED;
-  boost::lock_guard<boost::mutex> l(retired_mutex_);
+  folve::MutexLock l(&retired_mutex_);
   retired_.push_front(stats);
   while (retired_.size() > kMaxRetired) {
     ++expunged_retired_;
@@ -312,10 +312,10 @@ void StatusServer::AppendSettingsForm() {
 }
 
 struct CompareStats {
-  bool operator() (const HandlerStats &a, const HandlerStats &b) {
-    if (a.status < b.status) return true;   // open before idle.
-    else if (a.status > b.status) return false;
-    return b.last_access < a.last_access;   // reverse time.
+  bool operator() (const HandlerStats *a, const HandlerStats *b) {
+    if (a->status < b->status) return true;   // open before idle.
+    else if (a->status > b->status) return false;
+    return b->last_access < a->last_access;   // reverse time.
   }
 };
 
@@ -387,17 +387,22 @@ const std::string &StatusServer::CreatePage() {
           "<th>Pos</th><td></td><th>Len</th><th>Max&nbsp;out</th>"
           "<th>Format&nbsp;(used&nbsp;filter)</th>"
           "<th align='left'>File</th></tr>\n", kProgressWidth);
-  CompareStats comparator;
-  std::sort(stat_list.begin(), stat_list.end(), comparator);
+  // ICE in arm 2.7.1 compiler if we sort values.
+  std::vector<HandlerStats *> stat_ptrs;
   for (size_t i = 0; i < stat_list.size(); ++i) {
-    AppendFileInfo(kActiveProgress, stat_list[i]);
+    stat_ptrs.push_back(&stat_list[i]);
+  }
+  CompareStats comparator;
+  std::sort(stat_ptrs.begin(), stat_ptrs.end(), comparator);
+  for (size_t i = 0; i < stat_ptrs.size(); ++i) {
+    AppendFileInfo(kActiveProgress, *stat_ptrs[i]);
   }
   content_.append("</table><hr/>\n");
 
   if (retired_.size() > 0) {
     content_.append("<h3>Retired</h3>\n");
     content_.append("<table>\n");
-    boost::lock_guard<boost::mutex> l(retired_mutex_);
+    folve::MutexLock l(&retired_mutex_);
     for (RetiredList::const_iterator it = retired_.begin();
          it != retired_.end(); ++it) {
       AppendFileInfo(kRetiredProgress, *it);

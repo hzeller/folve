@@ -25,9 +25,8 @@
 #include <string>
 #include <vector>
 
-#include <boost/thread/mutex.hpp>
-
 #include "file-handler.h"
+#include "util.h"
 
 class FileHandler;
 
@@ -84,7 +83,7 @@ public:
 
   const size_t max_size_;
   Observer *observer_;
-  boost::mutex mutex_;
+  folve::Mutex mutex_;
   CacheMap cache_;
 };
 
