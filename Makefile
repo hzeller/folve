@@ -10,8 +10,7 @@ LDFLAGS=-lfuse -lsndfile -lzita-convolver -lmicrohttpd -lfftw3f -lpthread
 
 ifdef LINK_STATIC
 # static linking requires us to be much more explicit when linking
-LDFLAGS+=-lFLAC -lvorbisenc -lvorbis -logg \
-         -lstdc++ -lm -lpthread -lrt -ldl
+LDFLAGS+=-lFLAC -lvorbisenc -lvorbis -logg -lstdc++ -lm -lrt -ldl
 LD_STATIC=-static
 endif
 
