@@ -22,7 +22,7 @@ folve: $(OBJECTS)
 	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS) $(LD_STATIC)
 
 install: folve
-	install folve $(DESTDIR)/bin
+	install folve $(PREFIX)/bin
 
 clean:
 	rm -f folve $(OBJECTS)

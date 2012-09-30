@@ -11,7 +11,7 @@ To install in the default location /usr/local/bin, just do
 
         sudo make install
 
-.. otherwise specify the alternative location with DESTDIR
+.. otherwise specify the alternative location with PREFIX
 
         sudo make PREFIX=/usr install
 
