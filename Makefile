@@ -1,5 +1,5 @@
 CXX=g++
-DESTDIR=/usr/local
+PREFIX=/usr/local
 
 F_VERSION=$(shell git log -n1 --date=short --format="%cd (commit=%h)" 2>/dev/null || echo "[unknown version - compile from git]")
 
