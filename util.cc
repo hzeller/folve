@@ -44,9 +44,9 @@ void folve::Appendf(std::string *str, const char *format, ...) {
 }
 
 std::string folve::StringPrintf(const char *format, ...) {
-  std::string result;
   va_list ap;
   va_start(ap, format);
+  std::string result;
   vAppendf(&result, format, ap);
   va_end(ap);
   return result;
