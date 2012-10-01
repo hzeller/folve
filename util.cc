@@ -17,10 +17,11 @@
 
 #include "util.h"
 
-#include <stdarg.h>
 #include <stdio.h>
 #include <sys/time.h>
 #include <syslog.h>
+
+#include <cstdarg>
 
 double folve::CurrentTime() {
   struct timeval tv;
