@@ -61,6 +61,7 @@ public:
 
   // Config file used to create this processor.
   const std::string &config_file() const { return config_file_; }
+  const time_t config_file_timestamp() const { return config_file_timestamp_; }
 
 private:
   SoundProcessor(const ZitaConfig &config, const std::string &cfg_file);
@@ -68,6 +69,8 @@ private:
 
   const ZitaConfig zita_config_;
   const std::string config_file_;
+  time_t config_file_timestamp_;
+
   float *const buffer_;
   const int channels_;
   // TODO: instead of two positions, better have one position and two states

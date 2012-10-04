@@ -52,6 +52,9 @@ SoundProcessor::SoundProcessor(const ZitaConfig &config, const std::string &cfg)
     channels_(config.ninp),
     input_pos_(0), output_pos_(0),
     max_out_value_observed_(0.0) {
+  struct stat st;
+  stat(cfg.c_str(), &st);
+  config_file_timestamp_ = st.st_mtime;
   Reset();
 }
 
