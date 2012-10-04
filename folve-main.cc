@@ -174,17 +174,7 @@ static void *folve_init(struct fuse_conn_info *conn) {
     }
   }
 
-  // Some sanity checks.
-  std::set<std::string> available_dirs = folve_rt.fs->GetAvailableConfigDirs();
-  if (available_dirs.empty()) {
-    syslog(LOG_NOTICE, "No filter configuration directories given. "
-           "Any files will be just passed through verbatim.");
-  }
-  if (available_dirs.size() > 2 && folve_rt.status_port < 0) {
-    syslog(LOG_WARNING, "Multiple filter configurations given, but no HTTP "
-           "status port. You only can switch filters via the HTTP interface; "
-           "add -p <port>");
-  }
+  folve_rt.fs->SetupInitialConfig();
   return NULL;
 }
 

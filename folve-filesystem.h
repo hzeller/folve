@@ -62,6 +62,9 @@ public:
   // to stderr.
   bool CheckInitialized();
 
+  // After startup: choose the initial configuation.
+  void SetupInitialConfig();
+
   // Create a new filter given the filesystem path and the underlying
   // path.
   // Returns NULL, if it cannot be created.
@@ -99,6 +102,17 @@ private:
   FileHandler *CreateFromDescriptor(int filedes, const std::string &cfg_dir,
                                     const char *fs_path,
                                     const std::string &underlying_file);
+
+  // Sanitize path to configuration subdirectory. Checks if someone tries
+  // to break out of the given base directory.
+  // Return if this is a sane directory.
+  // Passes the sanitized directory in the parameter.
+  bool SanitizeConfigSubdir(std::string *subdir_path) const;
+
+  // List available config directories; if "warn_invalid" is true,
+  // non-directories or symbolic links breaking out of the directory are
+  // reported.
+  const std::set<std::string> ListConfigDirs(bool warn_invalid) const;
 
   std::string underlying_dir_;
   std::string base_config_dir_;

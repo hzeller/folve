@@ -640,6 +640,14 @@ void FolveFilesystem::Close(const char *fs_path, const FileHandler *handler) {
   open_file_cache_.Unpin(cache_key);
 }
 
+static bool IsDirectory(const std::string &path) {
+  if (path.empty()) return false;
+  struct stat st;
+  if (stat(path.c_str(), &st) != 0)
+    return false;
+  return (st.st_mode & S_IFMT) == S_IFDIR;
+}
+
 bool FolveFilesystem::ListDirectory(const std::string &fs_dir,
                                     const std::string &suffix,
                                     std::set<std::string> *files) {
@@ -656,31 +664,40 @@ bool FolveFilesystem::ListDirectory(const std::string &fs_dir,
   return true;
 }
 
+bool FolveFilesystem::SanitizeConfigSubdir(std::string *subdir_path) const {
+  if (base_config_dir_.length() + 1 + subdir_path->length() > PATH_MAX)
+    return false;  // uh, someone wants to buffer overflow us ?
+  const std::string to_verify_path = base_config_dir_ + "/" + *subdir_path;
+  char all_path[PATH_MAX];
+  // This will as well eat symbolic links that break out, though one could
+  // argue that that would be sane. We could think of some light
+  // canonicalization that only removes ./ and ../
+  const char *verified = realpath(to_verify_path.c_str(), all_path);
+  if (verified == NULL) { // bogus directory.
+    return false;
+  }
+  if (strncmp(verified, base_config_dir_.c_str(),
+              base_config_dir_.length()) != 0) {
+    // Attempt to break out with ../-tricks.
+    return false;
+  }
+  if (!IsDirectory(verified))
+    return false;
+
+  // Derive from sanitized dir. So someone can write lowpass/../highpass
+  // or '.' for empty filter. Or ./highpass. And all work.
+  *subdir_path = ((strlen(verified) == base_config_dir_.length()) 
+                  ? ""   // chose subdir '.'
+                  : verified + base_config_dir_.length() + 1 /*slash*/);
+  return true;
+}
+
 bool FolveFilesystem::SwitchCurrentConfigDir(const std::string &subdir_in) {
   std::string subdir = subdir_in;
-  if (!subdir.empty()) {
-    std::string to_verify_path = base_config_dir_ + "/" + subdir;
-    if (to_verify_path.length() > PATH_MAX)
-      return false;  // uh, someone wants to buffer overflow us ?
-    char all_path[PATH_MAX];
-    const char *verified = realpath(to_verify_path.c_str(), all_path);
-    if (verified == NULL) { // bogus directory.
-      syslog(LOG_INFO, "Filter config switch attempt to '%s': %s",
-             subdir.c_str(), strerror(errno));
-      return false;
-    }
-    if (strncmp(verified, base_config_dir_.c_str(),
-                base_config_dir_.length()) != 0) {
-      // Attempt to break out with ../-tricks.
-      syslog(LOG_INFO, "Filter config switch: Someone tries something nasty "
-             "changing filter to '%s'. Ha, in your face!", subdir.c_str());
-      return false;
-    }
-    // Derive from sanitized dir. So someone can write lowpass/../highpass
-    // or '.' for empty filter. Or ./highpass. And all work.
-    subdir = ((strlen(verified) == base_config_dir_.length()) 
-              ? ""   // chose subdir '.'
-              : verified + base_config_dir_.length() + 1 /*slash*/);
+  if (!subdir.empty() && !SanitizeConfigSubdir(&subdir)) {
+    syslog(LOG_INFO, "Invalid config switch attempt to '%s'",
+           subdir_in.c_str());
+    return false;
   }
   if (subdir != current_config_subdir_) {
     current_config_subdir_ = subdir;
@@ -692,14 +709,6 @@ bool FolveFilesystem::SwitchCurrentConfigDir(const std::string &subdir_in) {
     return true;
   }
   return false;
-}
-
-static bool IsDirectory(const std::string &path) {
-  if (path.empty()) return false;
-  struct stat st;
-  if (stat(path.c_str(), &st) != 0)
-    return false;
-  return (st.st_mode & S_IFMT) == S_IFDIR;
 }
 
 bool FolveFilesystem::CheckInitialized() {
@@ -720,28 +729,45 @@ bool FolveFilesystem::CheckInitialized() {
     return false;
   }
 
-  std::set<std::string> cfg_dirs = GetAvailableConfigDirs();
-  if (cfg_dirs.size() > 1) {
-    // By default, lets set the index to the first filter the user provided.
-    SwitchCurrentConfigDir(*++cfg_dirs.begin());
-  }
   return true;
 }
 
+void FolveFilesystem::SetupInitialConfig() {
+  std::set<std::string> available_dirs = ListConfigDirs(true);
+  // Some sanity checks.
+  if (available_dirs.size() == 1) {
+    syslog(LOG_NOTICE, "No filter configuration directories given. "
+           "Any files will be just passed through verbatim.");
+  }
+  if (available_dirs.size() > 1) {
+    // By default, lets set the index to the first filter the user provided.
+    SwitchCurrentConfigDir(*++available_dirs.begin());
+  }
+}
+
 const std::set<std::string> FolveFilesystem::GetAvailableConfigDirs() const {
+  return ListConfigDirs(false);
+}
+
+const std::set<std::string> FolveFilesystem::ListConfigDirs(bool warn_invalid)
+  const {
   std::set<std::string> result;
   result.insert("");  // empty directory: pass-through.
   DIR *dp = opendir(base_config_dir_.c_str());
   if (dp == NULL) return result;
   struct dirent *dent;
   while ((dent = readdir(dp)) != NULL) {
-    if (dent->d_name == std::string(".") || dent->d_name == std::string(".."))
+    std::string subdir = dent->d_name;
+    if (subdir == "." || subdir == "..")
       continue;
-    std::string full_path = base_config_dir_ + "/" + dent->d_name;
-    struct stat st;
-    if (stat(full_path.c_str(), &st) != 0 || !S_ISDIR(st.st_mode))
+    if (!SanitizeConfigSubdir(&subdir)) {
+      if (warn_invalid) {
+        syslog(LOG_INFO, "Note: '%s' ignored in config directory; not a "
+               "directory or pointing outside base directory.", dent->d_name);
+      }
       continue;
-    result.insert(dent->d_name);
+    }
+    result.insert(subdir);
   }
   closedir(dp);
   return result;
