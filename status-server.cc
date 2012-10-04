@@ -245,9 +245,19 @@ void StatusServer::AppendFileInfo(const char *progress_style,
   content_.append("</tr>\n");
 }
 
-static void CreateSelection(std::string *result,
-                            const std::set<std::string> &options,
-                            const std::string &selected) {
+static void AppendSanitizedUrlParam(const std::string &in, std::string *out) {
+  for (std::string::const_iterator i = in.begin(); i != in.end(); ++i) {
+    if (*i <= ' ' || *i == '\'' || (*i & 0x80)) {
+      Appendf(out, "%%%02x", (unsigned char) *i);
+    } else {
+      out->append(1, *i);
+    }
+  }
+}
+
+static void CreateSelection(const std::set<std::string> &options,
+                            const std::string &selected,
+                            std::string *result) {
   if (options.size() == 1) {
     result->append(selected);
     return;
@@ -260,9 +270,10 @@ static void CreateSelection(std::string *result,
     if (active) {
       Appendf(result, "<span class='filter_sel active'>%s</span>\n", title);
     } else {
-      Appendf(result, "<a class='filter_sel inactive' "
-              "href='%s?f=%s'>%s</a>\n",
-              kSettingsUrl, it->c_str(), title);
+      Appendf(result, "<a class='filter_sel inactive' href='%s?f=",
+              kSettingsUrl);
+      AppendSanitizedUrlParam(*it, result);
+      Appendf(result, "'>%s</a>\n", title);
     }
   }
 }
@@ -270,9 +281,9 @@ static void CreateSelection(std::string *result,
 void StatusServer::AppendSettingsForm() {
   content_.append("<p>Active filter: ");
   std::set<std::string> available_dirs = filesystem_->GetAvailableConfigDirs();
-  CreateSelection(&content_,
-                  available_dirs,
-                  filesystem_->current_config_subdir());
+  CreateSelection(available_dirs,
+                  filesystem_->current_config_subdir(),
+                  &content_);
   if (available_dirs.empty() == 1) {
     content_.append(" (This is a boring configuration, add filter directories)");
   } else if (filter_switched_) {
