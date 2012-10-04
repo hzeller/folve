@@ -656,20 +656,31 @@ bool FolveFilesystem::ListDirectory(const std::string &fs_dir,
   return true;
 }
 
-bool FolveFilesystem::SwitchCurrentConfigDir(const std::string &subdir) {
+bool FolveFilesystem::SwitchCurrentConfigDir(const std::string &subdir_in) {
+  std::string subdir = subdir_in;
   if (!subdir.empty()) {
     std::string to_verify_path = base_config_dir_ + "/" + subdir;
     if (to_verify_path.length() > PATH_MAX)
       return false;  // uh, someone wants to buffer overflow us ?
     char all_path[PATH_MAX];
     const char *verified = realpath(to_verify_path.c_str(), all_path);
-    if (verified == NULL)  // bogus directory.
+    if (verified == NULL) { // bogus directory.
+      syslog(LOG_INFO, "Filter config switch attempt to '%s': %s",
+             subdir.c_str(), strerror(errno));
       return false;
+    }
     if (strncmp(verified, base_config_dir_.c_str(),
                 base_config_dir_.length()) != 0) {
       // Attempt to break out with ../-tricks.
+      syslog(LOG_INFO, "Filter config switch: Someone tries something nasty "
+             "changing filter to '%s'. Ha, in your face!", subdir.c_str());
       return false;
     }
+    // Derive from sanitized dir. So someone can write lowpass/../highpass
+    // or '.' for empty filter. Or ./highpass. And all work.
+    subdir = ((strlen(verified) == base_config_dir_.length()) 
+              ? ""   // chose subdir '.'
+              : verified + base_config_dir_.length() + 1 /*slash*/);
   }
   if (subdir != current_config_subdir_) {
     current_config_subdir_ = subdir;

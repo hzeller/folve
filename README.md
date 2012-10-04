@@ -182,10 +182,10 @@ directory -- and the result is split between these two files.
 To manually switch the configuration from the command line, you can use `wget`
 or `curl`, whatever you prefer:
 
-    wget -q -O/dev/null http://localhost:17322/settings?f=2
-    curl http://localhost:17322/settings?f=2
+    wget -q -O/dev/null http://localhost:17322/settings?f=highpass
+    curl http://localhost:17322/settings?f=SantaLucia
 
-The parameter given to `f=` is the configuration in the same sequence you
-supplied on startup, starting to count from 1. Configuration 0 means
-'no filter' (And no, there is no security built-in. If you want people from
+The parameter given to `f=` is the name of the subdirectory in your base
+configuration directory. An empty string is no filter, i.e. 'pass through'.
+(And no, there is no security built-in. If you want people from
 messing with the configuration of your Folve-daemon, do not use `-p <port>` :)).
