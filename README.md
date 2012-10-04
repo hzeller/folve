@@ -87,7 +87,8 @@ directories with the `-C <config-dir>` option.
 Very useful is the `-p <port>` that starts a HTTP status server. Let's use
 some example filters from this distribution;
 if you are in the Folve source directory, you find the directory `demo-filters/`
-that contains subdirectories with filters.
+that contains subdirectories with filters. If we pass this directory to folve,
+folve will search in this directory for named filters:
 
     mkdir /tmp/test-mount
     ./folve -C demo-filters -p 17322 -f \
@@ -114,6 +115,9 @@ directory with the `fusermount` command:
     fusermount -u /tmp/test-mount
 
 ### Filter Configuration ###
+With the `-C` option, you give folve a directory in which it looks for
+subdirectories with named filter configurations.
+
 Filters are WAV files containing an impulse response (IR). This is
 used by jconvolver's convolution engine to create a
 [Finite Impulse Response](http://en.wikipedia.org/wiki/Finite_impulse_response)
@@ -156,8 +160,8 @@ please let me know.)
 
     usage: folve [options] <original-dir> <mount-point-dir>
     Options: (in sequence of usefulness)
-      -c <cfg-dir> : Convolver configuration directory.
-                     You can supply this option multiple times:
+      -C <cfg-dir> : Convolver base configuration directory.
+                     Sub-directories name the different filters.
                      Select on the HTTP status page.
       -p <port>    : Port to run the HTTP status server on.
       -r <refresh> : Seconds between refresh of status page;
