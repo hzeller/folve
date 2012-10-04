@@ -137,12 +137,8 @@ StatusServer::StatusServer(FolveFilesystem *fs)
 }
 
 void StatusServer::SetFilter(const char *filter) {
-  if (filter == NULL || *filter == '\0') return;
-  char *end;
-  int index = strtol(filter, &end, 10);
-  if (end == NULL || *end != '\0') return;
-  filter_switched_ = (index != filesystem_->current_cfg_index());
-  filesystem_->SwitchCurrentConfigIndex(index);
+  if (filter == NULL) return;
+  filter_switched_ = filesystem_->SwitchCurrentConfigDir(filter);
 }
 
 void StatusServer::SetDebug(const char *dbg) {
@@ -151,7 +147,6 @@ void StatusServer::SetDebug(const char *dbg) {
 }
 
 bool StatusServer::Start(int port) {
-  PrepareConfigDirectoriesForUI();
   daemon_ = MHD_start_daemon(MHD_USE_SELECT_INTERNALLY, port, NULL, NULL,
                              &HandleHttp, this,
                              MHD_OPTION_END);
@@ -242,65 +237,44 @@ void StatusServer::AppendFileInfo(const char *progress_style,
     content_.append("<td>-</td>");
   }
 
+  const char *filter_dir = stats.filter_dir.empty()
+    ? "Pass Through" : stats.filter_dir.c_str();
   Appendf(&content_, "<td class='fb'>&nbsp;%s (%s)&nbsp;</td>",
-          stats.format.c_str(), ui_config_directories_[stats.filter_id].c_str());
+          stats.format.c_str(), filter_dir);
   Appendf(&content_,"<td class='fn'>%s</td>", stats.filename.c_str());
   content_.append("</tr>\n");
 }
 
-void StatusServer::PrepareConfigDirectoriesForUI() {
-  // Essentially only keep the directory name.
-  if (!ui_config_directories_.empty()) return;
-  ui_config_directories_.push_back("None : Pass Through");
-  for (size_t i = 1; i < filesystem_->config_dirs().size(); ++i) {
-    std::string d = filesystem_->config_dirs()[i];
-    while (d.length() > 0 && d[d.length() - 1] == '/') {
-      d.resize(d.length() - 1);   // trim trailing slashes.
-    }
-    const std::string::size_type slash_pos = d.find_last_of('/');
-    if (slash_pos != std::string::npos) {
-      d = d.substr(slash_pos + 1);
-    }
-    ui_config_directories_.push_back(d);
-  }
-}
-
 static void CreateSelection(std::string *result,
-                            const std::vector<std::string> &option_titles,
-                            const std::vector<std::string> &options,
-                            int selected) {
+                            const std::set<std::string> &options,
+                            const std::string &selected) {
   if (options.size() == 1) {
-    result->append(options[0]);   // no reason to make this a form :)
+    result->append(selected);
     return;
   }
-  for (size_t i = 0; i < options.size(); ++i) {
-    const std::string &c = options[i];
+  typedef std::set<std::string> Set;
+  for (Set::const_iterator it = options.begin(); it != options.end(); ++it) {
     result->append("&nbsp;");
-    const bool active = (int) i == selected;
+    const bool active = (*it == selected);
+    const char *title = it->empty() ? "None : Pass Through" : it->c_str();
     if (active) {
-      Appendf(result, "<span title='%s' class='filter_sel active'>%s</span>\n",
-              (option_titles.size() > i) ? option_titles[i].c_str() : "",
-              c.c_str());
+      Appendf(result, "<span class='filter_sel active'>%s</span>\n", title);
     } else {
-      Appendf(result, "<a title='%s' class='filter_sel inactive' "
-              "href='%s?f=%zd'>%s</a>\n",
-              (option_titles.size() > i) ? option_titles[i].c_str() : "",
-              kSettingsUrl, i, c.c_str());
+      Appendf(result, "<a class='filter_sel inactive' "
+              "href='%s?f=%s'>%s</a>\n",
+              kSettingsUrl, it->c_str(), title);
     }
   }
 }
 
 void StatusServer::AppendSettingsForm() {
   content_.append("<p>Active filter: ");
+  std::set<std::string> available_dirs = filesystem_->GetAvailableConfigDirs();
   CreateSelection(&content_,
-                  show_details()
-                  ? filesystem_->config_dirs()
-                  : std::vector<std::string>(),
-                  ui_config_directories_,
-                  filesystem_->current_cfg_index());
-  if (filesystem_->config_dirs().size() == 1) {
-    content_.append(" (This is a boring configuration, add filter directories "
-                    "with -c &lt;dir&gt; [-c &lt;another-dir&gt; ...] :-) )");
+                  available_dirs,
+                  filesystem_->current_config_subdir());
+  if (available_dirs.empty() == 1) {
+    content_.append(" (This is a boring configuration, add filter directories)");
   } else if (filter_switched_) {
     content_.append("&nbsp;<span class='rounded_box' "
                     "style='font-size:small;background:#FFFFa0;'>"

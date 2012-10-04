@@ -82,16 +82,15 @@ For hints on how to compile on older systems see INSTALL.md.
 Folve requires at least two parameters: the directory where your original
 FLAC files reside and the mount point of this filesystem.
 
-Also, do be useful, you need to supply at least one configuration directory
-with the `-c <config-dir>` option. Very useful is the `-p <port>` that starts
-a HTTP status server. Let's use some example filters from this distribution;
+Also, do be useful, you need to supply the directory that contains filter
+directories with the `-C <config-dir>` option.
+Very useful is the `-p <port>` that starts a HTTP status server. Let's use
+some example filters from this distribution;
 if you are in the Folve source directory, you find the directory `demo-filters/`
 that contains subdirectories with filters.
-Let's choose some filters to play with:
 
     mkdir /tmp/test-mount
-    ./folve -c demo-filters/SantaLucia -c demo-filters/lowpass \
-            -c demo-filters/highpass -p 17322 -f \
+    ./folve -C demo-filters -p 17322 -f \
             /path/to/your/directory/with/flacs /tmp/test-mount
 
 Now you can access the fileystem under that mount point; it has the same

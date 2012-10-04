@@ -42,15 +42,21 @@ public:
   void set_underlying_dir(const std::string &dir) { underlying_dir_ = dir; }
   const std::string &underlying_dir() const { return underlying_dir_; }
 
-  // Config directories contain the filter configurations.
-  void add_config_dir(const std::string &config_dir) {
-    config_dirs_.push_back(config_dir);
+  // Set the base configuration directory.
+  void SetBaseConfigDir(const std::string &config_dir) {
+    base_config_dir_ = config_dir;
   }
-  const std::vector<std::string> &config_dirs() const { return config_dirs_; }
 
-  // Switch the current config to i. Values out of range are not accepted.
-  void SwitchCurrentConfigIndex(int i);
-  int current_cfg_index() const { return current_cfg_index_; }
+  // Return a set of available named configurations. Essentially the names
+  // of subdirectories in the configuration dir.
+  const std::set<std::string> GetAvailableConfigDirs() const;
+
+  // Switch the current config to subdir. Returns 'true', if this was a valid
+  // choice and we actually did a switch to a new directory.
+  bool SwitchCurrentConfigDir(const std::string &subdir);
+  const std::string &current_config_subdir() const {
+    return current_config_subdir_;
+  }
 
   // Check if properly initialized. Return 'false' if not and print a message
   // to stderr.
@@ -88,15 +94,15 @@ public:
 
 private:
   // Get cache key, depending on the given configuration.
-  std::string CacheKey(int config_idx, const char *fs_path);
+  std::string CacheKey(const std::string &config_path, const char *fs_path);
 
-  FileHandler *CreateFromDescriptor(int filedes, int cfg_idx,
+  FileHandler *CreateFromDescriptor(int filedes, const std::string &cfg_dir,
                                     const char *fs_path,
                                     const std::string &underlying_file);
 
   std::string underlying_dir_;
-  std::vector<std::string> config_dirs_;
-  int current_cfg_index_;
+  std::string base_config_dir_;
+  std::string current_config_subdir_;
   bool debug_ui_enabled_;
   bool gapless_processing_;
   FileHandlerCache open_file_cache_;

@@ -175,11 +175,12 @@ static void *folve_init(struct fuse_conn_info *conn) {
   }
 
   // Some sanity checks.
-  if (folve_rt.fs->config_dirs().size() == 1) {
+  std::set<std::string> available_dirs = folve_rt.fs->GetAvailableConfigDirs();
+  if (available_dirs.empty()) {
     syslog(LOG_NOTICE, "No filter configuration directories given. "
            "Any files will be just passed through verbatim.");
   }
-  if (folve_rt.fs->config_dirs().size() > 2 && folve_rt.status_port < 0) {
+  if (available_dirs.size() > 2 && folve_rt.status_port < 0) {
     syslog(LOG_WARNING, "Multiple filter configurations given, but no HTTP "
            "status port. You only can switch filters via the HTTP interface; "
            "add -p <port>");
@@ -194,8 +195,8 @@ static void folve_destroy(void *) {
 static int usage(const char *prg) {
   printf("usage: %s [options] <original-dir> <mount-point-dir>\n", prg);
   printf("Options: (in sequence of usefulness)\n"
-         "\t-c <cfg-dir> : Convolver configuration directory.\n"
-         "\t               You can supply this option multiple times:\n"
+         "\t-C <cfg-dir> : Convolver base configuration directory.\n"
+         "\t               Sub-directories name the different filters.\n"
          "\t               Select on the HTTP status page.\n"
          "\t-p <port>    : Port to run the HTTP status server on.\n"
          "\t-r <refresh> : Seconds between refresh of status page;\n"
@@ -254,9 +255,9 @@ int FolveOptionHandling(void *data, const char *arg, int key,
     rt->refresh_time = atoi(arg + 2);  // strip "-r"
     return 0;
   case FOLVE_OPT_CONFIG: {
-    const char *config_dir = realpath(arg + 2, realpath_buf);  // strip "-c"
+    const char *config_dir = realpath(arg + 2, realpath_buf);  // strip "-C"
     if (config_dir != NULL) {
-      rt->fs->add_config_dir(config_dir);
+      rt->fs->SetBaseConfigDir(config_dir);
     } else {
       fprintf(stderr, "Invalid config dir '%s': %s\n", 
               arg + 2, strerror(errno));
@@ -286,7 +287,7 @@ int main(int argc, char *argv[]) {
   static struct fuse_opt folve_options[] = {
     FUSE_OPT_KEY("-p ", FOLVE_OPT_PORT),
     FUSE_OPT_KEY("-r ", FOLVE_OPT_REFRESH_TIME),
-    FUSE_OPT_KEY("-c ", FOLVE_OPT_CONFIG),
+    FUSE_OPT_KEY("-C ", FOLVE_OPT_CONFIG),
     FUSE_OPT_KEY("-D",  FOLVE_OPT_DEBUG),
     FUSE_OPT_KEY("-g",  FOLVE_OPT_GAPLESS),
     FUSE_OPT_END   // This fails to compile for fuse <= 2.8.1; get >= 2.8.4
