@@ -186,6 +186,28 @@ void StatusServer::RetireHandlerEvent(FileHandler *handler) {
   }
 }
 
+// The directories are user-input, so we need to sanitize stuff.
+static void AppendSanitizedUrlParam(const std::string &in, std::string *out) {
+  for (std::string::const_iterator i = in.begin(); i != in.end(); ++i) {
+    if (isupper(*i) || islower(*i) || isdigit(*i)) {
+      out->append(1, *i);
+    } else {
+      Appendf(out, "%%%02x", (unsigned char) *i);
+    }
+  }
+}
+
+static void AppendSanitizedHTML(const std::string &in, std::string *out) {
+  for (std::string::const_iterator i = in.begin(); i != in.end(); ++i) {
+    switch (*i) {
+    case '<': out->append("&lt;"); break;
+    case '>': out->append("&gt;"); break;
+    case '&': out->append("&amp;"); break;
+    default: out->append(1, *i);
+    }
+  }
+}
+
 // As ugly #defines, so that gcc can warn about printf() format problems.
 #define sMessageRowHtml \
   "<td>%s</td><td colspan='3' style='font-size:small;'>%s</td>"
@@ -244,32 +266,11 @@ void StatusServer::AppendFileInfo(const char *progress_style,
 
   const char *filter_dir = stats.filter_dir.empty()
     ? "Pass Through" : stats.filter_dir.c_str();
-  Appendf(&content_, "<td class='fb'>&nbsp;%s (%s)&nbsp;</td>",
-          stats.format.c_str(), filter_dir);
-  Appendf(&content_,"<td class='fn'>%s</td>", stats.filename.c_str());
-  content_.append("</tr>\n");
-}
-
-// The directories are user-input, so we need to sanitize stuff.
-static void AppendSanitizedUrlParam(const std::string &in, std::string *out) {
-  for (std::string::const_iterator i = in.begin(); i != in.end(); ++i) {
-    if (isupper(*i) || islower(*i) || isdigit(*i)) {
-      out->append(1, *i);
-    } else {
-      Appendf(out, "%%%02x", (unsigned char) *i);
-    }
-  }
-}
-
-static void AppendSanitizedHTML(const std::string &in, std::string *out) {
-  for (std::string::const_iterator i = in.begin(); i != in.end(); ++i) {
-    switch (*i) {
-    case '<': out->append("&lt;"); break;
-    case '>': out->append("&gt;"); break;
-    case '&': out->append("&amp;"); break;
-    default: out->append(1, *i);
-    }
-  }
+  Appendf(&content_, "<td class='fb'>&nbsp;%s (", stats.format.c_str());
+  AppendSanitizedHTML(filter_dir, &content_);
+  content_.append(")&nbsp;</td><td class='fn'>");
+  AppendSanitizedHTML(stats.filename, &content_);
+  content_.append("</td></tr>\n");
 }
 
 static void CreateSelection(const std::set<std::string> &options,
