@@ -65,11 +65,16 @@ static const char kStartHtmlHeader[] = "<html><head>"
 // that into a C-string that we can include it in the binary.
 static const char kCSS[] =
   "<style type='text/css'>"
+  " body { font-family:Sans-Serif; }\n"
   " a:link { text-decoration:none; }\n"
   " a:visited { text-decoration:none; }\n"
   " a:hover { text-decoration:underline; }\n"
   " a:active { text-decoration:underline; }\n"
   " .rounded_box, .filter_sel {\n"
+  "        float: left;\n"
+  "        margin: 5px;\n"
+  "        margin-right: 5px;\n"
+  "        margin-bottom: 5px;\n"
   "        padding: 5px 15px;\n"
   "        border-radius: 5px;\n"
   "        -moz-border-radius: 5px; }\n"
@@ -245,12 +250,24 @@ void StatusServer::AppendFileInfo(const char *progress_style,
   content_.append("</tr>\n");
 }
 
+// The directories are user-input, so we need to sanitize stuff.
 static void AppendSanitizedUrlParam(const std::string &in, std::string *out) {
   for (std::string::const_iterator i = in.begin(); i != in.end(); ++i) {
-    if (*i <= ' ' || *i == '\'' || (*i & 0x80)) {
-      Appendf(out, "%%%02x", (unsigned char) *i);
-    } else {
+    if (isupper(*i) || islower(*i) || isdigit(*i)) {
       out->append(1, *i);
+    } else {
+      Appendf(out, "%%%02x", (unsigned char) *i);
+    }
+  }
+}
+
+static void AppendSanitizedHTML(const std::string &in, std::string *out) {
+  for (std::string::const_iterator i = in.begin(); i != in.end(); ++i) {
+    switch (*i) {
+    case '<': out->append("&lt;"); break;
+    case '>': out->append("&gt;"); break;
+    case '&': out->append("&amp;"); break;
+    default: out->append(1, *i);
     }
   }
 }
@@ -264,22 +281,25 @@ static void CreateSelection(const std::set<std::string> &options,
   }
   typedef std::set<std::string> Set;
   for (Set::const_iterator it = options.begin(); it != options.end(); ++it) {
-    result->append("&nbsp;");
     const bool active = (*it == selected);
     const char *title = it->empty() ? "None : Pass Through" : it->c_str();
     if (active) {
-      Appendf(result, "<span class='filter_sel active'>%s</span>\n", title);
+      result->append("<span class='filter_sel active'>");
+      AppendSanitizedHTML(title, result);
+      result->append("</span>");
     } else {
       Appendf(result, "<a class='filter_sel inactive' href='%s?f=",
               kSettingsUrl);
       AppendSanitizedUrlParam(*it, result);
-      Appendf(result, "'>%s</a>\n", title);
+      result->append("'>");
+      AppendSanitizedHTML(title, result);
+      result->append("</a>\n");
     }
   }
 }
 
 void StatusServer::AppendSettingsForm() {
-  content_.append("<p>Active filter: ");
+  content_.append("<p><span class='filter_sel'>Active filter:</span>");
   std::set<std::string> available_dirs = filesystem_->GetAvailableConfigDirs();
   CreateSelection(available_dirs,
                   filesystem_->current_config_subdir(),
@@ -287,13 +307,13 @@ void StatusServer::AppendSettingsForm() {
   if (available_dirs.empty() == 1) {
     content_.append(" (This is a boring configuration, add filter directories)");
   } else if (filter_switched_) {
-    content_.append("&nbsp;<span class='rounded_box' "
+    content_.append("<span class='rounded_box' "
                     "style='font-size:small;background:#FFFFa0;'>"
                     "Affects re- or newly opened files.</span>");
     filter_switched_ = false;  // only show once.
   }
   // TODO: re-add something for filesystem_->is_debug_ui_enabled()
-  content_.append("</p><hr/>");
+  content_.append("</p><hr style='clear:both;'/>");
 }
 
 struct CompareStats {
@@ -318,7 +338,7 @@ const std::string &StatusServer::CreatePage() {
   content_.append(kCSS);
   content_.append("</head>\n");
 
-  content_.append("<body style='font-family:Sans-Serif;'>\n");
+  content_.append("<body>\n");
   Appendf(&content_, "<center style='background-color:#A0FFA0;'>"
           "Welcome to "
           "<a href='https://github.com/hzeller/folve#readme'>Folve</a> "
