@@ -55,9 +55,8 @@ private:
   void AppendSettingsForm();
   void AppendFileInfo(const char *progress_style, const HandlerStats &stats);
 
-  // Set filter or debug mode from http-request. Gracefully handles garbage.
+  // Set filter from http-request. Gracefully handles garbage.
   void SetFilter(const char *value);
-  void SetDebug(const char *value);
 
   // Show details that might only be interesting while setting up things.
   bool show_details();

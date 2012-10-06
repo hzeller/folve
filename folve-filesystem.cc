@@ -538,7 +538,7 @@ private:
 }  // namespace
 
 FolveFilesystem::FolveFilesystem()
-  : debug_ui_enabled_(false), gapless_processing_(false),
+  : gapless_processing_(false),
     open_file_cache_(4), processor_pool_(3),
     total_file_openings_(0), total_file_reopen_(0) {
 }

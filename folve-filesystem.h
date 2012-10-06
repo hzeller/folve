@@ -87,9 +87,6 @@ public:
   FileHandlerCache *handler_cache() { return &open_file_cache_; }
   ProcessorPool *processor_pool() { return &processor_pool_; }
 
-  void set_debug_ui_enabled(bool b) { debug_ui_enabled_ = b; }
-  bool is_debug_ui_enabled() const { return debug_ui_enabled_; }
-
   void set_gapless_processing(bool b) { gapless_processing_ = b; }
   bool gapless_processing() const { return gapless_processing_; }
 
@@ -120,7 +117,6 @@ private:
   std::string base_config_dir_;
 
   std::string current_config_subdir_;
-  bool debug_ui_enabled_;
   bool gapless_processing_;
   FileHandlerCache open_file_cache_;
   ProcessorPool processor_pool_;

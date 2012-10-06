@@ -252,14 +252,12 @@ int FolveOptionHandling(void *data, const char *arg, int key,
     if (config_dir != NULL) {
       rt->fs->SetBaseConfigDir(config_dir);
     } else {
-      fprintf(stderr, "Invalid config dir '%s': %s\n", 
-              arg + 2, strerror(errno));
+      fprintf(stderr, "Invalid config dir '%s': %s\n", arg + 2, strerror(errno));
       rt->parameter_error = true;
     }
     return 0;
   }
   case FOLVE_OPT_DEBUG:
-    // rt->fs->set_debug_ui_enabled(true); // Disabled in status-server.
     folve::EnableDebugLog(true);
     return 0;
   case FOLVE_OPT_GAPLESS:

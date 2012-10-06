@@ -112,8 +112,6 @@ int StatusServer::HandleHttp(void* user_argument,
   if (strcmp(url, kSettingsUrl) == 0) {
     server->SetFilter(MHD_lookup_connection_value(connection,
                                                   MHD_GET_ARGUMENT_KIND, "f"));
-    server->SetDebug(MHD_lookup_connection_value(connection,
-                                                 MHD_GET_ARGUMENT_KIND, "d"));
     // We redirect to slash after this, to remove parameters from the GET-URL
     response = MHD_create_response_from_data(0, (void*)"", MHD_NO, MHD_NO);
     MHD_add_response_header(response, "Location", "/");
@@ -144,11 +142,6 @@ StatusServer::StatusServer(FolveFilesystem *fs)
 void StatusServer::SetFilter(const char *filter) {
   if (filter == NULL) return;
   filter_switched_ = filesystem_->SwitchCurrentConfigDir(filter);
-}
-
-void StatusServer::SetDebug(const char *dbg) {
-  if (!filesystem_->is_debug_ui_enabled()) return;
-  folve::EnableDebugLog(dbg != NULL && *dbg == '1');
 }
 
 bool StatusServer::Start(int port) {
@@ -313,7 +306,6 @@ void StatusServer::AppendSettingsForm() {
                     "Affects re- or newly opened files.</span>");
     filter_switched_ = false;  // only show once.
   }
-  // TODO: re-add something for filesystem_->is_debug_ui_enabled()
   content_.append("</p><hr style='clear:both;'/>");
 }
 
