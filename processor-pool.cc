@@ -46,7 +46,7 @@ for (size_t i = 0; i < path.size(); ++i) {
 
 SoundProcessor *ProcessorPool::GetOrCreate(const std::string &base_dir,
                                            int sampling_rate, int channels,
-                                           int bits) {
+                                           int bits, std::string *errmsg) {
   std::vector<std::string> path_choices;
   // From specific to non-specific.
   path_choices.push_back(StringPrintf("%s/filter-%d-%d-%d.conf",
@@ -58,9 +58,14 @@ SoundProcessor *ProcessorPool::GetOrCreate(const std::string &base_dir,
   path_choices.push_back(StringPrintf("%s/filter-%d.conf",
                                       base_dir.c_str(),
                                       sampling_rate));
+
   std::string config_path;
-  if (!FindFirstAccessiblePath(path_choices, &config_path))
+  if (!FindFirstAccessiblePath(path_choices, &config_path)) {
+    *errmsg = StringPrintf("No filter in %s for %.1fkHz/%d ch/%d bits",
+                           base_dir.c_str(), sampling_rate / 1000.0,
+                           channels, bits);
     return NULL;
+  }
   SoundProcessor *result;
   while ((result = CheckOutOfPool(config_path)) != NULL) {
     if (result->ConfigStillUpToDate())
@@ -76,6 +81,7 @@ SoundProcessor *ProcessorPool::GetOrCreate(const std::string &base_dir,
 
   result = SoundProcessor::Create(config_path, sampling_rate, channels);
   if (result == NULL) {
+    *errmsg = "Problem parsing " + config_path;
     syslog(LOG_ERR, "filter-config %s is broken.", config_path.c_str());
   }
   DLogf("Processor %p: Newly created [%s]", result, config_path.c_str());

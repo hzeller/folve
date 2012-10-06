@@ -34,8 +34,11 @@ public:
   ProcessorPool(int max_per_config);
 
   // Get a new SoundProcesor from this pool with the given configuration.
+  // If this isn't possible, NULL is returned an an error message stored in
+  // "errmsg".
   SoundProcessor *GetOrCreate(const std::string &base_dir,
-                              int sampling_rate, int channels, int bits);
+                              int sampling_rate, int channels, int bits,
+                              std::string *errmsg);
 
   // Return a processor pack to the pool.
   void Return(SoundProcessor *processor);

@@ -120,14 +120,9 @@ public:
     partial_file_info->duration_seconds = in_info.frames / in_info.samplerate;
 
     SoundProcessor *processor = fs->processor_pool()
-      ->GetOrCreate(zita_config_dir, in_info.samplerate, in_info.channels, bits);
+      ->GetOrCreate(zita_config_dir, in_info.samplerate, in_info.channels, bits,
+                    &partial_file_info->message);
     if (processor == NULL) {
-      // TODO: depending on why this happened, provide one of these messages.
-      /*
-      partial_file_info_.message = "Problem parsing " + config_path_;
-      partial_file_info->message = "Missing ( " + path_choices[0]
-        + "<br/> ... " + path_choices[max_choice] + " )";
-      */
       sf_close(snd);
       return NULL;
     }
