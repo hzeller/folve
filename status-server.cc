@@ -132,8 +132,7 @@ int StatusServer::HandleHttp(void* user_argument,
 }
 
 StatusServer::StatusServer(FolveFilesystem *fs)
-  : expunged_retired_(0), total_seconds_filtered_(0),
-    total_seconds_music_seen_(0),
+  : expunged_retired_(0),
     meta_refresh_time_(-1),
     filesystem_(fs), daemon_(NULL), filter_switched_(false) {
   fs->handler_cache()->SetObserver(this);
@@ -165,10 +164,6 @@ bool StatusServer::show_details() {
 void StatusServer::RetireHandlerEvent(FileHandler *handler) {
   HandlerStats stats;
   handler->GetHandlerStatus(&stats);  // Get last available stats.
-  if (stats.progress >= 0) {
-    total_seconds_music_seen_ += stats.duration_seconds;
-    total_seconds_filtered_ += stats.duration_seconds * stats.progress;
-  }
   stats.last_access = folve::CurrentTime();
   stats.status = HandlerStats::RETIRED;
   folve::MutexLock l(&retired_mutex_);
@@ -347,31 +342,11 @@ const std::string &StatusServer::CreatePage() {
   std::vector<HandlerStats> stat_list;
   filesystem_->handler_cache()->GetStats(&stat_list);
 
-  // Get statistics of active files to add to the existing ones.
-  double active_music_seen = 0.0;
-  double active_filtered = 0.0;
-  for (size_t i = 0; i < stat_list.size(); ++i) {
-    const HandlerStats &stats = stat_list[i];
-    if (stats.progress >= 0) {
-      active_music_seen += stats.duration_seconds;
-      active_filtered += stats.duration_seconds * stats.progress;
-    }
-  }
   if (show_details()) {
-    const int t_seen = total_seconds_music_seen_ + active_music_seen;
-    const int t_filtered = total_seconds_filtered_ + active_filtered;
     Appendf(&content_, "Total opening files <b>%d</b> "
 	    ".. and re-opened from recency cache <b>%d</b><br/>",
 	    filesystem_->total_file_openings(),
 	    filesystem_->total_file_reopen());
-    Appendf(&content_, "Total music seen <b>%dd %d:%02d:%02d</b> ",
-	    t_seen / 86400, (t_seen % 86400) / 3600,
-	    (t_seen % 3600) / 60, t_seen % 60);
-    Appendf(&content_, ".. and convolved <b>%dd %d:%02d:%02d</b> ",
-	    t_filtered / 86400, (t_filtered % 86400) / 3600,
-	    (t_filtered % 3600) / 60, t_filtered % 60);
-    Appendf(&content_, "(%.1f%%)<br/>",
-	    (t_seen == 0) ? 0.0 : (100.0 * t_filtered / t_seen));
   }
 
   Appendf(&content_, "<h3>Accessed Recently</h3>\n%zd in recency cache.\n",
