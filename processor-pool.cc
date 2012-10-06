@@ -16,6 +16,7 @@
 
 #include "processor-pool.h"
 
+#include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <syslog.h>
@@ -61,9 +62,9 @@ SoundProcessor *ProcessorPool::GetOrCreate(const std::string &base_dir,
 
   std::string config_path;
   if (!FindFirstAccessiblePath(path_choices, &config_path)) {
+    const char *short_dir = strrchr(base_dir.c_str(), '/') + 1;
     *errmsg = StringPrintf("No filter in %s for %.1fkHz/%d ch/%d bits",
-                           base_dir.c_str(), sampling_rate / 1000.0,
-                           channels, bits);
+                           short_dir, sampling_rate / 1000.0, channels, bits);
     return NULL;
   }
   SoundProcessor *result;

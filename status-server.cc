@@ -337,8 +337,10 @@ const std::string &StatusServer::CreatePage() {
           "<a href='https://github.com/hzeller/folve#readme'>Folve</a> "
           FOLVE_VERSION "</center>\n");
   if (show_details()) {
-    Appendf(&content_, "Convolving audio files from <code>%s</code>\n",
-            filesystem_->underlying_dir().c_str());
+    Appendf(&content_, "Convolving audio files from <code>%s</code>; "
+            "Filter base directory <code>%s</code>\n",
+            filesystem_->underlying_dir().c_str(),
+            filesystem_->base_config_dir().c_str());
   }
   AppendSettingsForm();
 

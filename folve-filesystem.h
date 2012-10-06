@@ -47,6 +47,7 @@ public:
   void SetBaseConfigDir(const std::string &config_dir) {
     base_config_dir_ = config_dir;
   }
+  const std::string &base_config_dir() const { return base_config_dir_; }
 
   // Return a set of available named configurations. Essentially the names
   // of subdirectories in the configuration dir.
