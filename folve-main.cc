@@ -55,11 +55,20 @@ static struct FolveRuntime {
 // Logger that only prints to stderr; used for
 class ReaddirLogger {
 public:
+  ReaddirLogger() : start_time_(folve::CurrentTime()) {}
+
+  void WriteInit() {
+    if (!folve_rt.readdir_dump_file) return;
+    fprintf (folve_rt.readdir_dump_file, "%-11s %-8s: <log>\n",
+             "#  time", "  tid");
+    fflush(folve_rt.readdir_dump_file);
+  }
+
   ReaddirLogger &Log(const char *fmt, ...)
   __attribute__ ((format (printf, 2, 3))) {
     if (!folve_rt.readdir_dump_file) return *this;
-    fprintf (folve_rt.readdir_dump_file, "%.6f %08lx: ", folve::CurrentTime(),
-             syscall(SYS_gettid));
+    fprintf (folve_rt.readdir_dump_file, "%011.6f %08lx: ",
+             folve::CurrentTime() - start_time_, syscall(SYS_gettid));
     va_list ap;
     va_start(ap, fmt);
     folve::MutexLock l(&io_mutex_);
@@ -67,12 +76,16 @@ public:
     va_end(ap);
     return *this;
   }
+
   void Flush() {
     if (folve_rt.readdir_dump_file) {
       folve::MutexLock l(&io_mutex_);
       fflush(folve_rt.readdir_dump_file);
     }
   }
+
+private:
+  const double start_time_;
   folve::Mutex io_mutex_;
 } rlog;
 
@@ -307,6 +320,7 @@ int FolveOptionHandling(void *data, const char *arg, int key,
     return 0;
   case FOLVE_OPT_DEBUG_READDIR:
     rt->readdir_dump_file = fopen(arg + 2, "w"); 
+    rlog.WriteInit();
     return 0;
   case FOLVE_OPT_GAPLESS:
     rt->fs->set_gapless_processing(true);
