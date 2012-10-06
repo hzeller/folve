@@ -23,14 +23,17 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <sndfile.h>  // for sf_version_string
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/syscall.h>   // need to call gettid syscall.
 #include <sys/time.h>
+#include <sys/types.h>
 #include <syslog.h>
 #include <unistd.h>
-#include <sndfile.h>  // for sf_version_string
 
 #include "folve-filesystem.h"
 #include "status-server.h"
@@ -48,6 +51,30 @@ static struct FolveRuntime {
   bool parameter_error;
   FILE *readdir_dump_file;
 } folve_rt;
+
+// Logger that only prints to stderr; used for
+class ReaddirLogger {
+public:
+  ReaddirLogger &Log(const char *fmt, ...)
+  __attribute__ ((format (printf, 2, 3))) {
+    if (!folve_rt.readdir_dump_file) return *this;
+    fprintf (folve_rt.readdir_dump_file, "%.6f %08lx: ", folve::CurrentTime(),
+             syscall(SYS_gettid));
+    va_list ap;
+    va_start(ap, fmt);
+    folve::MutexLock l(&io_mutex_);
+    vfprintf(folve_rt.readdir_dump_file, fmt, ap);
+    va_end(ap);
+    return *this;
+  }
+  void Flush() {
+    if (folve_rt.readdir_dump_file) {
+      folve::MutexLock l(&io_mutex_);
+      fflush(folve_rt.readdir_dump_file);
+    }
+  }
+  folve::Mutex io_mutex_;
+} rlog;
 
 static char *concat_path(char *buf, const char *a, const char *b) {
   strcpy(buf, a);
@@ -70,19 +97,14 @@ static int folve_getattr(const char *path, struct stat *stbuf) {
   if (result != 0) {
     char path_buf[PATH_MAX];
     result = lstat(assemble_orig_path(path_buf, path), stbuf);
-    if (folve_rt.readdir_dump_file) {
-      fprintf(folve_rt.readdir_dump_file,
-              "STAT %s mode=%03o %s %s %s", path,
-              stbuf->st_mode & 0777, S_ISDIR(stbuf->st_mode) ? "DIR" : "",
-              (result == -1) ? strerror(errno) : "",
-              ctime(&stbuf->st_mtime));  // ctime ends with \n, so put that last
-    }
+    rlog.Log("STAT %s mode=%03o %s %s %s", path,
+             stbuf->st_mode & 0777, S_ISDIR(stbuf->st_mode) ? "DIR" : "",
+             (result == -1) ? strerror(errno) : "",
+             ctime(&stbuf->st_mtime));  // ctime ends with \n, so put that last
     if (result == -1)
       return -errno;
   } else {
-    if (folve_rt.readdir_dump_file) {
-      fprintf(folve_rt.readdir_dump_file, "FOLVE-Stat %s\n", path);
-    }
+    rlog.Log("FOLVE-Stat %s\n", path);
   }
   // Whatever write mode was there before: now things are readonly.
   stbuf->st_mode &= ~(S_IWUSR | S_IWGRP | S_IWOTH);
@@ -104,9 +126,7 @@ static int folve_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
   const size_t entry_size = sizeof(struct dirent) + PATH_MAX;
   struct dirent *entry_buf = (struct dirent *) malloc(entry_size);
 
-  if (folve_rt.readdir_dump_file) {
-    fprintf(folve_rt.readdir_dump_file, "LIST %s\n", path);
-  }
+  rlog.Log("LIST %s\n", path);
 
   while (readdir_r(dp, entry_buf, &de) == 0 && de != NULL) {
     struct stat st;
@@ -114,22 +134,14 @@ static int folve_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     st.st_ino = de->d_ino;
     st.st_mode = de->d_type << 12;
     const char *entry_name = de->d_name;
-    if (folve_rt.readdir_dump_file) {
-      fprintf(folve_rt.readdir_dump_file, "ITEM %s%s%s\n",
-              path, strlen(path) > 1 ? "/" : "", de->d_name);
-    }
+    rlog.Log("ITEM %s%s%s\n", path, strlen(path) > 1 ? "/" : "", de->d_name);
     if (filler(buf, entry_name, &st, 0)) {
-      if (folve_rt.readdir_dump_file) {
-        fprintf(folve_rt.readdir_dump_file, "DONE (%s)\n", de->d_name);
-      }
+      rlog.Log("DONE (%s)\n", de->d_name);
       break;
     }
   }
   free(entry_buf);
-  if (folve_rt.readdir_dump_file) {
-    fprintf(folve_rt.readdir_dump_file, "DONE %s\n", path);
-    fflush(folve_rt.readdir_dump_file);
-  }
+  rlog.Log("DONE %s\n", path).Flush();
   closedir(dp);
   return 0;
 }
