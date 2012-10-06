@@ -42,7 +42,7 @@ struct HandlerStats {
   float max_output_value;       // Clipping ? Absolute value, should be [0 .. 1].
   bool in_gapless;              // We were handed a processor to continue.
   bool out_gapless;             // We passed on our processor to the next.
-  int  filter_id;               // The filter-id is in use. 0 for pass-through.
+  std::string filter_dir;       // The filter-id is in use. "" for pass-through.
 };
 
 class SoundProcessor;
@@ -53,10 +53,10 @@ class SoundProcessor;
 // fuse filesystem (see file-handler-cache.h for rationale)
 class FileHandler {
 public:
-  explicit FileHandler(int filter_id) : filter_id_(filter_id) {}
+  explicit FileHandler(const std::string &filter) : filter_dir_(filter) {}
   virtual ~FileHandler() {}
 
-  int filter_id() const { return filter_id_; }
+  const std::string &filter_dir() const { return filter_dir_; }
 
   // Returns bytes read or a negative value indicating a negative errno.
   virtual int Read(char *buf, size_t size, off_t offset) = 0;
@@ -70,7 +70,7 @@ public:
   virtual bool AcceptProcessor(SoundProcessor *s) { return false; }
 
 private:
-  const int filter_id_;
+  const std::string filter_dir_;
 };
 
 #endif // FOLVE_FILE_HANDLER_H

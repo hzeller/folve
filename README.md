@@ -82,16 +82,16 @@ For hints on how to compile on older systems see INSTALL.md.
 Folve requires at least two parameters: the directory where your original
 FLAC files reside and the mount point of this filesystem.
 
-Also, do be useful, you need to supply at least one configuration directory
-with the `-c <config-dir>` option. Very useful is the `-p <port>` that starts
-a HTTP status server. Let's use some example filters from this distribution;
+Also, do be useful, you need to supply the directory that contains filter
+directories with the `-C <config-dir>` option.
+Very useful is the `-p <port>` that starts a HTTP status server. Let's use
+some example filters from this distribution;
 if you are in the Folve source directory, you find the directory `demo-filters/`
-that contains subdirectories with filters.
-Let's choose some filters to play with:
+that contains subdirectories with filters. If we pass this directory to folve,
+folve will search in this directory for named filters:
 
     mkdir /tmp/test-mount
-    ./folve -c demo-filters/SantaLucia -c demo-filters/lowpass \
-            -c demo-filters/highpass -p 17322 -f \
+    ./folve -C demo-filters -p 17322 -f \
             /path/to/your/directory/with/flacs /tmp/test-mount
 
 Now you can access the fileystem under that mount point; it has the same
@@ -115,6 +115,9 @@ directory with the `fusermount` command:
     fusermount -u /tmp/test-mount
 
 ### Filter Configuration ###
+With the `-C` option, you give folve a directory in which it looks for
+subdirectories with named filter configurations.
+
 Filters are WAV files containing an impulse response (IR). This is
 used by jconvolver's convolution engine to create a
 [Finite Impulse Response](http://en.wikipedia.org/wiki/Finite_impulse_response)
@@ -157,8 +160,8 @@ please let me know.)
 
     usage: folve [options] <original-dir> <mount-point-dir>
     Options: (in sequence of usefulness)
-      -c <cfg-dir> : Convolver configuration directory.
-                     You can supply this option multiple times:
+      -C <cfg-dir> : Convolver base configuration directory.
+                     Sub-directories name the different filters.
                      Select on the HTTP status page.
       -p <port>    : Port to run the HTTP status server on.
       -r <refresh> : Seconds between refresh of status page;
@@ -179,10 +182,10 @@ directory -- and the result is split between these two files.
 To manually switch the configuration from the command line, you can use `wget`
 or `curl`, whatever you prefer:
 
-    wget -q -O/dev/null http://localhost:17322/settings?f=2
-    curl http://localhost:17322/settings?f=2
+    wget -q -O/dev/null http://localhost:17322/settings?f=highpass
+    curl http://localhost:17322/settings?f=SantaLucia
 
-The parameter given to `f=` is the configuration in the same sequence you
-supplied on startup, starting to count from 1. Configuration 0 means
-'no filter' (And no, there is no security built-in. If you want people from
+The parameter given to `f=` is the name of the subdirectory in your base
+configuration directory. An empty string is no filter, i.e. 'pass through'.
+(And no, there is no security built-in. If you want people from
 messing with the configuration of your Folve-daemon, do not use `-p <port>` :)).

@@ -18,6 +18,7 @@
 #include "folve-filesystem.h"
 
 #include <FLAC/metadata.h>
+#include <assert.h>
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -52,14 +53,14 @@ namespace {
 // everything that is not a sound-file.
 class PassThroughHandler : public FileHandler {
 public:
-  PassThroughHandler(int filedes, int filter_id,
+  PassThroughHandler(int filedes, const std::string &filter_id,
                     const HandlerStats &known_stats)
     : FileHandler(filter_id), filedes_(filedes),
       file_size_(-1), max_accessed_(0), info_stats_(known_stats) {
     DLogf("Creating PassThrough filter for '%s'", known_stats.filename.c_str());
     struct stat st;
     file_size_ = (Stat(&st) == 0) ? st.st_size : -1;
-    info_stats_.filter_id = 0;  // pass through.
+    info_stats_.filter_dir = "";  // pass through.
   }
   ~PassThroughHandler() { close(filedes_); }
 
@@ -108,7 +109,7 @@ public:
   static FileHandler *Create(FolveFilesystem *fs,
                              int filedes, const char *fs_path,
                              const std::string &underlying_file,
-                             int filter_id,
+                             const std::string &filter_subdir,
                              const std::string &zita_config_dir,
                              HandlerStats *partial_file_info) {
     SF_INFO in_info;
@@ -161,7 +162,7 @@ public:
       sf_close(snd);
       return NULL;
     }
-    return new SndFileHandler(fs, fs_path, filter_id,
+    return new SndFileHandler(fs, fs_path, filter_subdir,
                               underlying_file, filedes, snd, in_info,
                               *partial_file_info, config_path);
   }
@@ -243,12 +244,13 @@ public:
     
 private:
   // TODO(hzeller): trim parameter list.
-  SndFileHandler(FolveFilesystem *fs, const char *fs_path, int filter_id,
+  SndFileHandler(FolveFilesystem *fs, const char *fs_path,
+                 const std::string &filter_dir,
                  const std::string &underlying_file,
                  int filedes, SNDFILE *snd_in,
                  const SF_INFO &in_info, const HandlerStats &file_info,
                  const std::string &config_path)
-    : FileHandler(filter_id), fs_(fs),
+    : FileHandler(filter_dir), fs_(fs),
       filedes_(filedes), snd_in_(snd_in), in_info_(in_info),
       config_path_(config_path),
       base_stats_(file_info),
@@ -574,40 +576,38 @@ private:
 }  // namespace
 
 FolveFilesystem::FolveFilesystem()
-  : current_cfg_index_(0), debug_ui_enabled_(false), gapless_processing_(false),
+  : debug_ui_enabled_(false), gapless_processing_(false),
     open_file_cache_(4), total_file_openings_(0), total_file_reopen_(0) {
-  config_dirs_.push_back("");  // The first config is special: empty.
 }
 
 FileHandler *FolveFilesystem::CreateFromDescriptor(
      int filedes,
-     int cfg_idx,
+     const std::string &config_dir,
      const char *fs_path,
      const std::string &underlying_file) {
   HandlerStats file_info;
   file_info.filename = fs_path;
-  file_info.filter_id = cfg_idx;
-  if (cfg_idx != 0) {
+  file_info.filter_dir = config_dir;
+  if (!config_dir.empty()) {
+    const std::string full_config_path = base_config_dir_ + "/" + config_dir;
     FileHandler *filter = SndFileHandler::Create(this, filedes, fs_path,
                                                  underlying_file,
-                                                 cfg_idx,
-                                                 config_dirs()[cfg_idx],
+                                                 config_dir, full_config_path,
                                                  &file_info);
     if (filter != NULL) return filter;
   }
   // Every other file-type is just passed through as is.
-  return new PassThroughHandler(filedes, cfg_idx, file_info);
+  return new PassThroughHandler(filedes, config_dir, file_info);
 }
 
-std::string FolveFilesystem::CacheKey(int config_idx, const char *fs_path) {
-  std::string result;
-  Appendf(&result, "%d/%s", config_idx, fs_path);
-  return result;
+std::string FolveFilesystem::CacheKey(const std::string &config_path,
+                                      const char *fs_path) {
+  return config_path + fs_path;
 }
 
 FileHandler *FolveFilesystem::GetOrCreateHandler(const char *fs_path) {
-  const int config_idx = current_cfg_index_;
-  const std::string cache_key = CacheKey(config_idx, fs_path);
+  const std::string config_path = current_config_subdir_;
+  const std::string cache_key = CacheKey(config_path, fs_path);
   const std::string underlying_file = underlying_dir() + fs_path;
   FileHandler *handler = open_file_cache_.FindAndPin(cache_key);
   if (handler == NULL) {
@@ -615,7 +615,7 @@ FileHandler *FolveFilesystem::GetOrCreateHandler(const char *fs_path) {
     if (filedes < 0)
       return NULL;
     ++total_file_openings_;
-    handler = CreateFromDescriptor(filedes, config_idx,
+    handler = CreateFromDescriptor(filedes, config_path,
                                    fs_path, underlying_file);
     handler = open_file_cache_.InsertPinned(cache_key, handler);
   } else {
@@ -625,7 +625,7 @@ FileHandler *FolveFilesystem::GetOrCreateHandler(const char *fs_path) {
 }
 
 int FolveFilesystem::StatByFilename(const char *fs_path, struct stat *st) {
-  const std::string cache_key = CacheKey(current_cfg_index_, fs_path);
+  const std::string cache_key = CacheKey(current_config_subdir_, fs_path);
   FileHandler *handler = open_file_cache_.FindAndPin(cache_key);
   if (handler == 0)
     return -1;
@@ -635,8 +635,17 @@ int FolveFilesystem::StatByFilename(const char *fs_path, struct stat *st) {
 }
 
 void FolveFilesystem::Close(const char *fs_path, const FileHandler *handler) {
-  const std::string cache_key = CacheKey(handler->filter_id(), fs_path);
+  assert(handler != NULL);
+  const std::string cache_key = CacheKey(handler->filter_dir(), fs_path);
   open_file_cache_.Unpin(cache_key);
+}
+
+static bool IsDirectory(const std::string &path) {
+  if (path.empty()) return false;
+  struct stat st;
+  if (stat(path.c_str(), &st) != 0)
+    return false;
+  return (st.st_mode & S_IFMT) == S_IFDIR;
 }
 
 bool FolveFilesystem::ListDirectory(const std::string &fs_dir,
@@ -655,26 +664,51 @@ bool FolveFilesystem::ListDirectory(const std::string &fs_dir,
   return true;
 }
 
-void FolveFilesystem::SwitchCurrentConfigIndex(int i) {
-  if (i < 0 || i >= (int) config_dirs_.size())
-    return;
-  if (i != current_cfg_index_) {
-    if (i == 0) {
-      syslog(LOG_INFO, "Switching to pass-through mode.");
-    } else {
-      syslog(LOG_INFO, "Switching config directory to '%s'",
-             config_dirs()[i].c_str());
-    }
-    current_cfg_index_ = i;
+bool FolveFilesystem::SanitizeConfigSubdir(std::string *subdir_path) const {
+  if (base_config_dir_.length() + 1 + subdir_path->length() > PATH_MAX)
+    return false;  // uh, someone wants to buffer overflow us ?
+  const std::string to_verify_path = base_config_dir_ + "/" + *subdir_path;
+  char all_path[PATH_MAX];
+  // This will as well eat symbolic links that break out, though one could
+  // argue that that would be sane. We could think of some light
+  // canonicalization that only removes ./ and ../
+  const char *verified = realpath(to_verify_path.c_str(), all_path);
+  if (verified == NULL) { // bogus directory.
+    return false;
   }
+  if (strncmp(verified, base_config_dir_.c_str(),
+              base_config_dir_.length()) != 0) {
+    // Attempt to break out with ../-tricks.
+    return false;
+  }
+  if (!IsDirectory(verified))
+    return false;
+
+  // Derive from sanitized dir. So someone can write lowpass/../highpass
+  // or '.' for empty filter. Or ./highpass. And all work.
+  *subdir_path = ((strlen(verified) == base_config_dir_.length()) 
+                  ? ""   // chose subdir '.'
+                  : verified + base_config_dir_.length() + 1 /*slash*/);
+  return true;
 }
 
-static bool IsDirectory(const std::string &path) {
-  if (path.empty()) return false;
-  struct stat st;
-  if (stat(path.c_str(), &st) != 0)
+bool FolveFilesystem::SwitchCurrentConfigDir(const std::string &subdir_in) {
+  std::string subdir = subdir_in;
+  if (!subdir.empty() && !SanitizeConfigSubdir(&subdir)) {
+    syslog(LOG_INFO, "Invalid config switch attempt to '%s'",
+           subdir_in.c_str());
     return false;
-  return (st.st_mode & S_IFMT) == S_IFDIR;
+  }
+  if (subdir != current_config_subdir_) {
+    current_config_subdir_ = subdir;
+    if (subdir.empty()) {
+      syslog(LOG_INFO, "Switching to pass-through mode.");
+    } else {
+      syslog(LOG_INFO, "Switching config directory to '%s'", subdir.c_str());
+    }
+    return true;
+  }
+  return false;
 }
 
 bool FolveFilesystem::CheckInitialized() {
@@ -682,22 +716,60 @@ bool FolveFilesystem::CheckInitialized() {
     fprintf(stderr, "Don't know the underlying directory to read from.\n");
     return false;
   }
+
   if (!IsDirectory(underlying_dir())) {
     fprintf(stderr, "<underlying-dir>: '%s' not a directory.\n",
             underlying_dir().c_str());
     return false;
   }
 
-  for (size_t i = 1; i < config_dirs_.size(); ++i) {
-    if (!IsDirectory(config_dirs_[i])) {
-      fprintf(stderr, "<config-dir>: '%s' not a directory.\n",
-              config_dirs_[i].c_str());
-      return false;
-    }
+  if (base_config_dir_.empty() || !IsDirectory(base_config_dir_)) {
+    fprintf(stderr, "<config-dir>: '%s' not a directory.\n",
+            base_config_dir_.c_str());
+    return false;
   }
-  if (config_dirs_.size() > 1) {
-    // By default, lets set the index to the first filter the user provided.
-    SwitchCurrentConfigIndex(1);
-  }
+
   return true;
 }
+
+void FolveFilesystem::SetupInitialConfig() {
+  std::set<std::string> available_dirs = ListConfigDirs(true);
+  // Some sanity checks.
+  if (available_dirs.size() == 1) {
+    syslog(LOG_NOTICE, "No filter configuration directories given. "
+           "Any files will be just passed through verbatim.");
+  }
+  if (available_dirs.size() > 1) {
+    // By default, lets set the index to the first filter the user provided.
+    SwitchCurrentConfigDir(*++available_dirs.begin());
+  }
+}
+
+const std::set<std::string> FolveFilesystem::GetAvailableConfigDirs() const {
+  return ListConfigDirs(false);
+}
+
+const std::set<std::string> FolveFilesystem::ListConfigDirs(bool warn_invalid)
+  const {
+  std::set<std::string> result;
+  result.insert("");  // empty directory: pass-through.
+  DIR *dp = opendir(base_config_dir_.c_str());
+  if (dp == NULL) return result;
+  struct dirent *dent;
+  while ((dent = readdir(dp)) != NULL) {
+    std::string subdir = dent->d_name;
+    if (subdir == "." || subdir == "..")
+      continue;
+    if (!SanitizeConfigSubdir(&subdir)) {
+      if (warn_invalid) {
+        syslog(LOG_INFO, "Note: '%s' ignored in config directory; not a "
+               "directory or pointing outside base directory.", dent->d_name);
+      }
+      continue;
+    }
+    result.insert(subdir);
+  }
+  closedir(dp);
+  return result;
+}
+
