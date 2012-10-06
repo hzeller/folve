@@ -39,12 +39,14 @@
 // Compilation unit variables to communicate with the fuse callbacks.
 static struct FolveRuntime {
   FolveRuntime() : fs(NULL), mount_point(NULL),
-                   status_port(-1), refresh_time(10), parameter_error(false) {}
+                   status_port(-1), refresh_time(10), parameter_error(false),
+                   readdir_dump_file(NULL) {}
   FolveFilesystem *fs;
   const char *mount_point;
   int status_port;
   int refresh_time;
   bool parameter_error;
+  FILE *readdir_dump_file;
 } folve_rt;
 
 static char *concat_path(char *buf, const char *a, const char *b) {
@@ -91,14 +93,23 @@ static int folve_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
   const size_t entry_size = sizeof(struct dirent) + PATH_MAX;
   struct dirent *entry_buf = (struct dirent *) malloc(entry_size);
 
+  if (folve_rt.readdir_dump_file)
+    fprintf(folve_rt.readdir_dump_file, "LIST %s\n", path);
+
   while (readdir_r(dp, entry_buf, &de) == 0 && de != NULL) {
     struct stat st;
     memset(&st, 0, sizeof(st));
     st.st_ino = de->d_ino;
     st.st_mode = de->d_type << 12;
     const char *entry_name = de->d_name;
-    if (filler(buf, entry_name, &st, 0))
+    if (folve_rt.readdir_dump_file)
+      fprintf(folve_rt.readdir_dump_file, "ITEM %s%s%s\n",
+              path, strlen(path) > 1 ? "/" : "", de->d_name);
+    if (filler(buf, entry_name, &st, 0)) {
+      if (folve_rt.readdir_dump_file)
+        fprintf(folve_rt.readdir_dump_file, "DONE (%s)\n", de->d_name);
       break;
+    }
   }
   free(entry_buf);
 
@@ -182,6 +193,9 @@ static void *folve_init(struct fuse_conn_info *conn) {
 }
 
 static void folve_destroy(void *) {
+  if (folve_rt.readdir_dump_file) {
+    fclose(folve_rt.readdir_dump_file);
+  }
   syslog(LOG_INFO, "Exiting.");
 }
 
@@ -200,6 +214,7 @@ static int usage(const char *prg) {
          "\t-f           : Operate in foreground; useful for debugging.\n"
          "\t-o <mnt-opt> : other generic mount parameters passed to FUSE.\n"
          "\t-d           : High volume FUSE debug log. Implies -f.\n",
+         "\t-R <file>    : Debug readdir() calls. Debug output to file.\n",
          folve_rt.refresh_time);
   return 1;
 }
@@ -217,6 +232,7 @@ enum {
   FOLVE_OPT_REFRESH_TIME,
   FOLVE_OPT_CONFIG,
   FOLVE_OPT_DEBUG,
+  FOLVE_OPT_DEBUG_READDIR,
   FOLVE_OPT_GAPLESS,
 };
 
@@ -260,6 +276,9 @@ int FolveOptionHandling(void *data, const char *arg, int key,
   case FOLVE_OPT_DEBUG:
     folve::EnableDebugLog(true);
     return 0;
+  case FOLVE_OPT_DEBUG_READDIR:
+    rt->readdir_dump_file = fopen(arg + 2, "w"); 
+    return 0;
   case FOLVE_OPT_GAPLESS:
     rt->fs->set_gapless_processing(true);
     return 0;
@@ -280,6 +299,7 @@ int main(int argc, char *argv[]) {
     FUSE_OPT_KEY("-r ", FOLVE_OPT_REFRESH_TIME),
     FUSE_OPT_KEY("-C ", FOLVE_OPT_CONFIG),
     FUSE_OPT_KEY("-D",  FOLVE_OPT_DEBUG),
+    FUSE_OPT_KEY("-R ",  FOLVE_OPT_DEBUG_READDIR),
     FUSE_OPT_KEY("-g",  FOLVE_OPT_GAPLESS),
     FUSE_OPT_END   // This fails to compile for fuse <= 2.8.1; get >= 2.8.4
   };
