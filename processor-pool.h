@@ -18,6 +18,8 @@
 
 #include <map>
 #include <deque>
+#include <string>
+
 #include "util.h"
 
 class SoundProcessor;
@@ -33,9 +35,16 @@ public:
   void Return(SoundProcessor *processor);
 
 private:
-  typedef std::map<string, std::deque<SoundProcessor*> > PoolMap;
-  folve::mutex pool_mutex_;
+  typedef std::map<std::string, time_t> LastModifiedMap;
+  typedef std::deque<SoundProcessor*> ProcessorList;
+  typedef std::map<std::string, ProcessorList*> PoolMap;
+
+  SoundProcessor *CheckOutOfPool(const std::string &config_path);
+
+  const size_t max_per_config_;
+  folve::Mutex pool_mutex_;
   PoolMap pool_;
+  LastModifiedMap config_changed_;
 };
 
 #endif  // FOLVE_PROCESSOR_POOL_

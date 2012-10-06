@@ -27,6 +27,7 @@
 
 #include "file-handler-cache.h"
 #include "file-handler.h"
+#include "processor-pool.h"
 
 #ifndef FOLVE_VERSION
 #define FOLVE_VERSION "[unknown version - compile from git]"
