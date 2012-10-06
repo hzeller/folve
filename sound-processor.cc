@@ -19,6 +19,9 @@
 
 #include <assert.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include "util.h"
 
@@ -46,15 +49,19 @@ SoundProcessor *SoundProcessor::Create(const std::string &config_file,
   return new SoundProcessor(zita, config_file);
 }
 
+static time_t GetModificationTime(const std::string &filename) {
+  struct stat st;
+  stat(filename.c_str(), &st);
+  return st.st_mtime;
+}
+
 SoundProcessor::SoundProcessor(const ZitaConfig &config, const std::string &cfg)
   : zita_config_(config), config_file_(cfg),
+    config_file_timestamp_(GetModificationTime(cfg)),
     buffer_(new float[config.fragm * config.ninp]),
     channels_(config.ninp),
     input_pos_(0), output_pos_(0),
     max_out_value_observed_(0.0) {
-  struct stat st;
-  stat(cfg.c_str(), &st);
-  config_file_timestamp_ = st.st_mtime;
   Reset();
 }
 
@@ -117,6 +124,12 @@ void SoundProcessor::Process() {
   output_pos_ = 0;
 }
 
+bool SoundProcessor::ConfigStillUpToDate() const {
+  // TODO(hzeller): this should as well check if any *.wav file mentioned in
+  // config is still the same timestamp.
+  return config_file_timestamp_ == GetModificationTime(config_file_);
+}
+    
 void SoundProcessor::ResetMaxValues() {
   max_out_value_observed_ = 0.0;
 }

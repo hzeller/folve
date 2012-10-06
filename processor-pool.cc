@@ -27,8 +27,10 @@
 #include "util.h"
 
 using folve::StringPrintf;
+using folve::DLogf;
 
-ProcessorPool::ProcessorPool(int max_available) : max_per_config_(max_available) {
+ProcessorPool::ProcessorPool(int max_available)
+  : max_per_config_(max_available) {
 }
 
 static bool FindFirstAccessiblePath(const std::vector<std::string> &path,
@@ -59,34 +61,50 @@ SoundProcessor *ProcessorPool::GetOrCreate(const std::string &base_dir,
   std::string config_path;
   if (!FindFirstAccessiblePath(path_choices, &config_path))
     return NULL;
-  SoundProcessor *result = CheckOutOfPool(config_path);
+  SoundProcessor *result;
+  while ((result = CheckOutOfPool(config_path)) != NULL) {
+    if (result->ConfigStillUpToDate())
+      break;
+    DLogf("Processor %p: outdated; Good riddance after config file change %s",
+          result, config_path.c_str());
+    delete result;
+  }
   if (result != NULL) {
-    fprintf(stderr, "From Pool: %s\n", config_path.c_str());
+    DLogf("Processor %p: Got from pool [%s]", result, config_path.c_str());
     return result;
   }
 
-  fprintf(stderr, "Creating new for %s\n", config_path.c_str());
   result = SoundProcessor::Create(config_path, sampling_rate, channels);
   if (result == NULL) {
     syslog(LOG_ERR, "filter-config %s is broken.", config_path.c_str());
   }
-
+  DLogf("Processor %p: Newly created [%s]", result, config_path.c_str());
   return result;
 }
 
 void ProcessorPool::Return(SoundProcessor *processor) {
+  if (processor == NULL) return;
+  if (!processor->ConfigStillUpToDate()) {
+    DLogf("Processor %p: outdated. Not returning back in pool [%s]", processor,
+          processor->config_file().c_str());
+    delete processor;
+    return;
+  }
   folve::MutexLock l(&pool_mutex_);
-  PoolMap::iterator ins_pos = pool_.insert(make_pair(processor->config_file(),
-                                                     (ProcessorList*) NULL)).first;
+  PoolMap::iterator ins_pos = 
+    pool_.insert(make_pair(processor->config_file(),
+                           (ProcessorList*) NULL)).first;
   if (ins_pos->second == NULL) {
     ins_pos->second = new ProcessorList();
   }
   if (ins_pos->second->size() < max_per_config_) {
     processor->Reset();
     ins_pos->second->push_back(processor);
-    fprintf(stderr, "Returned %s (%zd)\n", processor->config_file().c_str(),
-            ins_pos->second->size());
+    DLogf("Processor %p: Returned to pool (count=%zd) [%s]\n",
+          processor, ins_pos->second->size(), processor->config_file().c_str());
   } else {
+    DLogf("Processor %p: Getting rid of it; enough processors in pool.",
+          processor);
     delete processor;
   } 
 }

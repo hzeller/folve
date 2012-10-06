@@ -86,17 +86,6 @@ private:
   HandlerStats info_stats_;
 };
 
-static bool FindFirstAccessiblePath(const std::vector<std::string> &path,
-                                    std::string *match) {
-  for (size_t i = 0; i < path.size(); ++i) {
-    if (access(path[i].c_str(), R_OK) == 0) {
-      *match = path[i];
-      return true;
-    }
-  }
-  return false;
-}
-
 class SndFileHandler :
     public FileHandler,
     public ConversionBuffer::SoundSource {
@@ -130,41 +119,26 @@ public:
             in_info.samplerate / 1000.0, bits);
     partial_file_info->duration_seconds = in_info.frames / in_info.samplerate;
 
-    std::vector<std::string> path_choices;
-    // From specific to non-specific.
-    path_choices.push_back(StringPrintf("%s/filter-%d-%d-%d.conf",
-                                        zita_config_dir.c_str(),
-                                        in_info.samplerate,
-                                        in_info.channels, bits));
-    path_choices.push_back(StringPrintf("%s/filter-%d-%d.conf",
-                                        zita_config_dir.c_str(),
-                                        in_info.samplerate,
-                                        in_info.channels));
-    path_choices.push_back(StringPrintf("%s/filter-%d.conf",
-                                        zita_config_dir.c_str(),
-                                        in_info.samplerate));
-    const int seconds = in_info.frames / in_info.samplerate;
-    const int max_choice = path_choices.size() - 1;
-    std::string config_path;
-    const bool found_config = FindFirstAccessiblePath(path_choices,
-                                                      &config_path);
-    if (found_config) {
-      DLogf("File %s, %.1fkHz, %d Bit, %d:%02d: filter config %s",
-            underlying_file.c_str(), in_info.samplerate / 1000.0, bits,
-            seconds / 60, seconds % 60,
-            config_path.c_str());
-    } else {
-      DLogf("File %s: couldn't find filter config %s...%s",
-            underlying_file.c_str(),
-            path_choices[0].c_str(), path_choices[max_choice].c_str());
+    SoundProcessor *processor = fs->processor_pool()
+      ->GetOrCreate(zita_config_dir, in_info.samplerate, in_info.channels, bits);
+    if (processor == NULL) {
+      // TODO: depending on why this happened, provide one of these messages.
+      /*
+      partial_file_info_.message = "Problem parsing " + config_path_;
       partial_file_info->message = "Missing ( " + path_choices[0]
         + "<br/> ... " + path_choices[max_choice] + " )";
+      */
       sf_close(snd);
       return NULL;
     }
+    const int seconds = in_info.frames / in_info.samplerate;
+    DLogf("File %s, %.1fkHz, %d Bit, %d:%02d: filter config %s",
+          underlying_file.c_str(), in_info.samplerate / 1000.0, bits,
+          seconds / 60, seconds % 60,
+          processor->config_file().c_str());
     return new SndFileHandler(fs, fs_path, filter_subdir,
                               underlying_file, filedes, snd, in_info,
-                              *partial_file_info, config_path);
+                              *partial_file_info, processor);
   }
   
   virtual ~SndFileHandler() {
@@ -220,7 +194,9 @@ public:
                      "(max=%.3f; Multiply gain with <= %.5f<br/>in %s)",
                      base_stats_.max_output_value,
                      1.0 / base_stats_.max_output_value,
-                     config_path_.c_str());
+                     processor_ != NULL
+                     ? processor_->config_file().c_str()
+                     : "filter");
     }
   }
 
@@ -249,13 +225,12 @@ private:
                  const std::string &underlying_file,
                  int filedes, SNDFILE *snd_in,
                  const SF_INFO &in_info, const HandlerStats &file_info,
-                 const std::string &config_path)
+                 SoundProcessor *processor)
     : FileHandler(filter_dir), fs_(fs),
       filedes_(filedes), snd_in_(snd_in), in_info_(in_info),
-      config_path_(config_path),
       base_stats_(file_info),
       error_(false), output_buffer_(NULL),
-      snd_out_(NULL), processor_(NULL),
+      snd_out_(NULL), processor_(processor),
       input_frames_left_(in_info.frames) {
 
     // Initial stat that we're going to report to clients. We'll adapt
@@ -341,19 +316,24 @@ private:
     out_buffer->HeaderFinished();
   }
 
-  virtual bool AcceptProcessor(SoundProcessor *new_processor) {
-    if (processor_ != NULL || !input_frames_left_) {
-      DLogf("Gapless attempt: Cannot bridge gap to alrady open file %s",
+  bool HasStarted() { return in_info_.frames != input_frames_left_; }
+  virtual bool AcceptProcessor(SoundProcessor *passover_processor) {
+    if (HasStarted()) {
+      DLogf("Gapless attempt: Cannot bridge gap to already open file %s",
             base_stats_.filename.c_str());
-      return false;  // We already have one.
-    }
-    if (new_processor->config_file() != config_path_) {
-      DLogf("Gapless: Configuration changed; can't join gapless");
       return false;
     }
-    // TODO: check that other parameters such as sampling rate and channels
-    // match (should be a rare problem as files in one dir typically match).
-    processor_ = new_processor;
+    assert(processor_);
+    if (passover_processor->config_file() != processor_->config_file()
+        || (passover_processor->config_file_timestamp()
+            != processor_->config_file_timestamp())) {
+      DLogf("Gapless: Configuration changed; can't use %p to join gapless.",
+            passover_processor);
+      return false;
+    }
+    // Ok, so don't use the processor we already have, but use the other one.
+    fs_->processor_pool()->Return(processor_);
+    processor_ = passover_processor;
     if (!processor_->is_input_buffer_complete()) {
       // Fill with our beginning so that the donor can finish its processing.
       input_frames_left_ -= processor_->FillBuffer(snd_in_);
@@ -375,25 +355,11 @@ private:
   }
 
   virtual bool AddMoreSoundData() {
-    if (processor_ && processor_->pending_writes() > 0) {
-      processor_->WriteProcessed(snd_out_, processor_->pending_writes());
-      return input_frames_left_;
-    }
     if (!input_frames_left_)
       return false;
-    if (!processor_) {
-      // First time we're called and we don't have any processor yet.
-      processor_ = SoundProcessor::Create(config_path_, in_info_.samplerate,
-                                          in_info_.channels);
-      if (processor_ == NULL) {
-        syslog(LOG_ERR, "Oops - filter-config %s is broken. Please fix. "
-               "Won't play this stream %s (simulating empty file)",
-               config_path_.c_str(), base_stats_.filename.c_str());
-        base_stats_.message = "Problem parsing " + config_path_;
-        input_frames_left_ = 0;
-        Close();
-        return false;
-      }
+    if (processor_->pending_writes() > 0) {
+      processor_->WriteProcessed(snd_out_, processor_->pending_writes());
+      return input_frames_left_;
     }
     const int r = processor_->FillBuffer(snd_in_);
     if (r == 0) {
@@ -422,7 +388,8 @@ private:
            && (next_file = fs_->GetOrCreateHandler(found->c_str()))
            && next_file->AcceptProcessor(processor_));
       if (passed_processor) {
-        DLogf("Gapless pass-on from '%s' to alphabetically next '%s'",
+        DLogf("Processor %p: Gapless pass-on from "
+              "'%s' to alphabetically next '%s'", processor_,
               base_stats_.filename.c_str(), found->c_str());
       }
       stats_mutex_.Lock();
@@ -529,9 +496,10 @@ private:
       syslog(LOG_ERR, "Observed output clipping in '%s': "
              "Max=%.3f; Multiply gain with <= %.5f in %s",
              base_stats_.filename.c_str(), base_stats_.max_output_value,
-             1.0 / base_stats_.max_output_value, config_path_.c_str());
+             1.0 / base_stats_.max_output_value, 
+             processor_ != NULL ? processor_->config_file().c_str() : "filter");
     }
-    delete processor_;
+    fs_->processor_pool()->Return(processor_);
     processor_ = NULL;
     // We can't disable buffer writes here, because outfile closing will flush
     // the last couple of sound samples.
@@ -556,7 +524,6 @@ private:
   const int filedes_;
   SNDFILE *const snd_in_;
   const SF_INFO in_info_;
-  const std::string config_path_;
 
   folve::Mutex stats_mutex_;
   HandlerStats base_stats_;      // UI information about current file.
@@ -577,7 +544,8 @@ private:
 
 FolveFilesystem::FolveFilesystem()
   : debug_ui_enabled_(false), gapless_processing_(false),
-    open_file_cache_(4), total_file_openings_(0), total_file_reopen_(0) {
+    open_file_cache_(4), processor_pool_(3),
+    total_file_openings_(0), total_file_reopen_(0) {
 }
 
 FileHandler *FolveFilesystem::CreateFromDescriptor(

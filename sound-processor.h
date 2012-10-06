@@ -19,9 +19,8 @@
 #ifndef FOLVE_SOUND_PROCESSOR_H
 #define FOLVE_SOUND_PROCESSOR_H
 
-#include <sndfile.h>
-
 #include <string>
+#include <sndfile.h>
 
 #include "zita-config.h"
 
@@ -63,13 +62,16 @@ public:
   const std::string &config_file() const { return config_file_; }
   const time_t config_file_timestamp() const { return config_file_timestamp_; }
 
+  // Verifies if configuration is still up-to-date.
+  bool ConfigStillUpToDate() const;
+
 private:
   SoundProcessor(const ZitaConfig &config, const std::string &cfg_file);
   void Process();
 
   const ZitaConfig zita_config_;
   const std::string config_file_;
-  time_t config_file_timestamp_;
+  const time_t config_file_timestamp_;
 
   float *const buffer_;
   const int channels_;

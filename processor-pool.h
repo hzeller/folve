@@ -23,9 +23,15 @@
 #include "util.h"
 
 class SoundProcessor;
+
+// An object pool for SoundProcessors. They are expensive to create, in
+// particular on slow machines, but they only change if the configuration
+// file is touched. Good candidates for re-use.
 class ProcessorPool {
 public:
-  ProcessorPool(int max_available);
+  // Create a processor pool. Stores at most "max_per_config" processors in
+  // pool per configuration file.
+  ProcessorPool(int max_per_config);
 
   // Get a new SoundProcesor from this pool with the given configuration.
   SoundProcessor *GetOrCreate(const std::string &base_dir,
@@ -35,7 +41,6 @@ public:
   void Return(SoundProcessor *processor);
 
 private:
-  typedef std::map<std::string, time_t> LastModifiedMap;
   typedef std::deque<SoundProcessor*> ProcessorList;
   typedef std::map<std::string, ProcessorList*> PoolMap;
 
@@ -44,7 +49,6 @@ private:
   const size_t max_per_config_;
   folve::Mutex pool_mutex_;
   PoolMap pool_;
-  LastModifiedMap config_changed_;
 };
 
 #endif  // FOLVE_PROCESSOR_POOL_

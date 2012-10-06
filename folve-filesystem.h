@@ -85,6 +85,7 @@ public:
                      std::set<std::string> *files);
 
   FileHandlerCache *handler_cache() { return &open_file_cache_; }
+  ProcessorPool *processor_pool() { return &processor_pool_; }
 
   void set_debug_ui_enabled(bool b) { debug_ui_enabled_ = b; }
   bool is_debug_ui_enabled() const { return debug_ui_enabled_; }
@@ -117,10 +118,12 @@ private:
 
   std::string underlying_dir_;
   std::string base_config_dir_;
+
   std::string current_config_subdir_;
   bool debug_ui_enabled_;
   bool gapless_processing_;
   FileHandlerCache open_file_cache_;
+  ProcessorPool processor_pool_;
   int total_file_openings_;
   int total_file_reopen_;
 };
