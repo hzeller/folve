@@ -30,6 +30,7 @@
 #include <sys/time.h>
 #include <syslog.h>
 #include <unistd.h>
+#include <sndfile.h>  // for sf_version_string
 
 #include "folve-filesystem.h"
 #include "status-server.h"
@@ -154,8 +155,10 @@ static void *folve_init(struct fuse_conn_info *conn) {
   char *ident = (char*) malloc(ident_len);  // openlog() keeps reference. Leaks.
   snprintf(ident, ident_len, "folve[%d]", getpid());
   openlog(ident, LOG_CONS|LOG_PERROR, LOG_USER);
-  syslog(LOG_INFO, "Version " FOLVE_VERSION " started. "
-         "Serving '%s' on mount point '%s'",
+  syslog(LOG_INFO, "Version " FOLVE_VERSION " started "
+         "(with fuse=%d.%d; sndfile=%s). ",
+         FUSE_MAJOR_VERSION, FUSE_MINOR_VERSION, sf_version_string());
+  syslog(LOG_INFO, "Serving '%s' on mount point '%s'",
          folve_rt.fs->underlying_dir().c_str(), folve_rt.mount_point);
   if (folve::IsDebugLogEnabled()) {
     syslog(LOG_INFO, "Debug logging enabled (-D)");
