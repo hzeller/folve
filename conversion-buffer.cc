@@ -124,11 +124,8 @@ ssize_t ConversionBuffer::SndAppend(const void *data, size_t count) {
 
 void ConversionBuffer::HeaderFinished() { header_end_ = FileSize(); }
 
-// Mmh, looks like we're calling ourself while in FillUntil() loop. Investigate.
-// Until then: don't lock mutex for simple access.
-
 off_t ConversionBuffer::FileSize() const {
-  //folve::MutexLock l(&mutex_);
+  folve::MutexLock l(&mutex_);
   return FileSize_Locked();
 }
 
@@ -137,12 +134,12 @@ off_t ConversionBuffer::FileSize_Locked() const {
 }
 
 off_t ConversionBuffer::MaxAccessed() const {
-  //folve::MutexLock l(&mutex_);
+  folve::MutexLock l(&mutex_);
   return max_accessed_;
 }
 
 bool ConversionBuffer::IsFileComplete() const {
-  //folve::MutexLock l(&mutex_);
+  folve::MutexLock l(&mutex_);
   return file_complete_;
 }
 

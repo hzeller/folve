@@ -211,19 +211,19 @@ public:
   }
 
   virtual void GetHandlerStatus(HandlerStats *stats) {
-    folve::MutexLock l(&stats_mutex_);
+    const off_t file_size = output_buffer_->FileSize();
+    const off_t max_access = output_buffer_->MaxAccessed();
     if (processor_ != NULL) {
       base_stats_.max_output_value = processor_->max_output_value();
     }
     *stats = base_stats_;
-    const int frames_done = in_info_.frames - input_frames_left_;
+    const int frames_done = in_info_.frames - frames_left();
     if (frames_done == 0 || in_info_.frames == 0) {
       stats->buffer_progress = 0.0;
       stats->access_progress = 0.0;
     } else {
       stats->buffer_progress = 1.0 * frames_done / in_info_.frames;
-      stats->access_progress = stats->buffer_progress
-        * output_buffer_->MaxAccessed() / output_buffer_->FileSize();
+      stats->access_progress = stats->buffer_progress * max_access / file_size;
     }
 
     if (base_stats_.max_output_value > 1.0) {
@@ -241,11 +241,12 @@ public:
   }
 
   virtual int Stat(struct stat *st) {
-    if (output_buffer_->FileSize() > start_estimating_size_) {
-      const int frames_done = in_info_.frames - input_frames_left_;
+    const off_t current_file_size = output_buffer_->FileSize();
+    if (current_file_size > start_estimating_size_) {
+      const int frames_done = in_info_.frames - frames_left();
       if (frames_done > 0) {
         const float estimated_end = 1.0 * in_info_.frames / frames_done;
-        off_t new_size = estimated_end * output_buffer_->FileSize();
+        off_t new_size = estimated_end * current_file_size;
         // Report a bit bigger size which is less harmful than programs
         // reading short.
         new_size += 16384;
@@ -569,6 +570,11 @@ private:
     if (pread(filedes, flac_magic, sizeof(flac_magic), 0) != sizeof(flac_magic))
       return false;
     return memcmp(flac_magic, "fLaC", sizeof(flac_magic)) == 0;
+  }
+
+  int frames_left() {
+    folve::MutexLock l(&stats_mutex_);
+    return input_frames_left_;
   }
 
   FolveFilesystem *const fs_;
