@@ -107,7 +107,7 @@ static const char *assemble_orig_path(char *buf, const char *path) {
 // Essentially lstat(). Just forward to the original filesystem (this
 // will by lying: our convolved files are of different size...)
 static int folve_getattr(const char *path, struct stat *stbuf) {
-  if (folve_rt.status_server && strcmp(path, kStatusFileName) == 0) {
+  if (strcmp(path, kStatusFileName) == 0) {
     FileHandler *status = folve_rt.status_server->CreateStatusFileHandler();
     status->Stat(stbuf);
     delete status;
@@ -136,7 +136,7 @@ static int folve_getattr(const char *path, struct stat *stbuf) {
 // readdir(). Just forward to original filesystem.
 static int folve_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
                          off_t offset, struct fuse_file_info *fi) {
-  if (folve_rt.status_server && strcmp(path, "/") == 0) {
+  if (strcmp(path, "/") == 0) {
     struct stat st;
     memset(&st, 0, sizeof(st));
     filler(buf, kStatusFileName + 1, &st, 0);
@@ -187,7 +187,7 @@ static int folve_readlink(const char *path, char *buf, size_t size) {
 }
 
 static int folve_open(const char *path, struct fuse_file_info *fi) {
-  if (folve_rt.status_server && strcmp(path, kStatusFileName) == 0) {
+  if (strcmp(path, kStatusFileName) == 0) {
     fi->fh = (uint64_t) folve_rt.status_server->CreateStatusFileHandler();
     return 0;
   }
@@ -214,7 +214,7 @@ static int folve_read(const char *path, char *buf, size_t size, off_t offset,
 }
 
 static int folve_release(const char *path, struct fuse_file_info *fi) {
-  if (folve_rt.status_server && strcmp(path, kStatusFileName) == 0) {
+  if (strcmp(path, kStatusFileName) == 0) {
     delete reinterpret_cast<FileHandler *>(fi->fh);
   } else {
     folve_rt.fs->Close(path, reinterpret_cast<FileHandler *>(fi->fh));
@@ -241,9 +241,10 @@ static void *folve_init(struct fuse_conn_info *conn) {
     syslog(LOG_INFO, "Debug logging enabled (-D)");
   }
 
+  // Status server is always used - it serves the status as an HTML file.
+  folve_rt.status_server = new StatusServer(folve_rt.fs);
   if (folve_rt.status_port > 0) {
     // Need to start status server after we're daemonized.
-    folve_rt.status_server = new StatusServer(folve_rt.fs);
     if (folve_rt.status_server->Start(folve_rt.status_port)) {
       syslog(LOG_INFO, "HTTP status server on port %d; refresh=%d",
              folve_rt.status_port, folve_rt.refresh_time);
