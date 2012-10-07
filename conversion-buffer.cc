@@ -60,7 +60,7 @@ ConversionBuffer::~ConversionBuffer() {
 sf_count_t ConversionBuffer::SndTell(void *userdata) {
   // This will be called within writing, when our mutex is locked. So only
   // call the version that assumed locked by mutex.
-  return reinterpret_cast<ConversionBuffer*>(userdata)->FileSize_Locked();
+  return reinterpret_cast<ConversionBuffer*>(userdata)->FileSize();
 }
 sf_count_t ConversionBuffer::SndWrite(const void *ptr, sf_count_t count,
                                       void *userdata) {
@@ -124,17 +124,17 @@ ssize_t ConversionBuffer::SndAppend(const void *data, size_t count) {
 
 void ConversionBuffer::HeaderFinished() { header_end_ = FileSize(); }
 
+// The following are rather informal; because we access them in 
+// StatusServer:
+//  FileCacheHandler::GetHandlerStatus() -> ConversionBuffer::FileSize()
+// PreBufferThread:
+//  ConversionBuffer::FillUntil() -> FileHandlerCache::FindAndPin
+// We don't lock these values here.
 off_t ConversionBuffer::FileSize() const {
-  folve::MutexLock l(&mutex_);
-  return FileSize_Locked();
-}
-
-off_t ConversionBuffer::FileSize_Locked() const {
   return total_written_;
 }
 
 off_t ConversionBuffer::MaxAccessed() const {
-  folve::MutexLock l(&mutex_);
   return max_accessed_;
 }
 

@@ -89,12 +89,11 @@ public:
   // Returns if we've completed this file.
   bool IsFileComplete() const;
 
-  // Current max file position. Must not be called within AddMoreSoundData().
+  // Current max file position.
   off_t FileSize() const;
 
   // Maximum position accessed. This might be different from FileSize in case
   // we have a pre-buffering thread running.
-  // Must not be called within AddMoreSoundData()
   off_t MaxAccessed() const;
 
 private:
@@ -107,9 +106,6 @@ private:
   // Create a SNDFILE the user has to write to in the WriteToSoundfile callback.
   // Can be NULL on error.
   SNDFILE *CreateOutputSoundfile(const SF_INFO &info);
-
-  // Like FileSize(), but assuming that the mutex is already locked.
-  off_t FileSize_Locked() const;
 
   SoundSource *const source_;
   int out_filedes_;
