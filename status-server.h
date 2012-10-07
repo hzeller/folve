@@ -53,7 +53,9 @@ private:
 
   // Some helper functions to create the page:
   void AppendSettingsForm();
-  void AppendFileInfo(const char *progress_style, const HandlerStats &stats);
+  void AppendFileInfo(const char *progress_access_color,
+                      const char *progress_buffer_color,
+                      const HandlerStats &stats);
 
   // Set filter from http-request. Gracefully handles garbage.
   void SetFilter(const char *value);

@@ -17,6 +17,7 @@
 
 #include "util.h"
 
+#include <assert.h>
 #include <stdio.h>
 #include <sys/time.h>
 #include <syslog.h>
@@ -77,4 +78,24 @@ bool folve::HasSuffix(const std::string &str, const std::string &suffix) {
   if (str.length() < suffix.length()) return false;
   return str.compare(str.length() - suffix.length(),
                      suffix.length(), suffix) == 0;
+}
+
+static void *CallRun(void *tobject) {
+  reinterpret_cast<folve::Thread*>(tobject)->Run();
+  return NULL;
+}
+
+folve::Thread::Thread() : started_(false) {}
+folve::Thread::~Thread() { WaitFinished(); }
+
+void folve::Thread::Start() {
+  assert(!started_);
+  pthread_create(&thread_, NULL, &CallRun, this);
+  started_ = true;
+}
+
+void folve::Thread::WaitFinished() {
+  if (!started_) return;
+  pthread_join(thread_, NULL);
+  started_ = false;
 }

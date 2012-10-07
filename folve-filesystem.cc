@@ -75,7 +75,8 @@ public:
   virtual void GetHandlerStatus(HandlerStats *stats) {
     *stats = info_stats_;
     if (file_size_ > 0) {
-      stats->progress = 1.0 * max_accessed_ / file_size_;
+      stats->access_progress = 1.0 * max_accessed_ / file_size_;
+      stats->buffer_progress = stats->access_progress;
     }
   }
 
@@ -84,6 +85,45 @@ private:
   size_t file_size_;
   long unsigned int max_accessed_;
   HandlerStats info_stats_;
+};
+
+// A thread, that attempts to pre-buffer data. There are some misbehaving
+// media clients out there, that buffer a whole chunk but don't start reading
+// again when they're low on buffer - in particular on small machines that
+// use considerable CPU for folve, this is not desirable.
+class PreBufferThread : public folve::Thread {
+public:
+  // Buffer thread around conversion buffer. Does not take over ownership
+  // of buffer.
+  PreBufferThread(ConversionBuffer *buffer, int buffer_ahead)
+    : buffer_(buffer), buffer_ahead_(buffer_ahead), do_run_(true) {}
+
+  void StopRunning() {
+    folve::MutexLock l(&run_mutex_);
+    do_run_ = false;
+  }
+
+  virtual void Run() {
+    const int kBufferChunk = (16 << 10);  // 16k
+    while (ShouldRun() && !buffer_->IsFileComplete()) {
+      const off_t goal = buffer_->MaxAccessed() + buffer_ahead_;
+      while (!buffer_->IsFileComplete() && buffer_->FileSize() < goal) {
+        buffer_->FillUntil(buffer_->FileSize() + kBufferChunk);
+      }
+      // TODO: make condition variables not crude sleep.
+      usleep(500000);
+    }
+  }
+
+private:
+  bool ShouldRun() {
+    folve::MutexLock l(&run_mutex_);
+    return do_run_;
+  }
+  ConversionBuffer *const buffer_;
+  const int buffer_ahead_;
+  folve::Mutex run_mutex_;
+  bool do_run_;
 };
 
 class SndFileHandler :
@@ -138,6 +178,7 @@ public:
   
   virtual ~SndFileHandler() {
     Close();
+    delete buffer_thread_;
     delete output_buffer_;
   }
 
@@ -176,10 +217,14 @@ public:
     }
     *stats = base_stats_;
     const int frames_done = in_info_.frames - input_frames_left_;
-    if (frames_done == 0 || in_info_.frames == 0)
-      stats->progress = 0.0;
-    else
-      stats->progress = 1.0 * frames_done / in_info_.frames;
+    if (frames_done == 0 || in_info_.frames == 0) {
+      stats->buffer_progress = 0.0;
+      stats->access_progress = 0.0;
+    } else {
+      stats->buffer_progress = 1.0 * frames_done / in_info_.frames;
+      stats->access_progress = stats->buffer_progress
+        * output_buffer_->MaxAccessed() / output_buffer_->FileSize();
+    }
 
     if (base_stats_.max_output_value > 1.0) {
       // TODO: the status server could inspect this value and make better
@@ -224,7 +269,7 @@ private:
     : FileHandler(filter_dir), fs_(fs),
       filedes_(filedes), snd_in_(snd_in), in_info_(in_info),
       base_stats_(file_info),
-      error_(false), output_buffer_(NULL),
+      error_(false), output_buffer_(NULL), buffer_thread_(NULL),
       snd_out_(NULL), processor_(processor),
       input_frames_left_(in_info.frames) {
 
@@ -258,6 +303,10 @@ private:
     }
 
     output_buffer_ = new ConversionBuffer(this, out_info);
+    if (fs_->pre_buffer_size() > 0) {
+      buffer_thread_ = new PreBufferThread(output_buffer_,
+                                           fs->pre_buffer_size());
+    }
   }
 
   virtual void SetOutputSoundfile(ConversionBuffer *out_buffer,
@@ -312,7 +361,7 @@ private:
   }
 
   bool HasStarted() { return in_info_.frames != input_frames_left_; }
-  virtual bool AcceptProcessor(SoundProcessor *passover_processor) {
+  virtual bool PassoverProcessor(SoundProcessor *passover_processor) {
     if (HasStarted()) {
       DLogf("Gapless attempt: Cannot bridge gap to already open file %s",
             base_stats_.filename.c_str());
@@ -335,6 +384,12 @@ private:
     }
     base_stats_.in_gapless = true;
     return true;
+  }
+
+  virtual void NotifyPassedProcessorUnreferenced() {
+    if (buffer_thread_ && !buffer_thread_->started()) {
+      buffer_thread_->Start();
+    }
   }
 
   static bool ExtractDirAndSuffix(const std::string &filename,
@@ -381,28 +436,28 @@ private:
            && fs_->ListDirectory(fs_dir, file_suffix, &dirset)
            && (found = dirset.upper_bound(base_stats_.filename)) != dirset.end()
            && (next_file = fs_->GetOrCreateHandler(found->c_str()))
-           && next_file->AcceptProcessor(processor_));
+           && next_file->PassoverProcessor(processor_));
       if (passed_processor) {
         DLogf("Processor %p: Gapless pass-on from "
               "'%s' to alphabetically next '%s'", processor_,
               base_stats_.filename.c_str(), found->c_str());
       }
-      stats_mutex_.Lock();
       processor_->WriteProcessed(snd_out_, r);
-      stats_mutex_.Unlock();
       if (passed_processor) {
         base_stats_.out_gapless = true;
         SaveOutputValues();
         processor_ = NULL;   // we handed over ownership.
+        next_file->NotifyPassedProcessorUnreferenced();
       }
       if (next_file) fs_->Close(found->c_str(), next_file);
     } else {
-      stats_mutex_.Lock();
       processor_->WriteProcessed(snd_out_, r);
-      stats_mutex_.Unlock();
     }
     if (input_frames_left_ == 0) {
       Close();
+    }
+    if (buffer_thread_ && !buffer_thread_->started()) {
+      buffer_thread_->Start();
     }
     return input_frames_left_;
   }
@@ -501,6 +556,7 @@ private:
     if (snd_in_) sf_close(snd_in_);
     if (snd_out_) sf_close(snd_out_);
     snd_out_ = NULL;
+    if (buffer_thread_) buffer_thread_->StopRunning();
     close(filedes_);
   }
 
@@ -529,6 +585,7 @@ private:
   bool error_;
   bool copy_flac_header_verbatim_;
   ConversionBuffer *output_buffer_;
+  PreBufferThread *buffer_thread_;
   SNDFILE *snd_out_;
 
   // Used in conversion.
@@ -538,7 +595,7 @@ private:
 }  // namespace
 
 FolveFilesystem::FolveFilesystem()
-  : gapless_processing_(false),
+  : gapless_processing_(false), pre_buffer_size_(-1),
     open_file_cache_(4), processor_pool_(3),
     total_file_openings_(0), total_file_reopen_(0) {
 }

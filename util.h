@@ -48,9 +48,10 @@ namespace folve {
   bool IsDebugLogEnabled();
 
   // Importing boost::mutex posed too many dependencies on some embedded systems
-  // with insufficient library support.
-  // So we have our own little wrapper around the pthread mutex.
-  // Non-recursive.
+  // with insufficient library support. So do our own barebone wrappers
+  // around posix threads.
+
+  // Non-recursive Mutex.
   class Mutex {
   public:
     Mutex() { pthread_mutex_init(&mutex_, NULL); }
@@ -72,6 +73,24 @@ namespace folve {
     Mutex *const mutex_;
   };
 
+  // Thread.
+  class Thread {
+  public:
+    Thread();
+    virtual ~Thread();
+
+    void Start();
+    bool started() const { return started_; }
+
+    void WaitFinished();
+
+    // Override this.
+    virtual void Run() = 0;
+
+  private:
+    bool started_;
+    pthread_t thread_;
+  };
 }  // namespece folve
 
 #undef PRINTF_FMT_CHECK

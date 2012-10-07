@@ -27,14 +27,16 @@
 // gone, to show 'retired' elements in the status server.
 struct HandlerStats {
   HandlerStats()
-    : duration_seconds(-1), progress(-1), status(OPEN), last_access(0),
+    : duration_seconds(-1), access_progress(-1), buffer_progress(-1),
+      status(OPEN), last_access(0),
       max_output_value(0), in_gapless(false), out_gapless(false) {}
 
   std::string filename;         // filesystem name.
   std::string format;           // File format info if recognized.
   std::string message;          // Per file (error) message if any.
   int duration_seconds;         // Audio file length if known; -1 otherwise.
-  float progress;               // File access rogress if known; -1 otherwise.
+  float access_progress;        // File access progress if known; -1 otherwise.
+  float buffer_progress;        // File buffering progress if known.
 
   enum Status { OPEN, IDLE, RETIRED };
   Status status;                // Status of this file handler.
@@ -67,7 +69,13 @@ public:
 
   // Accept processor passed on from the previous file. Can return false
   // if this FileHandler cannot use it (e.g. it alrady started convolving).
-  virtual bool AcceptProcessor(SoundProcessor *s) { return false; }
+  // The Receiver must not use this processor until 
+  // NotifyPassedProcessorUnreferenced() is called.
+  virtual bool PassoverProcessor(SoundProcessor *s) { return false; }
+
+  // If we got a processor passed over, the caller will notify us once it
+  // is fully done with it.
+  virtual void NotifyPassedProcessorUnreferenced() { }
 
 private:
   const std::string filter_dir_;

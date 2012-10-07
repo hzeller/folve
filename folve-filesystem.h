@@ -91,6 +91,10 @@ public:
   void set_gapless_processing(bool b) { gapless_processing_ = b; }
   bool gapless_processing() const { return gapless_processing_; }
 
+  // Should we attempt to pre-buffer files ?
+  void set_pre_buffer_size(int b) { pre_buffer_size_ = b; }
+  int pre_buffer_size() const { return pre_buffer_size_; }
+
   // Some stats.
   int total_file_openings() { return total_file_openings_; }
   int total_file_reopen() { return total_file_reopen_; }
@@ -119,6 +123,7 @@ private:
 
   std::string current_config_subdir_;
   bool gapless_processing_;
+  int pre_buffer_size_;
   FileHandlerCache open_file_cache_;
   ProcessorPool processor_pool_;
   int total_file_openings_;

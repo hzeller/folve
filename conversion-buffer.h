@@ -71,6 +71,9 @@ public:
   // used for chirurgical header editing...
   void WriteCharAt(unsigned char c, off_t offset);
 
+  // Fill read file until we have the required bytes available.
+  void FillUntil(off_t requested_min_written);
+
   // Enable writing through the SNDFILE.
   // If set to 'false', writes via the SNDFILE are ignored.
   // To be used to suppress writing of the header or
@@ -83,8 +86,16 @@ public:
   // (Long story, see Read() for details).
   void HeaderFinished();
 
-  // Current max file position.
-  off_t FileSize() const { return total_written_; }
+  // Returns if we've completed this file.
+  bool IsFileComplete() const;
+
+  // Current max file position. Must not be called within AddMoreSoundData().
+  off_t FileSize() const;
+
+  // Maximum position accessed. This might be different from FileSize in case
+  // we have a pre-buffering thread running.
+  // Must not be called within AddMoreSoundData()
+  off_t MaxAccessed() const;
 
 private:
   static sf_count_t SndTell(void *userdata);
@@ -97,12 +108,17 @@ private:
   // Can be NULL on error.
   SNDFILE *CreateOutputSoundfile(const SF_INFO &info);
 
+  // Like FileSize(), but assuming that the mutex is already locked.
+  off_t FileSize_Locked() const;
+
   SoundSource *const source_;
   int out_filedes_;
   bool snd_writing_enabled_;
   off_t total_written_;
+  off_t max_accessed_;
   off_t header_end_;
-  folve::Mutex mutex_;
+  bool file_complete_;
+  mutable folve::Mutex mutex_;
 };
 
 #endif  // FOLVE_CONVERSION_BUFFER_H

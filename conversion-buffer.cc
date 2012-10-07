@@ -40,7 +40,7 @@ static char *TempNameAllocated(const char *pattern) {
 
 ConversionBuffer::ConversionBuffer(SoundSource *source, const SF_INFO &info)
   : source_(source), out_filedes_(-1), snd_writing_enabled_(true),
-    total_written_(0), header_end_(0) {
+    total_written_(0), max_accessed_(0), header_end_(0), file_complete_(false) {
   char *filename = TempNameAllocated("folve-XXXXXX");
   out_filedes_ = mkstemp(filename);
   if (out_filedes_ < 0) {
@@ -58,7 +58,9 @@ ConversionBuffer::~ConversionBuffer() {
 }
 
 sf_count_t ConversionBuffer::SndTell(void *userdata) {
-  return reinterpret_cast<ConversionBuffer*>(userdata)->FileSize();
+  // This will be called within writing, when our mutex is locked. So only
+  // call the version that assumed locked by mutex.
+  return reinterpret_cast<ConversionBuffer*>(userdata)->FileSize_Locked();
 }
 sf_count_t ConversionBuffer::SndWrite(const void *ptr, sf_count_t count,
                                       void *userdata) {
@@ -122,6 +124,41 @@ ssize_t ConversionBuffer::SndAppend(const void *data, size_t count) {
 
 void ConversionBuffer::HeaderFinished() { header_end_ = FileSize(); }
 
+// Mmh, looks like we're calling ourself while in FillUntil() loop. Investigate.
+// Until then: don't lock mutex for simple access.
+
+off_t ConversionBuffer::FileSize() const {
+  //folve::MutexLock l(&mutex_);
+  return FileSize_Locked();
+}
+
+off_t ConversionBuffer::FileSize_Locked() const {
+  return total_written_;
+}
+
+off_t ConversionBuffer::MaxAccessed() const {
+  //folve::MutexLock l(&mutex_);
+  return max_accessed_;
+}
+
+bool ConversionBuffer::IsFileComplete() const {
+  //folve::MutexLock l(&mutex_);
+  return file_complete_;
+}
+
+void ConversionBuffer::FillUntil(off_t requested_min_written) {
+  // As soon as someone tries to read beyond of what we already have, we call
+  // the callback that fills more of it.
+  // We are shared between potentially several open files. Serialize threads.
+  folve::MutexLock l(&mutex_);
+  while (!file_complete_ && total_written_ < requested_min_written) {
+    if (!source_->AddMoreSoundData()) {
+      file_complete_ = true;
+      break;
+    }
+  }
+}
+
 ssize_t ConversionBuffer::Read(char *buf, size_t size, off_t offset) {
   // As long as we're reading only within the header area, allow 'short' reads,
   // i.e. reads that return less bytes than requested (but up to the headers'
@@ -138,15 +175,15 @@ ssize_t ConversionBuffer::Read(char *buf, size_t size, off_t offset) {
   //     required_min_written = offset + size;  // all requested bytes.
   const off_t required_min_written = offset + (offset >= header_end_ ? size : 1);
 
-  // As soon as someone tries to read beyond of what we already have, we call
-  // the callback that fills more of it.
-  // We are shared between potentially several open files. Serialize threads.
-  mutex_.Lock();
-  while (total_written_ < required_min_written) {
-    if (!source_->AddMoreSoundData())
-      break;
-  }
-  mutex_.Unlock();
+  FillUntil(required_min_written);
 
-  return pread(out_filedes_, buf, size, offset);
+  const ssize_t read_result = pread(out_filedes_, buf, size, offset);
+  if (read_result >= 0) {
+    const off_t new_max_accessed = offset + read_result;
+    if (new_max_accessed > max_accessed_) {
+      folve::MutexLock l(&mutex_);
+      max_accessed_ = new_max_accessed;
+    }
+  }
+  return read_result;
 }

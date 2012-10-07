@@ -251,6 +251,7 @@ static int usage(const char *prg) {
          "\t-r <refresh> : Seconds between refresh of status page;\n"
          "\t               Default is %d seconds; switch off with -1.\n"
          "\t-g           : Gapless convolving alphabetically adjacent files.\n"
+         "\t-b <MebiByte>: Pre-buffer files by given MB. Experimental.\n"
          "\t-D           : Moderate volume Folve debug messages to syslog,\n"
          "\t               and some more detailed configuration info in UI\n"
          "\t-f           : Operate in foreground; useful for debugging.\n"
@@ -271,6 +272,7 @@ struct FolveConfig {
 
 enum {
   FOLVE_OPT_PORT = 42,
+  FOLVE_OPT_PREBUFFER,
   FOLVE_OPT_REFRESH_TIME,
   FOLVE_OPT_CONFIG,
   FOLVE_OPT_DEBUG,
@@ -302,6 +304,22 @@ int FolveOptionHandling(void *data, const char *arg, int key,
   case FOLVE_OPT_PORT:
     rt->status_port = atoi(arg + 2);  // strip "-p"
     return 0;
+  case FOLVE_OPT_PREBUFFER: {
+    char *end;
+    const double value = strtod(arg + 2, &end);
+    if (*end != '\0') {
+      fprintf(stderr, "Invalid number %s\n", arg + 2);
+      rt->parameter_error= true;
+    } else if (value > 16) {
+      fprintf(stderr, "-b %.1f out of range. More than 16MB prebuffer. "
+              "That is a lot!\n",
+              value);
+      rt->parameter_error= true;
+    } else {
+      rt->fs->set_pre_buffer_size(value * (1 << 20));
+    }
+    return 0;
+  }
   case FOLVE_OPT_REFRESH_TIME:
     rt->refresh_time = atoi(arg + 2);  // strip "-r"
     return 0;
@@ -339,6 +357,7 @@ int main(int argc, char *argv[]) {
 
   static struct fuse_opt folve_options[] = {
     FUSE_OPT_KEY("-p ", FOLVE_OPT_PORT),
+    FUSE_OPT_KEY("-b ", FOLVE_OPT_PREBUFFER),
     FUSE_OPT_KEY("-r ", FOLVE_OPT_REFRESH_TIME),
     FUSE_OPT_KEY("-C ", FOLVE_OPT_CONFIG),
     FUSE_OPT_KEY("-D",  FOLVE_OPT_DEBUG),

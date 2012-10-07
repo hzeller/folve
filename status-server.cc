@@ -43,8 +43,10 @@ using folve::Appendf;
 static const int kProgressWidth = 300;
 
 static const size_t kMaxRetired = 20;
-static const char kActiveProgress[]  = "#7070ff";
-static const char kRetiredProgress[] = "#d0d0d0";
+static const char kActiveAccessProgress[]  = "#7070ff";
+static const char kActiveBufferProgress[]  = "#bbffbb";
+static const char kRetiredAccessProgress[] = "#d0d0d0";
+static const char kRetiredBufferProgress[] = "#e0e0e0";
 static const char kSettingsUrl[] = "/settings";
 
 // Aaah, I need to find the right Browser-Tab :)
@@ -70,6 +72,7 @@ static const char kCSS[] =
   " a:visited { text-decoration:none; }\n"
   " a:hover { text-decoration:underline; }\n"
   " a:active { text-decoration:underline; }\n"
+  " .lbox { border:1px solid black; padding-right:2em; }\n" // legend box
   " .rounded_box, .filter_sel {\n"
   "        float: left;\n"
   "        margin: 5px;\n"
@@ -204,15 +207,18 @@ static void AppendSanitizedHTML(const std::string &in, std::string *out) {
   "<td>%s</td>"  \
   "<td>%s</td>"  \
   "<td><div class='pf'>" \
-  "<div style='width:%dpx;background:%s;'>&nbsp;</div>\n</div></td>" \
-  "<td>%s</td>"
+  "<div style='width:%dpx;background:%s;float:left;'>&nbsp;</div>" \
+  "<div style='width:%dpx;background:%s;float:left;'>&nbsp;</div>" \
+  "<p style='clear:both;'></p>" \
+  "</div>\n</td><td>%s</td>"
 
 #define sTimeColumns \
   "<td class='nf'>%2d:%02d</td><td>/</td><td class='nf'>%2d:%02d</td>"
 #define sDecibelColumn \
   "<td class='nf'%s>%.1f dB</td>"
 
-void StatusServer::AppendFileInfo(const char *progress_style,
+void StatusServer::AppendFileInfo(const char *progress_access_color,
+                                  const char *progress_buffer_color,
                                   const HandlerStats &stats) {
   content_.append("<tr>");
   const char *status = "";
@@ -225,17 +231,22 @@ void StatusServer::AppendFileInfo(const char *progress_style,
 
   if (!stats.message.empty()) {
     Appendf(&content_, sMessageRowHtml, status, stats.message.c_str());
-  } else if (stats.progress == 0) {
+  } else if (stats.access_progress == 0 && stats.buffer_progress <= 0) {
+    // TODO(hzeller): we really need a way to display message and progress
+    // bar in parallel.
     Appendf(&content_, sMessageRowHtml, status, "Only header accessed");
   } else {
+    float accessed = stats.access_progress;
+    float buffered
+      = stats.buffer_progress > accessed ? stats.buffer_progress - accessed : 0;
     Appendf(&content_, sProgressRowHtml, status,
             stats.in_gapless ? "&rarr;" : "",
-            (int) (kProgressWidth * stats.progress),
-            progress_style,
+            (int) (kProgressWidth * accessed), progress_access_color,
+            (int) (kProgressWidth * buffered), progress_buffer_color,
             stats.out_gapless ? "&rarr;" : "");
   }
   const int secs = stats.duration_seconds;
-  const int fract_sec = stats.progress * secs;
+  const int fract_sec = stats.access_progress * secs;
   if (secs >= 0 && fract_sec >= 0) {
     Appendf(&content_, sTimeColumns,
             fract_sec / 60, fract_sec % 60,
@@ -355,6 +366,12 @@ const std::string &StatusServer::CreatePage() {
   if (filesystem_->gapless_processing()) {
     content_.append("Gapless transfers indicated with '&rarr;'.\n");
   }
+  if (filesystem_->pre_buffer_size() > 0) {
+    Appendf(&content_,
+            "Accessed: <span class='lbox' style='background:%s;'>&nbsp;</span> "
+            "Buffered: <span class='lbox' style='background:%s;'>&nbsp;</span>",
+            kActiveAccessProgress, kActiveBufferProgress);
+  }
   content_.append("<table>\n");
   Appendf(&content_, "<tr><th>Stat</th><td><!--gapless in--></td>"
           "<th width='%dpx'>Progress</th>"  // progress bar.
@@ -371,7 +388,7 @@ const std::string &StatusServer::CreatePage() {
   CompareStats comparator;
   std::sort(stat_ptrs.begin(), stat_ptrs.end(), comparator);
   for (size_t i = 0; i < stat_ptrs.size(); ++i) {
-    AppendFileInfo(kActiveProgress, *stat_ptrs[i]);
+    AppendFileInfo(kActiveAccessProgress, kActiveBufferProgress, *stat_ptrs[i]);
   }
   content_.append("</table><hr/>\n");
 
@@ -381,7 +398,7 @@ const std::string &StatusServer::CreatePage() {
     folve::MutexLock l(&retired_mutex_);
     for (RetiredList::const_iterator it = retired_.begin();
          it != retired_.end(); ++it) {
-      AppendFileInfo(kRetiredProgress, *it);
+      AppendFileInfo(kRetiredAccessProgress, kRetiredBufferProgress, *it);
     }
     content_.append("</table>\n");
     if (expunged_retired_ > 0) {
