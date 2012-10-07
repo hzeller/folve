@@ -39,23 +39,33 @@ public:
   // Start server, listing on given port.
   bool Start(int port);
 
+  // A file handler, that provides the current status as HTML-file. This
+  // allows to acces the current status even if there is no status port.
+  FileHandler *CreateStatusFileHandler();
+
   // Set browser meta-refresh time. < 0 to disable.
   void set_meta_refresh(int seconds) { meta_refresh_time_ = seconds; }
 
 private:
+  class HtmlFileHandler;
+  friend class HtmlFileHandler;
+
   // micro-httpd callback
   static int HandleHttp(void* user_argument,
                         struct MHD_Connection *,
                         const char *, const char *, const char *,
                         const char *, size_t *, void **);
 
-  const std::string &CreatePage();
+  void CreatePage(bool for_http, std::string *content);
+
+  const std::string &CreateHttpPage();
 
   // Some helper functions to create the page:
-  void AppendSettingsForm();
+  void AppendSettingsForm(bool for_http, std::string *out);
   void AppendFileInfo(const char *progress_access_color,
                       const char *progress_buffer_color,
-                      const HandlerStats &stats);
+                      const HandlerStats &stats,
+                      std::string *out);
 
   // Set filter from http-request. Gracefully handles garbage.
   void SetFilter(const char *value);
@@ -77,7 +87,7 @@ private:
   int meta_refresh_time_;
   FolveFilesystem *filesystem_;
   struct MHD_Daemon *daemon_;
-  std::string content_;
+  std::string http_content_;
   bool filter_switched_;
 };
 

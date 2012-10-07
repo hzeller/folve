@@ -39,17 +39,20 @@
 #include "status-server.h"
 #include "util.h"
 
+static const char kStatusFileName[] = "/folve-status.html";
+
 // Compilation unit variables to communicate with the fuse callbacks.
 static struct FolveRuntime {
   FolveRuntime() : fs(NULL), mount_point(NULL),
                    status_port(-1), refresh_time(10), parameter_error(false),
-                   readdir_dump_file(NULL) {}
+                   readdir_dump_file(NULL), status_server(NULL) {}
   FolveFilesystem *fs;
   const char *mount_point;
   int status_port;
   int refresh_time;
   bool parameter_error;
   FILE *readdir_dump_file;
+  StatusServer *status_server;
 } folve_rt;
 
 // Logger that only prints to stderr; used for
@@ -104,6 +107,12 @@ static const char *assemble_orig_path(char *buf, const char *path) {
 // Essentially lstat(). Just forward to the original filesystem (this
 // will by lying: our convolved files are of different size...)
 static int folve_getattr(const char *path, struct stat *stbuf) {
+  if (folve_rt.status_server && strcmp(path, kStatusFileName) == 0) {
+    FileHandler *status = folve_rt.status_server->CreateStatusFileHandler();
+    status->Stat(stbuf);
+    delete status;
+    return 0;
+  }
   // If this is a currently open filename, we might be able to output a better
   // estimate.
   int result = folve_rt.fs->StatByFilename(path, stbuf);
@@ -127,6 +136,12 @@ static int folve_getattr(const char *path, struct stat *stbuf) {
 // readdir(). Just forward to original filesystem.
 static int folve_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
                          off_t offset, struct fuse_file_info *fi) {
+  if (folve_rt.status_server && strcmp(path, "/") == 0) {
+    struct stat st;
+    memset(&st, 0, sizeof(st));
+    filler(buf, kStatusFileName + 1, &st, 0);
+  }
+
   DIR *dp;
   struct dirent *de;
   char path_buf[PATH_MAX];
@@ -172,6 +187,11 @@ static int folve_readlink(const char *path, char *buf, size_t size) {
 }
 
 static int folve_open(const char *path, struct fuse_file_info *fi) {
+  if (folve_rt.status_server && strcmp(path, kStatusFileName) == 0) {
+    fi->fh = (uint64_t) folve_rt.status_server->CreateStatusFileHandler();
+    return 0;
+  }
+
   // We want to be allowed to only return part of the requested data in read().
   // That way, we can separate reading the ID3-tags from
   // decoding of the music stream - that way indexing should be fast.
@@ -194,7 +214,11 @@ static int folve_read(const char *path, char *buf, size_t size, off_t offset,
 }
 
 static int folve_release(const char *path, struct fuse_file_info *fi) {
-  folve_rt.fs->Close(path, reinterpret_cast<FileHandler *>(fi->fh));
+  if (folve_rt.status_server && strcmp(path, kStatusFileName) == 0) {
+    delete reinterpret_cast<FileHandler *>(fi->fh);
+  } else {
+    folve_rt.fs->Close(path, reinterpret_cast<FileHandler *>(fi->fh));
+  }
   return 0;
 }
 
@@ -219,11 +243,11 @@ static void *folve_init(struct fuse_conn_info *conn) {
 
   if (folve_rt.status_port > 0) {
     // Need to start status server after we're daemonized.
-    StatusServer *status_server = new StatusServer(folve_rt.fs);
-    if (status_server->Start(folve_rt.status_port)) {
+    folve_rt.status_server = new StatusServer(folve_rt.fs);
+    if (folve_rt.status_server->Start(folve_rt.status_port)) {
       syslog(LOG_INFO, "HTTP status server on port %d; refresh=%d",
              folve_rt.status_port, folve_rt.refresh_time);
-      status_server->set_meta_refresh(folve_rt.refresh_time);
+      folve_rt.status_server->set_meta_refresh(folve_rt.refresh_time);
     } else {
       syslog(LOG_ERR, "Couldn't start HTTP server on port %d\n",
              folve_rt.status_port);

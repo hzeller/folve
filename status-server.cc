@@ -59,7 +59,8 @@ static const char kStartHtmlHeader[] = "<html><head>"
   "href='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2"
   "AAAAAXNSR0IArs4c6QAAAAlwSFlzAAALEwAACxMBAJqcGAAAAAd0SU1FB9wJDwUlEA/UBrsA"
   "AABSSURBVCjPrZIxDgAgDAKh8f9froOTirU1ssKFYqS7Q4mktAxFRQDJcsPORMDYsDCXhn331"
-  "9GPwHJVuaFl3l4D1+h0UjIdbTh9SpP2KQ2AgSfVAdEQGx23tOopAAAAAElFTkSuQmCC'/>\n";
+  "9GPwHJVuaFl3l4D1+h0UjIdbTh9SpP2KQ2AgSfVAdEQGx23tOopAAAAAElFTkSuQmCC'/>\n"
+  "<meta http-equiv='Content-Type' content='text/html'; charset='utf-8'>\n";
 
 // TODO: someone with a bit more stylesheet-fu can attempt to make this
 // more pretty and the HTML more compact.
@@ -100,6 +101,38 @@ static const char kCSS[] =
   "        -moz-border-radius: 3px; }\n"                  // format box
   "</style>";
 
+class StatusServer::HtmlFileHandler : public FileHandler {
+public:
+  HtmlFileHandler(StatusServer *server) : FileHandler("") {
+    server->CreatePage(false, &content_);
+    memset(&stat_, 0, sizeof(stat_));
+    stat_.st_size = content_.length();
+    stat_.st_mtime = time(NULL);
+    stat_.st_nlink = 1;
+    stat_.st_mode = 0100444;  // regular file. readonly.
+  }
+
+  virtual int Read(char *buf, size_t size, off_t offset) {
+    int end = size + offset;
+    if (end > (int) content_.length()) end = content_.length();
+    if (offset >= end) return 0;
+    memcpy(buf, content_.data() + offset, end - offset);
+    return end - offset;
+  }
+
+  virtual int Stat(struct stat *st) {
+    *st = stat_;
+    return 0;
+  }
+
+  // Get handler status.
+  virtual void GetHandlerStatus(HandlerStats *s) {}
+
+private:
+  std::string content_;
+  struct stat stat_;
+};
+
 // Callback function called by micro http daemon. Gets the StatusServer pointer
 // in the user_argument.
 int StatusServer::HandleHttp(void* user_argument,
@@ -120,7 +153,7 @@ int StatusServer::HandleHttp(void* user_argument,
     MHD_add_response_header(response, "Location", "/");
     ret = MHD_queue_response(connection, 302, response);
   } else {
-    const std::string &page = server->CreatePage();
+    const std::string &page = server->CreateHttpPage();
     response = MHD_create_response_from_data(page.length(), (void*) page.data(),
                                              MHD_NO, MHD_NO);
     MHD_add_response_header(response, "Content-Type",
@@ -139,6 +172,10 @@ StatusServer::StatusServer(FolveFilesystem *fs)
     meta_refresh_time_(-1),
     filesystem_(fs), daemon_(NULL), filter_switched_(false) {
   fs->handler_cache()->SetObserver(this);
+}
+
+FileHandler *StatusServer::CreateStatusFileHandler() {
+  return new HtmlFileHandler(this);
 }
 
 void StatusServer::SetFilter(const char *filter) {
@@ -219,8 +256,9 @@ static void AppendSanitizedHTML(const std::string &in, std::string *out) {
 
 void StatusServer::AppendFileInfo(const char *progress_access_color,
                                   const char *progress_buffer_color,
-                                  const HandlerStats &stats) {
-  content_.append("<tr>");
+                                  const HandlerStats &stats,
+                                  std::string *out) {
+  out->append("<tr>");
   const char *status = "";
   switch (stats.status) {
   case HandlerStats::OPEN:    status = "open"; break;
@@ -230,16 +268,16 @@ void StatusServer::AppendFileInfo(const char *progress_access_color,
   }
 
   if (!stats.message.empty()) {
-    Appendf(&content_, sMessageRowHtml, status, stats.message.c_str());
+    Appendf(out, sMessageRowHtml, status, stats.message.c_str());
   } else if (stats.access_progress == 0 && stats.buffer_progress <= 0) {
     // TODO(hzeller): we really need a way to display message and progress
     // bar in parallel.
-    Appendf(&content_, sMessageRowHtml, status, "Only header accessed");
+    Appendf(out, sMessageRowHtml, status, "Only header accessed");
   } else {
     float accessed = stats.access_progress;
     float buffered
       = stats.buffer_progress > accessed ? stats.buffer_progress - accessed : 0;
-    Appendf(&content_, sProgressRowHtml, status,
+    Appendf(out, sProgressRowHtml, status,
             stats.in_gapless ? "&rarr;" : "",
             (int) (kProgressWidth * accessed), progress_access_color,
             (int) (kProgressWidth * buffered), progress_buffer_color,
@@ -248,31 +286,32 @@ void StatusServer::AppendFileInfo(const char *progress_access_color,
   const int secs = stats.duration_seconds;
   const int fract_sec = stats.access_progress * secs;
   if (secs >= 0 && fract_sec >= 0) {
-    Appendf(&content_, sTimeColumns,
+    Appendf(out, sTimeColumns,
             fract_sec / 60, fract_sec % 60,
             secs / 60, secs % 60);
   } else {
-    content_.append("<td colspan='3'>-</td>");
+    out->append("<td colspan='3'>-</td>");
   }
 
   if (stats.max_output_value > 1e-6) {
-    Appendf(&content_, sDecibelColumn,
+    Appendf(out, sDecibelColumn,
             stats.max_output_value > 1.0 ? " style='background:#FF8080;'" : "",
             20 * log10f(stats.max_output_value));
   } else {
-    content_.append("<td>-</td>");
+    out->append("<td>-</td>");
   }
 
   const char *filter_dir = stats.filter_dir.empty()
     ? "Pass Through" : stats.filter_dir.c_str();
-  Appendf(&content_, "<td class='fb'>&nbsp;%s (", stats.format.c_str());
-  AppendSanitizedHTML(filter_dir, &content_);
-  content_.append(")&nbsp;</td><td class='fn'>");
-  AppendSanitizedHTML(stats.filename, &content_);
-  content_.append("</td></tr>\n");
+  Appendf(out, "<td class='fb'>&nbsp;%s (", stats.format.c_str());
+  AppendSanitizedHTML(filter_dir, out);
+  out->append(")&nbsp;</td><td class='fn'>");
+  AppendSanitizedHTML(stats.filename, out);
+  out->append("</td></tr>\n");
 }
 
-static void CreateSelection(const std::set<std::string> &options,
+static void CreateSelection(bool for_http,
+                            const std::set<std::string> &options,
                             const std::string &selected,
                             std::string *result) {
   if (options.size() == 1) {
@@ -287,7 +326,7 @@ static void CreateSelection(const std::set<std::string> &options,
       result->append("<span class='filter_sel active'>");
       AppendSanitizedHTML(title, result);
       result->append("</span>");
-    } else {
+    } else if (for_http) { // only provide links if we have this in http.
       Appendf(result, "<a class='filter_sel inactive' href='%s?f=",
               kSettingsUrl);
       AppendSanitizedUrlParam(*it, result);
@@ -298,21 +337,20 @@ static void CreateSelection(const std::set<std::string> &options,
   }
 }
 
-void StatusServer::AppendSettingsForm() {
-  content_.append("<p><span class='filter_sel'>Active filter:</span>");
+void StatusServer::AppendSettingsForm(bool for_http, std::string *out) {
+  out->append("<p><span class='filter_sel'>Active filter:</span>");
   std::set<std::string> available_dirs = filesystem_->GetAvailableConfigDirs();
-  CreateSelection(available_dirs,
-                  filesystem_->current_config_subdir(),
-                  &content_);
+  CreateSelection(for_http,
+                  available_dirs, filesystem_->current_config_subdir(), out);
   if (available_dirs.empty() == 1) {
-    content_.append(" (This is a boring configuration, add filter directories)");
+    out->append(" (This is a boring configuration, add filter directories)");
   } else if (filter_switched_) {
-    content_.append("<span class='rounded_box' "
-                    "style='font-size:small;background:#FFFFa0;'>"
-                    "Affects re- or newly opened files.</span>");
+    out->append("<span class='rounded_box' "
+                "style='font-size:small;background:#FFFFa0;'>"
+                "Affects re- or newly opened files.</span>");
     filter_switched_ = false;  // only show once.
   }
-  content_.append("</p><hr style='clear:both;'/>");
+  out->append("</p><hr style='clear:both;'/>");
 }
 
 struct CompareStats {
@@ -323,57 +361,64 @@ struct CompareStats {
   }
 };
 
-const std::string &StatusServer::CreatePage() {
+
+const std::string &StatusServer::CreateHttpPage() {
+  CreatePage(true, &http_content_);
+  return http_content_;
+}
+
+void StatusServer::CreatePage(bool for_http, std::string *content) {
   const double start = folve::CurrentTime();
   // We re-use a string to avoid re-allocing memory every time we generate
   // a page. Since we run with MHD_USE_SELECT_INTERNALLY, this is only accessed
   // by one thread.
-  content_.clear();
-  content_.append(kStartHtmlHeader);
-  if (meta_refresh_time_ > 0) {
-    Appendf(&content_, "<meta http-equiv='refresh' content='%d'>\n",
+  content->clear();
+  content->append(kStartHtmlHeader);
+  if (for_http && meta_refresh_time_ > 0) {
+    Appendf(content, "<meta http-equiv='refresh' content='%d'>\n",
             meta_refresh_time_);
   }
-  content_.append(kCSS);
-  content_.append("</head>\n");
+  content->append(kCSS);
+  content->append("</head>\n");
 
-  content_.append("<body>\n");
-  Appendf(&content_, "<center style='background-color:#A0FFA0;'>"
+  content->append("<body>\n");
+  Appendf(content, "<center style='background-color:#A0FFA0;'>"
           "Welcome to "
           "<a href='https://github.com/hzeller/folve#readme'>Folve</a> "
           FOLVE_VERSION "</center>\n");
   if (show_details()) {
-    Appendf(&content_, "Convolving audio files from <code>%s</code>; "
+    Appendf(content, "Convolving audio files from <code>%s</code>; "
             "Filter base directory <code>%s</code>\n",
             filesystem_->underlying_dir().c_str(),
             filesystem_->base_config_dir().c_str());
   }
-  AppendSettingsForm();
+  
+  AppendSettingsForm(for_http, content);
 
   std::vector<HandlerStats> stat_list;
   filesystem_->handler_cache()->GetStats(&stat_list);
 
   if (show_details()) {
-    Appendf(&content_, "Total opening files <b>%d</b> "
+    Appendf(content, "Total opening files <b>%d</b> "
 	    ".. and re-opened from recency cache <b>%d</b><br/>",
 	    filesystem_->total_file_openings(),
 	    filesystem_->total_file_reopen());
   }
 
-  Appendf(&content_, "<h3>Accessed Recently</h3>\n%zd in recency cache.\n",
+  Appendf(content, "<h3>Accessed Recently</h3>\n%zd in recency cache.\n",
           stat_list.size());
 
   if (filesystem_->gapless_processing()) {
-    content_.append("Gapless transfers indicated with '&rarr;'.\n");
+    content->append("Gapless transfers indicated with '&rarr;'.\n");
   }
   if (filesystem_->pre_buffer_size() > 0) {
-    Appendf(&content_,
+    Appendf(content,
             "Accessed: <span class='lbox' style='background:%s;'>&nbsp;</span> "
             "Buffered: <span class='lbox' style='background:%s;'>&nbsp;</span>",
             kActiveAccessProgress, kActiveBufferProgress);
   }
-  content_.append("<table>\n");
-  Appendf(&content_, "<tr><th>Stat</th><td><!--gapless in--></td>"
+  content->append("<table>\n");
+  Appendf(content, "<tr><th>Stat</th><td><!--gapless in--></td>"
           "<th width='%dpx'>Progress</th>"  // progress bar.
           "<td><!-- gapless out --></td>"
           "<th>Pos</th><td></td><th>Len</th><th>Max&nbsp;out</th>"
@@ -388,27 +433,29 @@ const std::string &StatusServer::CreatePage() {
   CompareStats comparator;
   std::sort(stat_ptrs.begin(), stat_ptrs.end(), comparator);
   for (size_t i = 0; i < stat_ptrs.size(); ++i) {
-    AppendFileInfo(kActiveAccessProgress, kActiveBufferProgress, *stat_ptrs[i]);
+    AppendFileInfo(kActiveAccessProgress, kActiveBufferProgress, *stat_ptrs[i],
+                   content);
   }
-  content_.append("</table><hr/>\n");
+  content->append("</table><hr/>\n");
 
   if (retired_.size() > 0) {
-    content_.append("<h3>Retired</h3>\n");
-    content_.append("<table>\n");
+    content->append("<h3>Retired</h3>\n");
+    content->append("<table>\n");
     folve::MutexLock l(&retired_mutex_);
     for (RetiredList::const_iterator it = retired_.begin();
          it != retired_.end(); ++it) {
-      AppendFileInfo(kRetiredAccessProgress, kRetiredBufferProgress, *it);
+      AppendFileInfo(kRetiredAccessProgress, kRetiredBufferProgress, *it,
+                     content);
     }
-    content_.append("</table>\n");
+    content->append("</table>\n");
     if (expunged_retired_ > 0) {
-      Appendf(&content_, "... (%d more)<p></p>", expunged_retired_);
+      Appendf(content, "... (%d more)<p></p>", expunged_retired_);
     }
-    content_.append("<hr/>");
+    content->append("<hr/>");
   }
 
   const double duration = folve::CurrentTime() - start;
-  Appendf(&content_,
+  Appendf(content,
           "<span style='float:left;font-size:x-small;'>%.2fms</span>"
           "<span style='float:right;font-size:x-small;'>"
           "&copy; 2012 Henner Zeller"
@@ -416,5 +463,4 @@ const std::string &StatusServer::CreatePage() {
           " | Conveyed under the terms of the "
           "<a href='http://www.gnu.org/licenses/gpl.html'>GPLv3</a>.</span>"
           "</body></html>\n", duration * 1000.0);
-  return content_;
 }
