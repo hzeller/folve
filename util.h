@@ -58,6 +58,7 @@ namespace folve {
     ~Mutex() { pthread_mutex_destroy(&mutex_); }
     void Lock() { pthread_mutex_lock(&mutex_); }
     void Unlock() { pthread_mutex_unlock(&mutex_); }
+    void WaitOn(pthread_cond_t *cond) { pthread_cond_wait(cond, &mutex_); }
 
   private:
     pthread_mutex_t mutex_;
@@ -68,7 +69,6 @@ namespace folve {
   public:
     MutexLock(Mutex *m) : mutex_(m) { mutex_->Lock(); }
     ~MutexLock() { mutex_->Unlock(); }
-
   private:
     Mutex *const mutex_;
   };
@@ -80,15 +80,28 @@ namespace folve {
     virtual ~Thread();
 
     void Start();
-    bool started() const { return started_; }
-
+    bool StartCalled();
     void WaitFinished();
 
     // Override this.
     virtual void Run() = 0;
 
   private:
-    bool started_;
+    enum Lifecycle {
+      INIT,
+      START_CALLED,
+      STOPPED,
+      JOINED,
+    };
+
+    void DoRun();
+    static void *PthreadCallRun(void *object);
+    void SetLifecycle(Lifecycle l);
+
+    pthread_cond_t lifecycle_condition_;
+    Mutex lifecycle_mutex_;
+    Lifecycle lifecycle_;
+
     pthread_t thread_;
   };
 }  // namespece folve

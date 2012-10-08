@@ -388,9 +388,9 @@ private:
   }
 
   virtual void NotifyPassedProcessorUnreferenced() {
-    if (buffer_thread_ && !buffer_thread_->started()) {
-      buffer_thread_->Start();
-    }
+    if (!buffer_thread_) return;
+    assert(!buffer_thread_->StartCalled());
+    buffer_thread_->Start();
   }
 
   static bool ExtractDirAndSuffix(const std::string &filename,
@@ -448,6 +448,7 @@ private:
         base_stats_.out_gapless = true;
         SaveOutputValues();
         processor_ = NULL;   // we handed over ownership.
+        Close();  // make sure that our thread is done.
         next_file->NotifyPassedProcessorUnreferenced();
       }
       if (next_file) fs_->Close(found->c_str(), next_file);
@@ -457,7 +458,8 @@ private:
     if (input_frames_left_ == 0) {
       Close();
     }
-    if (buffer_thread_ && !buffer_thread_->started()) {
+    if (buffer_thread_ && !buffer_thread_->StartCalled()) {
+      // First time we're called; fire up our thread.
       buffer_thread_->Start();
     }
     return input_frames_left_;
@@ -542,6 +544,10 @@ private:
 
   void Close() {
     if (snd_out_ == NULL) return;  // done.
+    if (buffer_thread_) {
+      buffer_thread_->StopRunning();
+      buffer_thread_->WaitFinished();
+    }
     SaveOutputValues();
     if (base_stats_.max_output_value > 1.0) {
       syslog(LOG_ERR, "Observed output clipping in '%s': "
@@ -557,7 +563,6 @@ private:
     if (snd_in_) sf_close(snd_in_);
     if (snd_out_) sf_close(snd_out_);
     snd_out_ = NULL;
-    if (buffer_thread_) buffer_thread_->StopRunning();
     close(filedes_);
   }
 
