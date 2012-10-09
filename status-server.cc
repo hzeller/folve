@@ -405,17 +405,17 @@ void StatusServer::CreatePage(bool for_http, std::string *content) {
 	    filesystem_->total_file_reopen());
   }
 
-  Appendf(content, "<h3>Accessed Recently</h3>\n%zd in recency cache.\n",
-          stat_list.size());
+  content->append("<h3>Accessed Recently</h3>\n");
 
-  if (filesystem_->gapless_processing()) {
-    content->append("Gapless transfers indicated with '&rarr;'.\n");
-  }
   if (filesystem_->pre_buffer_size() > 0) {
     Appendf(content,
             "Accessed: <span class='lbox' style='background:%s;'>&nbsp;</span> "
-            "Buffered: <span class='lbox' style='background:%s;'>&nbsp;</span>",
+            "&nbsp; Predictive Buffer: "
+            "<span class='lbox' style='background:%s;'>&nbsp;</span> &nbsp; ",
             kActiveAccessProgress, kActiveBufferProgress);
+  }
+  if (filesystem_->gapless_processing()) {
+    content->append("Gapless transfers indicated with '&rarr;'\n");
   }
   content->append("<table>\n");
   Appendf(content, "<tr><th>Stat</th><td><!--gapless in--></td>"
