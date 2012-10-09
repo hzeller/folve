@@ -263,8 +263,8 @@ private:
     // the filesize as we see it grow. Some clients continuously monitor
     // the size of the file to check when to stop.
     fstat(filedes_, &file_stat_);
-    file_stat_.st_size *= fs->file_oversize_factor();
     start_estimating_size_ = 0.4 * file_stat_.st_size;
+    file_stat_.st_size *= fs->file_oversize_factor();
 
     // The flac header we get is more rich than what we can create via
     // sndfile. So if we have one, just copy it.
