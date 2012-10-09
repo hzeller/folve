@@ -234,7 +234,7 @@ public:
         off_t new_size = estimated_end * current_file_size;
         // Report a bit bigger size which is less harmful than programs
         // reading short.
-        new_size += 16384;
+        new_size += 65535;
         if (new_size > file_stat_.st_size) {  // Only go forward in size.
           file_stat_.st_size = new_size;
         }
@@ -263,6 +263,7 @@ private:
     // the filesize as we see it grow. Some clients continuously monitor
     // the size of the file to check when to stop.
     fstat(filedes_, &file_stat_);
+    file_stat_.st_size *= fs->file_oversize_factor();
     start_estimating_size_ = 0.4 * file_stat_.st_size;
 
     // The flac header we get is more rich than what we can create via

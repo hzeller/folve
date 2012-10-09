@@ -123,6 +123,7 @@ static int folve_getattr(const char *path, struct stat *stbuf) {
              stbuf->st_mode & 0777, S_ISDIR(stbuf->st_mode) ? "DIR" : "",
              (result == -1) ? strerror(errno) : "",
              ctime(&stbuf->st_mtime));  // ctime ends with \n, so put that last
+    stbuf->st_size *= folve_rt.fs->file_oversize_factor();
     if (result == -1)
       return -errno;
   } else {

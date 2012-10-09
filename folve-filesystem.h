@@ -97,6 +97,17 @@ public:
   void set_pre_buffer_size(int b) { pre_buffer_size_ = b; }
   int pre_buffer_size() const { return pre_buffer_size_; }
 
+  // Some media servers look at the file size initially to decide which is
+  // the file-size they need to serve. However, the final file-size after
+  // convolving might be different (compression not really predictable) and
+  // we don't know that beforehand.
+  // So, we can't really hand out the original file size. But we don't really
+  // know the final file-size as well. So we multiply the original file size
+  // with a factor - overestimating seems to be less of a problem than
+  // understimating.
+  // This is the factor (maybe configurable later).
+  float file_oversize_factor() { return 1.5; }
+
   // Some stats.
   int total_file_openings() { return total_file_openings_; }
   int total_file_reopen() { return total_file_reopen_; }
