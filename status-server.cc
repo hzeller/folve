@@ -409,9 +409,10 @@ void StatusServer::CreatePage(bool for_http, std::string *content) {
 
   if (filesystem_->pre_buffer_size() > 0) {
     Appendf(content,
-            "Accessed: <span class='lbox' style='background:%s;'>&nbsp;</span> "
-            "&nbsp; Predictive Buffer: "
-            "<span class='lbox' style='background:%s;'>&nbsp;</span> &nbsp; ",
+            "Accessed <span class='lbox' style='background:%s;'>&nbsp;</span> "
+            "&nbsp; &nbsp; Predictive Buffer "
+            "<span class='lbox' style='background:%s;'>&nbsp;</span>"
+            " &nbsp; &nbsp; ",
             kActiveAccessProgress, kActiveBufferProgress);
   }
   if (filesystem_->gapless_processing()) {
