@@ -80,28 +80,13 @@ namespace folve {
     virtual ~Thread();
 
     void Start();
-    bool StartCalled();
-    void WaitFinished();
 
     // Override this.
     virtual void Run() = 0;
-
+    
   private:
-    enum Lifecycle {
-      INIT,
-      START_CALLED,
-      STOPPED,
-      JOINED,
-    };
-
-    void DoRun();
-    static void *PthreadCallRun(void *object);
-    void SetLifecycle(Lifecycle l);
-
-    pthread_cond_t lifecycle_condition_;
-    Mutex lifecycle_mutex_;
-    Lifecycle lifecycle_;
-
+    static void *PthreadCallRun(void *tobject);
+    bool started_;
     pthread_t thread_;
   };
 }  // namespece folve

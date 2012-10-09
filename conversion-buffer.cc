@@ -138,6 +138,11 @@ off_t ConversionBuffer::MaxAccessed() const {
   return max_accessed_;
 }
 
+void ConversionBuffer::NotifyFileComplete() {
+  folve::MutexLock l(&mutex_);
+  file_complete_ = true;
+}
+
 bool ConversionBuffer::IsFileComplete() const {
   folve::MutexLock l(&mutex_);
   return file_complete_;

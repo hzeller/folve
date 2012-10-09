@@ -35,21 +35,39 @@ struct FileHandlerCache::Entry {
 
 FileHandler *FileHandlerCache::InsertPinned(const std::string &key,
                                             FileHandler *handler) {
-  folve::MutexLock l(&mutex_);
-  CacheMap::iterator ins
-    = cache_.insert(std::make_pair(key, (Entry*)NULL)).first;
-  if (ins->second == NULL) {
-    ins->second = new Entry(handler);
-  } else {
-    delete handler;
+  std::vector<FileHandler *> to_delete;
+  FileHandler *result = NULL;
+  {
+    folve::MutexLock l(&mutex_);
+    CacheMap::iterator ins
+      = cache_.insert(std::make_pair(key, (Entry*)NULL)).first;
+    if (ins->second == NULL) {
+      ins->second = new Entry(handler);
+    } else {
+      delete handler;
+    }
+    ++ins->second->references;
+    if (cache_.size() > max_size_) {
+      CleanupOldestUnreferenced_Locked(&to_delete);
+    }
+    ins->second->last_access = folve::CurrentTime();
+    if (observer_) observer_->InsertHandlerEvent(ins->second->handler);
+    result = ins->second->handler;
   }
-  ++ins->second->references;
-  if (cache_.size() > max_size_) {
-    CleanupOldestUnreferenced_Locked();
+  // Items that are to be deleted need to be deleted ouside of the lock,
+  // otherwise there is a chance of a deadlock in the gapless case.
+  // t1: open new file -> need to retire old file
+  //                   -> delete while mutex held(*1)
+  //                   -> buffer being workd on in buffer thred
+  //                   -> wait-for-buffer-cache (*2) (current_item != buffer)
+  // buffer thread: (current_item, condition current_item == buffer) (*2)
+  //                -> call AddMoreSndData()
+  //                -> open new file for gapless -> call FileHandlerCache
+  //                -> wait-for-mutex (*1)
+  for (size_t i = 0; i < to_delete.size(); ++i) {
+    delete to_delete[i];
   }
-  ins->second->last_access = folve::CurrentTime();
-  if (observer_) observer_->InsertHandlerEvent(ins->second->handler);
-  return ins->second->handler;
+  return result;
 }
 
 FileHandler *FileHandlerCache::FindAndPin(const std::string &key) {
@@ -63,14 +81,18 @@ FileHandler *FileHandlerCache::FindAndPin(const std::string &key) {
 }
 
 void FileHandlerCache::Unpin(const std::string &key) {
-  folve::MutexLock l(&mutex_);
-  CacheMap::iterator found = cache_.find(key);
-  assert(found != cache_.end());
-  --found->second->references;
-  // If we are already beyond cache size, clean up as soon as we get idle.
-  if (found->second->references == 0 && cache_.size() > max_size_) {
-    Erase_Locked(found);
+  FileHandler *to_delete = NULL;
+  {
+    folve::MutexLock l(&mutex_);
+    CacheMap::iterator found = cache_.find(key);
+    assert(found != cache_.end());
+    --found->second->references;
+    // If we are already beyond cache size, clean up as soon as we get idle.
+    if (found->second->references == 0 && cache_.size() > max_size_) {
+      to_delete = Erase_Locked(found);
+    }
   }
+  delete to_delete;
 }
 
 void FileHandlerCache::SetObserver(Observer *observer) {
@@ -91,11 +113,12 @@ void FileHandlerCache::GetStats(std::vector<HandlerStats> *stats) {
   }
 }
 
-void FileHandlerCache::Erase_Locked(CacheMap::iterator &cache_it) {
+FileHandler *FileHandlerCache::Erase_Locked(CacheMap::iterator &cache_it) {
   if (observer_) observer_->RetireHandlerEvent(cache_it->second->handler);
-  delete cache_it->second->handler;  // FileHandler
+  FileHandler *result = cache_it->second->handler;  // don't delete in mutex.
   delete cache_it->second;           // Entry
   cache_.erase(cache_it);
+  return result;
 }
 
 struct FileHandlerCache::CompareAge {
@@ -103,7 +126,8 @@ struct FileHandlerCache::CompareAge {
     return a->second->last_access < b->second->last_access;
   }
 };
-void FileHandlerCache::CleanupOldestUnreferenced_Locked() {
+void FileHandlerCache::CleanupOldestUnreferenced_Locked(
+         std::vector<FileHandler*> *to_delete) {
   assert(cache_.size() > max_size_);  // otherwise we shouldn't have been called
   // While this iterating through the whole cache might look expensive,
   // in practice we're talking about 3 elements here.
@@ -119,7 +143,7 @@ void FileHandlerCache::CleanupOldestUnreferenced_Locked() {
   CompareAge comparator;
   std::sort(for_removal.begin(), for_removal.end(), comparator);
   for (size_t i = 0; i < to_erase_count; ++i) {
-    Erase_Locked(for_removal[i]);
+    to_delete->push_back(Erase_Locked(for_removal[i]));
   }
 }
 

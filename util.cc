@@ -82,60 +82,20 @@ bool folve::HasSuffix(const std::string &str, const std::string &suffix) {
 }
 
 void *folve::Thread::PthreadCallRun(void *tobject) {
-  reinterpret_cast<folve::Thread*>(tobject)->DoRun();
+  reinterpret_cast<folve::Thread*>(tobject)->Run();
   return NULL;
 }
 
-folve::Thread::Thread() : lifecycle_(INIT) {
-  pthread_cond_init(&lifecycle_condition_, NULL);
-}
+folve::Thread::Thread() : started_(false) {}
 folve::Thread::~Thread() {
-  WaitFinished();
-  MutexLock l(&lifecycle_mutex_);
-  if (lifecycle_ == STOPPED) {
-    int result = pthread_join(thread_, NULL);
-    if (result != 0) {
-      fprintf(stderr, "err code: %d %s\n", result, strerror(result));
-      assert(result == 0);
-    }
-    lifecycle_ = JOINED;  // just for good measure.
+  int result = pthread_join(thread_, NULL);
+  if (result != 0) {
+    fprintf(stderr, "err code: %d %s\n", result, strerror(result));
   }
-}
-
-void folve::Thread::DoRun() {
-  Run();
-  SetLifecycle(STOPPED);
-}
-
-bool folve::Thread::StartCalled() {   // more like: beyond init.
-  MutexLock l(&lifecycle_mutex_);
-  return lifecycle_ >= START_CALLED;
-}
-
-void folve::Thread::SetLifecycle(Lifecycle lifecycle) {
-  MutexLock l(&lifecycle_mutex_);
-  lifecycle_ = lifecycle;
-  pthread_cond_signal(&lifecycle_condition_);
 }
 
 void folve::Thread::Start() {
-  MutexLock l(&lifecycle_mutex_);
-  assert(lifecycle_ == INIT);
+  assert(!started_);
   pthread_create(&thread_, NULL, &PthreadCallRun, this);
-  lifecycle_ = START_CALLED;
-}
-
-void folve::Thread::WaitFinished() {
-  MutexLock l(&lifecycle_mutex_);
-  if (lifecycle_ == INIT) {
-    lifecycle_ = JOINED;  // Never started ? Consider ourself joined.
-    return;
-  }
-  if (lifecycle_ == STOPPED || lifecycle_ == JOINED) {
-    return;
-  }
-  assert(lifecycle_ == START_CALLED);  // that is what we're in now.
-  while (lifecycle_ != STOPPED) {
-    lifecycle_mutex_.WaitOn(&lifecycle_condition_);
-  }
+  started_ = true;
 }

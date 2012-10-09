@@ -35,6 +35,7 @@
 #include <string>
 #include <zita-convolver.h>
 
+#include "buffer-thread.h"
 #include "conversion-buffer.h"
 #include "file-handler-cache.h"
 #include "file-handler.h"
@@ -85,45 +86,6 @@ private:
   size_t file_size_;
   long unsigned int max_accessed_;
   HandlerStats info_stats_;
-};
-
-// A thread, that attempts to pre-buffer data. There are some misbehaving
-// media clients out there, that buffer a whole chunk but don't start reading
-// again when they're low on buffer - in particular on small machines that
-// use considerable CPU for folve, this is not desirable.
-class PreBufferThread : public folve::Thread {
-public:
-  // Buffer thread around conversion buffer. Does not take over ownership
-  // of buffer.
-  PreBufferThread(ConversionBuffer *buffer, int buffer_ahead)
-    : buffer_(buffer), buffer_ahead_(buffer_ahead), do_run_(true) {}
-
-  void StopRunning() {
-    folve::MutexLock l(&run_mutex_);
-    do_run_ = false;
-  }
-
-  virtual void Run() {
-    const int kBufferChunk = (16 << 10);  // 16k
-    while (ShouldRun() && !buffer_->IsFileComplete()) {
-      const off_t goal = buffer_->MaxAccessed() + buffer_ahead_;
-      while (!buffer_->IsFileComplete() && buffer_->FileSize() < goal) {
-        buffer_->FillUntil(buffer_->FileSize() + kBufferChunk);
-      }
-      // TODO: make condition variables not crude sleep.
-      usleep(500000);
-    }
-  }
-
-private:
-  bool ShouldRun() {
-    folve::MutexLock l(&run_mutex_);
-    return do_run_;
-  }
-  ConversionBuffer *const buffer_;
-  const int buffer_ahead_;
-  folve::Mutex run_mutex_;
-  bool do_run_;
 };
 
 class SndFileHandler :
@@ -177,13 +139,16 @@ public:
   }
   
   virtual ~SndFileHandler() {
-    Close();
-    delete buffer_thread_;
+    output_buffer_->NotifyFileComplete();
+    fs_->QuitBuffering(output_buffer_);  // stop working on our files.
+    Close();                             // ... so that we can close them :)
     delete output_buffer_;
   }
 
   virtual int Read(char *buf, size_t size, off_t offset) {
     if (error_) return -1;
+    const off_t current_filesize = output_buffer_->FileSize();
+    const off_t read_horizon = offset + size;
     // If this is a skip suspiciously at the very end of the file as
     // reported by stat, we don't do any encoding, just return garbage.
     // (otherwise we'd to convolve up to that point).
@@ -194,8 +159,8 @@ public:
     static const int kFudgeOverhang = 512;
     // But of course only if this is really a skip, not a regular approaching
     // end-of-file.
-    if (output_buffer_->FileSize() < offset
-        && (int) (offset + size + kFudgeOverhang) >= file_stat_.st_size) {
+    if (current_filesize < offset
+        && (int) (read_horizon + kFudgeOverhang) >= file_stat_.st_size) {
       const int pretended_bytes = std::min((off_t)size,
                                            file_stat_.st_size - offset);
       if (pretended_bytes > 0) {
@@ -207,7 +172,27 @@ public:
     }
     // The following read might block and call WriteToSoundfile() until the
     // buffer is filled.
-    return output_buffer_->Read(buf, size, offset);
+    int result = output_buffer_->Read(buf, size, offset);
+
+    // Only if the user obviously read beyond our header, we start the
+    // pre-buffering; otherwise things will get sluggish because any header
+    // access that goes a bit overboard triggers pre-buffer (i.e. while indexing)
+    // Amarok for instance seems to read up to 16k beyond the header.
+    //
+    // In general, this is a fine heuristic: this happens the first time we
+    // access the file, the first or second stream-read should trigger the
+    // pre-buffering (64k is less than a second music). If we're in gapless
+    // mode, we already start pre-buffering anyway early (see
+    // NotifyPassedProcessorUnreferenced()) - so that important use-case is
+    // covered.
+    const off_t well_beyond_header = output_buffer_->HeaderSize() + (64 << 10);
+    const bool should_request_prebuffer = !output_buffer_->IsFileComplete()
+      && read_horizon > well_beyond_header
+      && read_horizon + fs_->pre_buffer_size() > current_filesize;
+    if (should_request_prebuffer) {
+      fs_->RequestPrebuffer(output_buffer_);
+    }
+    return result;
   }
 
   virtual void GetHandlerStatus(HandlerStats *stats) {
@@ -270,7 +255,7 @@ private:
     : FileHandler(filter_dir), fs_(fs),
       filedes_(filedes), snd_in_(snd_in), in_info_(in_info),
       base_stats_(file_info),
-      error_(false), output_buffer_(NULL), buffer_thread_(NULL),
+      error_(false), output_buffer_(NULL),
       snd_out_(NULL), processor_(processor),
       input_frames_left_(in_info.frames) {
 
@@ -304,10 +289,6 @@ private:
     }
 
     output_buffer_ = new ConversionBuffer(this, out_info);
-    if (fs_->pre_buffer_size() > 0) {
-      buffer_thread_ = new PreBufferThread(output_buffer_,
-                                           fs->pre_buffer_size());
-    }
   }
 
   virtual void SetOutputSoundfile(ConversionBuffer *out_buffer,
@@ -388,9 +369,8 @@ private:
   }
 
   virtual void NotifyPassedProcessorUnreferenced() {
-    if (!buffer_thread_) return;
-    assert(!buffer_thread_->StartCalled());
-    buffer_thread_->Start();
+    // This is gapless. Good idea to pre-buffer the beginning.
+    fs_->RequestPrebuffer(output_buffer_);
   }
 
   static bool ExtractDirAndSuffix(const std::string &filename,
@@ -457,10 +437,6 @@ private:
     }
     if (input_frames_left_ == 0) {
       Close();
-    }
-    if (buffer_thread_ && !buffer_thread_->StartCalled()) {
-      // First time we're called; fire up our thread.
-      buffer_thread_->Start();
     }
     return input_frames_left_;
   }
@@ -544,10 +520,7 @@ private:
 
   void Close() {
     if (snd_out_ == NULL) return;  // done.
-    if (buffer_thread_) {
-      buffer_thread_->StopRunning();
-      buffer_thread_->WaitFinished();
-    }
+    input_frames_left_ = 0;
     SaveOutputValues();
     if (base_stats_.max_output_value > 1.0) {
       syslog(LOG_ERR, "Observed output clipping in '%s': "
@@ -596,7 +569,6 @@ private:
   bool error_;
   bool copy_flac_header_verbatim_;
   ConversionBuffer *output_buffer_;
-  PreBufferThread *buffer_thread_;
   SNDFILE *snd_out_;
 
   // Used in conversion.
@@ -607,8 +579,21 @@ private:
 
 FolveFilesystem::FolveFilesystem()
   : gapless_processing_(false), pre_buffer_size_(-1),
-    open_file_cache_(4), processor_pool_(3),
+    open_file_cache_(4), processor_pool_(3), buffer_thread_(NULL),
     total_file_openings_(0), total_file_reopen_(0) {
+}
+
+void FolveFilesystem::RequestPrebuffer(ConversionBuffer *buffer) {
+  if (pre_buffer_size_ <= 0) return;
+  if (buffer_thread_ == NULL) {
+    buffer_thread_ = new BufferThread(pre_buffer_size_);
+    buffer_thread_->Start();
+  }
+  buffer_thread_->EnqueueWork(buffer);
+}
+
+void FolveFilesystem::QuitBuffering(ConversionBuffer *buffer) {
+  if (buffer_thread_ != NULL) buffer_thread_->Forget(buffer);
 }
 
 FileHandler *FolveFilesystem::CreateFromDescriptor(

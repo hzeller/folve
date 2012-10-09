@@ -76,10 +76,10 @@ public:
   // -- methods called while holding the mutex.
 
   // Inform observer, delete FileFilter and erase element from cache.
-  void Erase_Locked(CacheMap::iterator &cache_it);
+  FileHandler *Erase_Locked(CacheMap::iterator &cache_it);
 
   // Find oldes element and get rid of it.
-  void CleanupOldestUnreferenced_Locked();
+  void CleanupOldestUnreferenced_Locked(std::vector<FileHandler *> *to_delete);
 
   const size_t max_size_;
   Observer *observer_;

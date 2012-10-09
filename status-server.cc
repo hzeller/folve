@@ -45,8 +45,8 @@ static const int kProgressWidth = 300;
 static const size_t kMaxRetired = 20;
 static const char kActiveAccessProgress[]  = "#7070ff";
 static const char kActiveBufferProgress[]  = "#bbffbb";
-static const char kRetiredAccessProgress[] = "#d0d0d0";
-static const char kRetiredBufferProgress[] = "#e0e0e0";
+static const char kRetiredAccessProgress[] = "#d0d0e8";
+static const char kRetiredBufferProgress[] = "#e0f0e0";
 static const char kSettingsUrl[] = "/settings";
 
 // Aaah, I need to find the right Browser-Tab :)

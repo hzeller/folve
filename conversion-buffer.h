@@ -85,9 +85,14 @@ public:
   // know so that it can serve reads in these different regions differently.
   // (Long story, see Read() for details).
   void HeaderFinished();
+  int HeaderSize() const { return header_end_; }
 
   // Returns if we've completed this file.
   bool IsFileComplete() const;
+
+  // Tell conversion buffer, that we're finished with this file. Any further
+  // FillUntil() calls will return immediately.
+  void NotifyFileComplete();
 
   // Current max file position.
   off_t FileSize() const;

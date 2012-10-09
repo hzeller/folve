@@ -341,8 +341,7 @@ int FolveOptionHandling(void *data, const char *arg, int key,
               value);
       rt->parameter_error= true;
     } else {
-      fprintf(stderr, "-b option disabled temporarily.\n");
-      //rt->fs->set_pre_buffer_size(value * (1 << 20));
+      rt->fs->set_pre_buffer_size(value * (1 << 20));
     }
     return 0;
   }

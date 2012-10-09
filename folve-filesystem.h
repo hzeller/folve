@@ -33,6 +33,8 @@
 #define FOLVE_VERSION "[unknown version - compile from git]"
 #endif
 
+class ConversionBuffer;
+class BufferThread;
 class FolveFilesystem {
 public:
   // Create a new filesystem. At least SetBasedir() needs to be called
@@ -99,6 +101,10 @@ public:
   int total_file_openings() { return total_file_openings_; }
   int total_file_reopen() { return total_file_reopen_; }
 
+  // Allows sound conversions to use the pre-buffer thread.
+  void RequestPrebuffer(ConversionBuffer *buffer);
+  void QuitBuffering(ConversionBuffer *buffer);
+
 private:
   // Get cache key, depending on the given configuration.
   std::string CacheKey(const std::string &config_path, const char *fs_path);
@@ -126,6 +132,7 @@ private:
   int pre_buffer_size_;
   FileHandlerCache open_file_cache_;
   ProcessorPool processor_pool_;
+  BufferThread *buffer_thread_;
   int total_file_openings_;
   int total_file_reopen_;
 };
