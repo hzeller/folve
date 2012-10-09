@@ -277,7 +277,7 @@ static int usage(const char *prg) {
          "\t-r <refresh> : Seconds between refresh of status page;\n"
          "\t               Default is %d seconds; switch off with -1.\n"
          "\t-g           : Gapless convolving alphabetically adjacent files.\n"
-         "\t-b <MebiByte>: Pre-buffer files by given MB. Experimental.\n"
+         "\t-b <KibiByte>: Pre-buffer files by given KiB.\n"
          "\t-D           : Moderate volume Folve debug messages to syslog,\n"
          "\t               and some more detailed configuration info in UI\n"
          "\t-f           : Operate in foreground; useful for debugging.\n"
@@ -336,13 +336,13 @@ int FolveOptionHandling(void *data, const char *arg, int key,
     if (*end != '\0') {
       fprintf(stderr, "Invalid number %s\n", arg + 2);
       rt->parameter_error= true;
-    } else if (value > 16) {
-      fprintf(stderr, "-b %.1f out of range. More than 16MB prebuffer. "
+    } else if (value > 16384) {
+      fprintf(stderr, "-b %.1f out of range. More than 16MiB prebuffer. "
               "That is a lot!\n",
               value);
       rt->parameter_error= true;
     } else {
-      rt->fs->set_pre_buffer_size(value * (1 << 20));
+      rt->fs->set_pre_buffer_size(value * (1 << 10));
     }
     return 0;
   }
