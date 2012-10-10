@@ -167,6 +167,7 @@ please let me know.)
       -r <refresh> : Seconds between refresh of status page;
                      Default is 10 seconds; switch off with -1.
       -g           : Gapless convolving alphabetically adjacent files.
+      -b <KibiByte>: Pre-buffer files by given KiB.
       -D           : Moderate volume Folve debug messages to syslog.
       -f           : Operate in foreground; useful for debugging.
       -o <mnt-opt> : other generic mount parameters passed to FUSE.
