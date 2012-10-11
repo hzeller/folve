@@ -17,6 +17,8 @@
 
 #include "util.h"
 
+#include <linux/sched.h>  // for SCHED_IDLE, <sched.h> doesn't do it everywhere
+
 #include <assert.h>
 #include <stdio.h>
 #include <sys/time.h>
@@ -97,9 +99,13 @@ folve::Thread::~Thread() {
 void folve::Thread::Start() {
   assert(!started_);
   pthread_create(&thread_, NULL, &PthreadCallRun, this);
+
+#ifdef SCHED_IDLE
   // Background thread:
   struct sched_param p;
   p.sched_priority = 0;
   pthread_setschedparam(thread_, SCHED_IDLE, &p);
+#endif
+
   started_ = true;
 }
