@@ -97,5 +97,9 @@ folve::Thread::~Thread() {
 void folve::Thread::Start() {
   assert(!started_);
   pthread_create(&thread_, NULL, &PthreadCallRun, this);
+  // Background thread:
+  struct sched_param p;
+  p.sched_priority = 0;
+  pthread_setschedparam(thread_, SCHED_IDLE, &p);
   started_ = true;
 }
