@@ -40,6 +40,8 @@
 #include "util.h"
 
 static const char kStatusFileName[] = "/folve-status.html";
+static const int kUsefulMinBuf = 64;
+static const int kUsefulMaxBuf = 16384;
 
 // Compilation unit variables to communicate with the fuse callbacks.
 static struct FolveRuntime {
@@ -277,14 +279,14 @@ static int usage(const char *prg) {
          "\t-r <refresh> : Seconds between refresh of status page;\n"
          "\t               Default is %d seconds; switch off with -1.\n"
          "\t-g           : Gapless convolving alphabetically adjacent files.\n"
-         "\t-b <KibiByte>: Pre-buffer files by given KiB.\n"
+         "\t-b <KibiByte>: Predictive pre-buffer by given KiB (%d...%d).\n"
+         "\t-o <mnt-opt> : other generic mount parameters passed to FUSE.\n"
          "\t-D           : Moderate volume Folve debug messages to syslog,\n"
          "\t               and some more detailed configuration info in UI\n"
          "\t-f           : Operate in foreground; useful for debugging.\n"
-         "\t-o <mnt-opt> : other generic mount parameters passed to FUSE.\n"
          "\t-d           : High volume FUSE debug log. Implies -f.\n"
          "\t-R <file>    : Debug readdir() & stat() calls. Output to file.\n",
-         folve_rt.refresh_time);
+         folve_rt.refresh_time, kUsefulMinBuf, kUsefulMaxBuf);
   return 1;
 }
 
@@ -308,7 +310,7 @@ enum {
 
 int FolveOptionHandling(void *data, const char *arg, int key,
                         struct fuse_args *outargs) {
-  char realpath_buf[PATH_MAX];  // running as daemon, need absolute names.
+  char realpath_buf[PATH_MAX];  // Running as daemon, need absolute names.
   FolveRuntime *rt = (FolveRuntime*) data;
   switch (key) {
   case FUSE_OPT_KEY_NONOPT:
@@ -327,32 +329,36 @@ int FolveOptionHandling(void *data, const char *arg, int key,
       rt->mount_point = strdup(arg);  // remmber as FYI
       return 1;   // .. but leave it to fuse
     }
+
   case FOLVE_OPT_PORT:
     rt->status_port = atoi(arg + 2);  // strip "-p"
     return 0;
+
   case FOLVE_OPT_PREBUFFER: {
     char *end;
     const double value = strtod(arg + 2, &end);
     if (*end != '\0') {
       fprintf(stderr, "Invalid number %s\n", arg + 2);
       rt->parameter_error= true;
-    } else if (value > 16384) {
-      fprintf(stderr, "-b %.1f out of range. More than 16MiB prebuffer. "
-              "That is a lot!\n",
-              value);
+    } else if (value > kUsefulMaxBuf) {
+      fprintf(stderr, "-b %.1f out of range. More than %d KiB prebuffer ("
+              "that is a lot!).\n", value, kUsefulMaxBuf);
       rt->parameter_error= true;
-    } else if (value < 8) {
-      fprintf(stderr, "-b %.1f is really small. You want more than 64KiB to "
-              "be useful, typically between 1024 and 8192.\n", value);
+    } else if (value < kUsefulMinBuf) {
+      fprintf(stderr, "-b %.1f is really small. You want more than %d KiB to "
+              "be useful, typically between 1024 and 8192.\n",
+              value, kUsefulMinBuf);
       rt->parameter_error= true;
     } else {
       rt->fs->set_pre_buffer_size(value * (1 << 10));
     }
     return 0;
   }
+
   case FOLVE_OPT_REFRESH_TIME:
     rt->refresh_time = atoi(arg + 2);  // strip "-r"
     return 0;
+
   case FOLVE_OPT_CONFIG: {
     const char *config_dir = realpath(arg + 2, realpath_buf);  // strip "-C"
     if (config_dir != NULL) {
@@ -363,13 +369,16 @@ int FolveOptionHandling(void *data, const char *arg, int key,
     }
     return 0;
   }
+
   case FOLVE_OPT_DEBUG:
     folve::EnableDebugLog(true);
     return 0;
+
   case FOLVE_OPT_DEBUG_READDIR:
     rt->readdir_dump_file = fopen(arg + 2, "w"); 
     rlog.WriteInit();
     return 0;
+
   case FOLVE_OPT_GAPLESS:
     rt->fs->set_gapless_processing(true);
     return 0;
