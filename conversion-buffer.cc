@@ -180,7 +180,7 @@ ssize_t ConversionBuffer::Read(char *buf, size_t size, off_t offset) {
   FillUntil(required_min_written);
 
   const ssize_t read_result = pread(out_filedes_, buf, size, offset);
-  if (read_result >= 0) {
+  if (read_result > 0) {
     const off_t new_max_accessed = offset + read_result;
     if (new_max_accessed > max_accessed_) {
       folve::MutexLock l(&mutex_);

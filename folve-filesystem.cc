@@ -55,7 +55,7 @@ namespace {
 class PassThroughHandler : public FileHandler {
 public:
   PassThroughHandler(int filedes, const std::string &filter_id,
-                    const HandlerStats &known_stats)
+                     const HandlerStats &known_stats)
     : FileHandler(filter_id), filedes_(filedes),
       file_size_(-1), max_accessed_(0), info_stats_(known_stats) {
     DLogf("Creating PassThrough filter for '%s'", known_stats.filename.c_str());
