@@ -343,7 +343,7 @@ int FolveOptionHandling(void *data, const char *arg, int key,
       rt->parameter_error= true;
     } else if (value < 8) {
       fprintf(stderr, "-b %.1f is really small. You want more than 64KiB to "
-              "be useful, typically 1024.\n", value);
+              "be useful, typically between 1024 and 8192.\n", value);
       rt->parameter_error= true;
     } else {
       rt->fs->set_pre_buffer_size(value * (1 << 10));
