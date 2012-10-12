@@ -346,7 +346,8 @@ int FolveOptionHandling(void *data, const char *arg, int key,
       rt->parameter_error= true;
     } else if (value < kUsefulMinBuf) {
       fprintf(stderr, "-b %.1f is really small. You want more than %d KiB to "
-              "be useful, typically between 1024 and 8192.\n",
+              "be useful, typically between 1024 and 8192 "
+              "(roughly 100 KiB is ~1 second buffer).\n",
               value, kUsefulMinBuf);
       rt->parameter_error= true;
     } else {
