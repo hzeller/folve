@@ -15,7 +15,7 @@ LD_STATIC=-static
 endif
 
 OBJECTS = folve-main.o folve-filesystem.o conversion-buffer.o \
-          processor-pool.o buffer-thread.o \
+          processor-pool.o buffer-thread.o pass-through-handler.o \
           sound-processor.o file-handler-cache.o status-server.o util.o \
           zita-audiofile.o zita-config.o zita-fconfig.o zita-sstring.o
 

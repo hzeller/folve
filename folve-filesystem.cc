@@ -39,9 +39,9 @@
 #include "conversion-buffer.h"
 #include "file-handler-cache.h"
 #include "file-handler.h"
+#include "pass-through-handler.h"
 #include "sound-processor.h"
 #include "util.h"
-
 #include "zita-config.h"
 
 using folve::Appendf;
@@ -49,44 +49,6 @@ using folve::StringPrintf;
 using folve::DLogf;
 
 namespace {
-
-// Very simple filter that just passes the original file through. Used for
-// everything that is not a sound-file.
-class PassThroughHandler : public FileHandler {
-public:
-  PassThroughHandler(int filedes, const std::string &filter_id,
-                     const HandlerStats &known_stats)
-    : FileHandler(filter_id), filedes_(filedes),
-      file_size_(-1), max_accessed_(0), info_stats_(known_stats) {
-    DLogf("Creating PassThrough filter for '%s'", known_stats.filename.c_str());
-    struct stat st;
-    file_size_ = (Stat(&st) == 0) ? st.st_size : -1;
-    info_stats_.filter_dir = "";  // pass through.
-  }
-  ~PassThroughHandler() { close(filedes_); }
-
-  virtual int Read(char *buf, size_t size, off_t offset) {
-    const int result = pread(filedes_, buf, size, offset);
-    max_accessed_ = std::max(max_accessed_, (long unsigned int) offset + result);
-    return result == -1 ? -errno : result;
-  }
-  virtual int Stat(struct stat *st) {
-    return fstat(filedes_, st);
-  }
-  virtual void GetHandlerStatus(HandlerStats *stats) {
-    *stats = info_stats_;
-    if (file_size_ > 0) {
-      stats->access_progress = 1.0 * max_accessed_ / file_size_;
-      stats->buffer_progress = stats->access_progress;
-    }
-  }
-
-private:
-  const int filedes_;
-  size_t file_size_;
-  long unsigned int max_accessed_;
-  HandlerStats info_stats_;
-};
 
 class SndFileHandler :
     public FileHandler,
