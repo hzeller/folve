@@ -106,7 +106,7 @@ public:
   // with a factor - overestimating seems to be less of a problem than
   // understimating.
   // This is the factor (maybe configurable later).
-  float file_oversize_factor() { return 1.5; }
+  float file_oversize_factor() { return 1.1; }
 
   // Some stats.
   int total_file_openings() { return total_file_openings_; }
