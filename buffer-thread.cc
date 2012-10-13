@@ -37,6 +37,7 @@ void BufferThread::EnqueueWork(ConversionBuffer *buffer) {
   for (WorkQueue::iterator it = queue_.begin(); it != queue_.end(); ++it) {
     if (it->buffer == buffer) {
       it->goal = goal;  // Already in queue; update goal.
+      found = true;
       break;
     }
   }
