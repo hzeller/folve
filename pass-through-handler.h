@@ -15,8 +15,8 @@
 //
 //  You should have received a copy of the GNU General Public License
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#ifndef FOLVE_PASS_THROUGH_HANDLER_
-#define FOLVE_PASS_THROUGH_HANDLER_
+#ifndef FOLVE_PASS_THROUGH_HANDLER_H_
+#define FOLVE_PASS_THROUGH_HANDLER_H_
 
 #include "file-handler.h"
 
@@ -40,4 +40,4 @@ private:
   HandlerStats info_stats_;
 };
 
-#endif  // FOLVE_PASS_THROUGH_HANDLER_
+#endif  // FOLVE_PASS_THROUGH_HANDLER_H_
