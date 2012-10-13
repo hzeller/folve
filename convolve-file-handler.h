@@ -89,6 +89,7 @@ private:
   HandlerStats base_stats_;      // UI information about current file.
 
   struct stat file_stat_;        // we dynamically report a changing size.
+  off_t original_file_size_;
   off_t start_estimating_size_;  // essentially const.
 
   bool error_;

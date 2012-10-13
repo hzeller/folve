@@ -169,7 +169,11 @@ void ConvolveFileHandler::GetHandlerStatus(HandlerStats *stats) {
 
 int ConvolveFileHandler::Stat(struct stat *st) {
   const off_t current_file_size = output_buffer_->FileSize();
-  if (current_file_size > start_estimating_size_) {
+  if (output_buffer_->IsFileComplete()) {
+    // Once we're complete, we know exactly the final size.
+    file_stat_.st_size = current_file_size;
+  }
+  else if (current_file_size > start_estimating_size_) {
     const int frames_done = in_info_.frames - frames_left();
     if (frames_done > 0) {
       const float estimated_end = 1.0 * in_info_.frames / frames_done;
@@ -207,6 +211,7 @@ ConvolveFileHandler::ConvolveFileHandler(FolveFilesystem *fs,
   // the size of the file to check when to stop.
   fstat(filedes_, &file_stat_);
   start_estimating_size_ = 0.4 * file_stat_.st_size;
+  original_file_size_ = file_stat_.st_size;
   file_stat_.st_size *= fs->file_oversize_factor();
 
   // The flac header we get is more rich than what we can create via
@@ -485,6 +490,16 @@ void ConvolveFileHandler::Close() {
   if (snd_out_) sf_close(snd_out_);
   snd_out_ = NULL;
   close(filedes_);
+
+  const double factor = 1.0 * output_buffer_->FileSize() / original_file_size_;
+  if (factor > fs_->file_oversize_factor()) {
+    syslog(LOG_WARNING, "File larger than prediction: "
+           "%ldx%.2f=%ld < %ld (x%4.2f) '%s'; "
+           "naive streamer implementations might trip.",
+           original_file_size_, fs_->file_oversize_factor(),
+           (off_t) (original_file_size_ * fs_->file_oversize_factor()),
+           output_buffer_->FileSize(), factor, base_stats_.filename.c_str());
+  }
 }
 
 bool ConvolveFileHandler::LooksLikeInputIsFlac(const SF_INFO &sndinfo,
