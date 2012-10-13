@@ -16,73 +16,93 @@
 
 #include "buffer-thread.h"
 
+#include <assert.h>
+#include <pthread.h>
 #include <algorithm>
 
 #include "conversion-buffer.h"
 #include "util.h"
 
 BufferThread::BufferThread(int buffer_ahead)
-  : buffer_ahead_size_(buffer_ahead), current_work_item_(NULL) {
+  : buffer_ahead_size_(buffer_ahead), current_work_buffer_(NULL) {
   pthread_cond_init(&enqueue_event_, NULL);
   pthread_cond_init(&picked_work_, NULL);
 }
 
 void BufferThread::EnqueueWork(ConversionBuffer *buffer) {
+  const off_t goal = buffer->MaxAccessed() + buffer_ahead_size_;
   folve::MutexLock l(&mutex_);
-  // We only need one element per buffer in the queue; when it is 'its' turn,
-  // we'll calculate the right buffer horizon anyway. So don't accept more.
-  //
-  // This is O(n), but we only expect n in the order of ~4, the cache size.
-  if (std::find(queue_.begin(), queue_.end(), buffer) != queue_.end()) {
-    return;
+  bool found = false;
+  // This is O(n), but n is typically in the order of max=4
+  for (WorkQueue::iterator it = queue_.begin(); it != queue_.end(); ++it) {
+    if (it->buffer == buffer) {
+      it->goal = goal;  // Already in queue; update goal.
+      break;
+    }
   }
-  queue_.push_back(buffer);
-  pthread_cond_signal(&enqueue_event_);
+  if (!found) {
+    WorkItem new_work;
+    new_work.buffer = buffer;
+    new_work.goal = goal;
+    queue_.push_back(new_work);
+    pthread_cond_signal(&enqueue_event_);
+  }
 }
 
 void BufferThread::Forget(ConversionBuffer *buffer) {
   folve::MutexLock l(&mutex_);
+  // If this was currently what we were working on, wait until that is gone
+  // to not delete conversion buffer being accessed.
+  while (current_work_buffer_ == buffer) {
+    mutex_.WaitOn(&picked_work_);
+  }
+
   // Again, O(n), but typical n is low.
   WorkQueue::iterator it = queue_.begin();
   while (it != queue_.end()) {
-    if (*it == buffer) {
+    if (it->buffer == buffer) {
       it = queue_.erase(it);
     } else  {
       ++it;
     }
   }
-  // If this was currently what we were working on, wait until that is gone.
-  while (current_work_item_ == buffer) {
-    mutex_.WaitOn(&picked_work_);
-  }
+}
+
+bool BufferThread::IsWorkComplete(const WorkItem &work) const {
+  return work.buffer->IsFileComplete() || work.buffer->FileSize() >= work.goal;
 }
 
 void BufferThread::Run() {
+  const int kBufferChunk = (8 << 10);
   for (;;) {
+    WorkItem work;
     {
       folve::MutexLock l(&mutex_);
       while (queue_.empty()) {
         mutex_.WaitOn(&enqueue_event_);
       }
-      current_work_item_ = queue_.front();
-      queue_.pop_front();
+      work = queue_.front();
+      current_work_buffer_ = work.buffer;
       pthread_cond_signal(&picked_work_);
     }
 
-    ConversionBuffer *const buffer = current_work_item_;  // convenient name.
-    const int kBufferChunk = (8 << 10);
-    const off_t goal = buffer->MaxAccessed() + buffer_ahead_size_;
-    while (!buffer->IsFileComplete() && buffer->FileSize() < goal) {
-      // We do this in chunks so that the main thread has a chance to
-      // get into there.
-      buffer->FillUntil(buffer->FileSize() + kBufferChunk);
+    // We only do one chunk at the time so that the main thread has a chance to
+    // get into there and _we_ can round-robin through all work scheduled.
+    if (!IsWorkComplete(work)) {
+      work.buffer->FillUntil(work.buffer->FileSize() + kBufferChunk);
     }
 
     {
       folve::MutexLock l(&mutex_);
-      current_work_item_ = NULL;
+      assert(queue_.front().buffer = current_work_buffer_);
+      if (!IsWorkComplete(queue_.front())) { // More work to do ? Re-schedule.
+        queue_.push_back(queue_.front());
+      }
+      queue_.pop_front();
+      current_work_buffer_ = NULL;
       pthread_cond_signal(&picked_work_);
     }
+    pthread_yield();
   }
 }
 

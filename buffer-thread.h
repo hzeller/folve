@@ -36,15 +36,23 @@ public:
  protected:
   virtual void Run();
 
+private:
+  struct WorkItem {
+    ConversionBuffer *buffer;
+    off_t goal;
+  };
+  typedef std::list<WorkItem> WorkQueue;
+
+  bool IsWorkComplete(const WorkItem &work) const;
+
   const int buffer_ahead_size_;
 
   folve::Mutex mutex_;
-  typedef std::list<ConversionBuffer *> WorkQueue;
   WorkQueue queue_;   // crude initial impl. of work-queue
   pthread_cond_t enqueue_event_;
 
   pthread_cond_t picked_work_;
-  ConversionBuffer *current_work_item_;
+  ConversionBuffer *current_work_buffer_;
 };
 
 #endif  // FOLVE_BUFFER_THREAD_H_
