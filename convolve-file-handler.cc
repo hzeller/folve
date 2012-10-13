@@ -494,11 +494,12 @@ void ConvolveFileHandler::Close() {
   const double factor = 1.0 * output_buffer_->FileSize() / original_file_size_;
   if (factor > fs_->file_oversize_factor()) {
     syslog(LOG_WARNING, "File larger than prediction: "
-           "%ldx%.2f=%ld < %ld (x%4.2f) '%s'; "
+           "%lldx%.2f=%lld < %lld (x%4.2f) '%s'; "
            "naive streamer implementations might trip.",
-           original_file_size_, fs_->file_oversize_factor(),
-           (off_t) (original_file_size_ * fs_->file_oversize_factor()),
-           output_buffer_->FileSize(), factor, base_stats_.filename.c_str());
+           (long long)original_file_size_, fs_->file_oversize_factor(),
+           (long long)(original_file_size_ * fs_->file_oversize_factor()),
+           (long long)output_buffer_->FileSize(), factor,
+           base_stats_.filename.c_str());
   }
 }
 
