@@ -93,12 +93,13 @@ static const char kCSS[] =
   // CSS classes used in the file-listin. Keep things compact.
   " td { text-wrap:none; white-space:nowrap; }\n"
   " .fn { font-size:small; text-wrap:none; white-space:nowrap; }\n"  // filename
-  " .pf { width:" PROGRESS_WIDTH "px;\n"     // progress-
-  "       background: white; border:1px solid black; }\n"   // frame
-  " .nf { text-align:right; }\n"                          // number formatting.
-  " .fb { background-color:#c0c0c0;"
+  " .pf { width:" PROGRESS_WIDTH "px;\n"                   // progress frame
+  "       background: white; border:1px solid black; }\n" 
+  " .nf { text-align:right; }\n"                           // number formatting.
+  " .fb { background-color:#c0c0c0;"                       // format box
   "        border-radius: 3px;\n"
-  "        -moz-border-radius: 3px; }\n"                  // format box
+  "        -moz-border-radius: 3px; }\n"
+  " .es { font-size:x-small; }\n"                           // extended status
   "</style>";
 
 class StatusServer::HtmlFileHandler : public FileHandler {
@@ -267,6 +268,14 @@ void StatusServer::AppendFileInfo(const char *progress_access_color,
     // no default to let the compiler detect new values.
   }
 
+  char extended_status[64];
+  if (show_details()) {
+    const double time_ago = folve::CurrentTime() - stats.last_access;
+    snprintf(extended_status, sizeof(extended_status),
+             "%s <span class='es'>(%1.1fs)</span>",
+             status, time_ago);
+    status = extended_status;
+  }
   if (!stats.message.empty()) {
     Appendf(out, sMessageRowHtml, status, stats.message.c_str());
   } else if (stats.access_progress == 0 && stats.buffer_progress <= 0) {
@@ -419,12 +428,14 @@ void StatusServer::CreatePage(bool for_http, std::string *content) {
     content->append("Gapless transfers indicated with '&rarr;'\n");
   }
   content->append("<table>\n");
-  Appendf(content, "<tr><th>Stat</th><td><!--gapless in--></td>"
+  Appendf(content, "<tr><th>Stat%s</th><td><!--gapless in--></td>"
           "<th width='%dpx'>Progress</th>"  // progress bar.
           "<td><!-- gapless out --></td>"
           "<th>Pos</th><td></td><th>Len</th><th>Max&nbsp;out</th>"
           "<th>Format&nbsp;(used&nbsp;filter)</th>"
-          "<th align='left'>File</th></tr>\n", kProgressWidth);
+          "<th align='left'>File</th></tr>\n",
+          show_details() ? " <span class='es'>(last)</span>" : "",
+          kProgressWidth);
   // ICE in arm 2.7.1 compiler if we sort values. So sort pointers
   // to the values instead.
   std::vector<HandlerStats *> stat_ptrs;
