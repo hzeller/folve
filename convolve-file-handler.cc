@@ -491,11 +491,12 @@ void ConvolveFileHandler::Close() {
   if (factor > fs_->file_oversize_factor()) {
     syslog(LOG_WARNING, "File larger than prediction: "
            "%lldx%.2f=%lld < %lld (x%4.2f) '%s'; "
-           "naive streamer implementations might trip.",
+           "naive streamer implementations might trip "
+           "(adapt prediction with -O %.2f)",
            (long long)original_file_size_, fs_->file_oversize_factor(),
            (long long)(original_file_size_ * fs_->file_oversize_factor()),
            (long long)output_buffer_->FileSize(), factor,
-           base_stats_.filename.c_str());
+           base_stats_.filename.c_str(), factor);
   }
 }
 

@@ -23,8 +23,8 @@
 #include <sys/resource.h>
 #include <sys/syscall.h>   // need to call gettid syscall.
 #include <sys/time.h>
-#include <sys/time.h>
 #include <syslog.h>
+#include <unistd.h>
 
 #include <cstdarg>
 #include <string.h>
