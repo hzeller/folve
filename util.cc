@@ -17,10 +17,12 @@
 
 #include "util.h"
 
-#include <linux/sched.h>  // for SCHED_IDLE, <sched.h> doesn't do it everywhere
-
 #include <assert.h>
+#include <linux/sched.h>  // for SCHED_IDLE, <sched.h> doesn't do it everywhere
 #include <stdio.h>
+#include <sys/resource.h>
+#include <sys/syscall.h>   // need to call gettid syscall.
+#include <sys/time.h>
 #include <sys/time.h>
 #include <syslog.h>
 
@@ -84,6 +86,10 @@ bool folve::HasSuffix(const std::string &str, const std::string &suffix) {
 }
 
 void *folve::Thread::PthreadCallRun(void *tobject) {
+  // Some hardcoded nicification of the thread. We use it for the pre-buffering
+  // which is nice-to-have and shouldn't interfere too much with other stuff.
+  setpriority(PRIO_PROCESS, syscall(SYS_gettid), 2);
+
   reinterpret_cast<folve::Thread*>(tobject)->Run();
   return NULL;
 }
