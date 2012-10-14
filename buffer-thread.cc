@@ -93,10 +93,11 @@ void BufferThread::Run() {
       work.buffer->FillUntil(work.buffer->FileSize() + kBufferChunk);
     }
 
+    const bool work_complete = IsWorkComplete(work);
     {
       folve::MutexLock l(&mutex_);
-      assert(queue_.front().buffer = current_work_buffer_);
-      if (!IsWorkComplete(queue_.front())) { // More work to do ? Re-schedule.
+      assert(queue_.front().buffer == current_work_buffer_);
+      if (!work_complete) { // More work to do ? Re-schedule.
         queue_.push_back(queue_.front());
       }
       queue_.pop_front();
