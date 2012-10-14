@@ -17,7 +17,10 @@
 #define FOLVE_BUFFER_THREAD_H_
 
 #include "util.h"
+
 #include <pthread.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include <list>
 
