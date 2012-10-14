@@ -21,6 +21,9 @@
 
 #include <string>
 
+#include <sys/types.h>
+#include <unistd.h>
+
 // Status about some handler, filled in by various subsystem.
 // This is mostly used to be displayed in the UI.
 // Data collected in this struct will survive after the FileHandler is long

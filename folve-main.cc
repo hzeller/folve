@@ -280,6 +280,8 @@ static int usage(const char *prg) {
          "\t               Default is %d seconds; switch off with -1.\n"
          "\t-g           : Gapless convolving alphabetically adjacent files.\n"
          "\t-b <KibiByte>: Predictive pre-buffer by given KiB (%d...%d).\n"
+         "\t-O <factor>  : Oversize: Multiply orig. file sizes with this. "
+         "Default 1.25.\n"
          "\t-o <mnt-opt> : other generic mount parameters passed to FUSE.\n"
          "\t-D           : Moderate volume Folve debug messages to syslog,\n"
          "\t               and some more detailed configuration info in UI\n"
@@ -303,6 +305,7 @@ enum {
   FOLVE_OPT_PREBUFFER,
   FOLVE_OPT_REFRESH_TIME,
   FOLVE_OPT_CONFIG,
+  FOLVE_OPT_OVERSIZE_PREDICT,
   FOLVE_OPT_DEBUG,
   FOLVE_OPT_DEBUG_READDIR,
   FOLVE_OPT_GAPLESS,
@@ -333,6 +336,18 @@ int FolveOptionHandling(void *data, const char *arg, int key,
   case FOLVE_OPT_PORT:
     rt->status_port = atoi(arg + 2);  // strip "-p"
     return 0;
+
+  case FOLVE_OPT_OVERSIZE_PREDICT: {
+    char *end;
+    const float value = strtof(arg + 2, &end);
+    if (*end != '\0') {
+      fprintf(stderr, "-O: Invalid number %s\n", arg + 2);
+      rt->parameter_error= true;
+    } else {
+      rt->fs->set_file_oversize_factor(value);
+    }
+    return 0;
+  }
 
   case FOLVE_OPT_PREBUFFER: {
     char *end;
@@ -402,6 +417,7 @@ int main(int argc, char *argv[]) {
     FUSE_OPT_KEY("-C ", FOLVE_OPT_CONFIG),
     FUSE_OPT_KEY("-D",  FOLVE_OPT_DEBUG),
     FUSE_OPT_KEY("-R ",  FOLVE_OPT_DEBUG_READDIR),
+    FUSE_OPT_KEY("-O ",  FOLVE_OPT_OVERSIZE_PREDICT),
     FUSE_OPT_KEY("-g",  FOLVE_OPT_GAPLESS),
     FUSE_OPT_END   // This fails to compile for fuse <= 2.8.1; get >= 2.8.4
   };

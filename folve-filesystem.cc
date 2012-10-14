@@ -45,7 +45,9 @@
 FolveFilesystem::FolveFilesystem()
   : gapless_processing_(false), pre_buffer_size_(-1), open_file_cache_(4),
     processor_pool_(3), buffer_thread_(NULL),
-    total_file_openings_(0), total_file_reopen_(0) {
+    total_file_openings_(0), total_file_reopen_(0),
+    // oversize factor of 1.25 seems to be a good initial size.
+    file_oversize_factor_(1.25) {
 }
 
 void FolveFilesystem::RequestPrebuffer(ConversionBuffer *buffer) {

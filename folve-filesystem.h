@@ -105,8 +105,8 @@ public:
   // know the final file-size as well. So we multiply the original file size
   // with a factor - overestimating seems to be less of a problem than
   // understimating.
-  // This is the factor (maybe configurable later).
-  double file_oversize_factor() { return 1.15; }
+  float file_oversize_factor() { return file_oversize_factor_; }
+  void set_file_oversize_factor(float v) { file_oversize_factor_ = v; }
 
   // Some stats.
   int total_file_openings() { return total_file_openings_; }
@@ -146,6 +146,7 @@ private:
   BufferThread *buffer_thread_;
   int total_file_openings_;
   int total_file_reopen_;
+  float file_oversize_factor_;
 };
 
 #endif // FOLVE_FILESYSTEM_H
