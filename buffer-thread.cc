@@ -69,10 +69,6 @@ void BufferThread::Forget(ConversionBuffer *buffer) {
   }
 }
 
-bool BufferThread::IsWorkComplete(const WorkItem &work) const {
-  return work.buffer->IsFileComplete() || work.buffer->FileSize() >= work.goal;
-}
-
 void BufferThread::Run() {
   const int kBufferChunk = (8 << 10);
   for (;;) {
@@ -89,11 +85,10 @@ void BufferThread::Run() {
 
     // We only do one chunk at the time so that the main thread has a chance to
     // get into there and _we_ can round-robin through all work scheduled.
-    if (!IsWorkComplete(work)) {
-      work.buffer->FillUntil(work.buffer->FileSize() + kBufferChunk);
-    }
+    const bool work_complete
+      = (work.buffer->FillUntil(work.buffer->FileSize() + kBufferChunk)
+         || work.buffer->FileSize() >= work.goal);
 
-    const bool work_complete = IsWorkComplete(work);
     {
       folve::MutexLock l(&mutex_);
       assert(queue_.front().buffer == current_work_buffer_);

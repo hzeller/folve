@@ -72,7 +72,8 @@ public:
   void WriteCharAt(unsigned char c, off_t offset);
 
   // Fill read file until we have the required bytes available.
-  void FillUntil(off_t requested_min_written);
+  // Return 'true' if file is complete
+  bool FillUntil(off_t requested_min_written);
 
   // Enable writing through the SNDFILE.
   // If set to 'false', writes via the SNDFILE are ignored.

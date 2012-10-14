@@ -148,7 +148,7 @@ bool ConversionBuffer::IsFileComplete() const {
   return file_complete_;
 }
 
-void ConversionBuffer::FillUntil(off_t requested_min_written) {
+bool ConversionBuffer::FillUntil(off_t requested_min_written) {
   // As soon as someone tries to read beyond of what we already have, we call
   // the callback that fills more of it.
   // We are shared between potentially several open files. Serialize threads.
@@ -159,6 +159,7 @@ void ConversionBuffer::FillUntil(off_t requested_min_written) {
       break;
     }
   }
+  return file_complete_;
 }
 
 ssize_t ConversionBuffer::Read(char *buf, size_t size, off_t offset) {

@@ -43,8 +43,6 @@ private:
   };
   typedef std::list<WorkItem> WorkQueue;
 
-  bool IsWorkComplete(const WorkItem &work) const;
-
   const int buffer_ahead_size_;
 
   folve::Mutex mutex_;

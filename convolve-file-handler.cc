@@ -128,9 +128,9 @@ int ConvolveFileHandler::Read(char *buf, size_t size, off_t offset) {
   // NotifyPassedProcessorUnreferenced()) - so that important use-case is
   // covered.
   const off_t well_beyond_header = output_buffer_->HeaderSize() + (64 << 10);
-  const bool should_request_prebuffer = !output_buffer_->IsFileComplete()
-    && read_horizon > well_beyond_header
-    && read_horizon + fs_->pre_buffer_size() > current_filesize;
+  const bool should_request_prebuffer = read_horizon > well_beyond_header
+    && read_horizon + fs_->pre_buffer_size() > current_filesize
+    && !output_buffer_->IsFileComplete();
   if (should_request_prebuffer) {
     fs_->RequestPrebuffer(output_buffer_);
   }
@@ -169,11 +169,7 @@ void ConvolveFileHandler::GetHandlerStatus(HandlerStats *stats) {
 
 int ConvolveFileHandler::Stat(struct stat *st) {
   const off_t current_file_size = output_buffer_->FileSize();
-  if (output_buffer_->IsFileComplete()) {
-    // Once we're complete, we know exactly the final size.
-    file_stat_.st_size = current_file_size;
-  }
-  else if (current_file_size > start_estimating_size_) {
+  if (current_file_size > start_estimating_size_) {
     const int frames_done = in_info_.frames - frames_left();
     if (frames_done > 0) {
       const float estimated_end = 1.0 * in_info_.frames / frames_done;
