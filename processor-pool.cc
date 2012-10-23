@@ -123,7 +123,7 @@ SoundProcessor *ProcessorPool::CheckOutOfPool(const std::string &config_path) {
     return NULL;
   ProcessorList *list = found->second;
   if (list->empty())
-    return false;
+    return NULL;
   SoundProcessor *result = list->front();
   list->pop_front();
   return result;
