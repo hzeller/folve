@@ -234,8 +234,10 @@ static int folve_fgetattr(const char *path, struct stat *result,
 static void *folve_init(struct fuse_conn_info *conn) {
   if (folve_rt.pid_file) {
     FILE *p = fopen(folve_rt.pid_file, "w+");
-    fprintf(p, "%d\n", getpid());
-    fclose(p);
+    if (p) {
+      fprintf(p, "%d\n", getpid());
+      fclose(p);
+    }
   }
   const int ident_len = 20;
   char *ident = (char*) malloc(ident_len);  // openlog() keeps reference. Leaks.
