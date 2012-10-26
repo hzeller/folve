@@ -45,11 +45,12 @@ static const int kUsefulMaxBuf = 16384;
 
 // Compilation unit variables to communicate with the fuse callbacks.
 static struct FolveRuntime {
-  FolveRuntime() : fs(NULL), mount_point(NULL),
+  FolveRuntime() : fs(NULL), mount_point(NULL), pid_file(NULL),
                    status_port(-1), refresh_time(10), parameter_error(false),
                    readdir_dump_file(NULL), status_server(NULL) {}
   FolveFilesystem *fs;
   const char *mount_point;
+  const char *pid_file;
   int status_port;
   int refresh_time;
   bool parameter_error;
@@ -231,6 +232,11 @@ static int folve_fgetattr(const char *path, struct stat *result,
 }
 
 static void *folve_init(struct fuse_conn_info *conn) {
+  if (folve_rt.pid_file) {
+    FILE *p = fopen(folve_rt.pid_file, "w+");
+    fprintf(p, "%d\n", getpid());
+    fclose(p);
+  }
   const int ident_len = 20;
   char *ident = (char*) malloc(ident_len);  // openlog() keeps reference. Leaks.
   snprintf(ident, ident_len, "folve[%d]", getpid());
@@ -283,6 +289,7 @@ static int usage(const char *prg) {
          "\t-O <factor>  : Oversize: Multiply orig. file sizes with this. "
          "Default 1.25.\n"
          "\t-o <mnt-opt> : other generic mount parameters passed to FUSE.\n"
+         "\t-P <pid-file>: Write PID to this file.\n"
          "\t-D           : Moderate volume Folve debug messages to syslog,\n"
          "\t               and some more detailed configuration info in UI\n"
          "\t-f           : Operate in foreground; useful for debugging.\n"
@@ -292,20 +299,13 @@ static int usage(const char *prg) {
   return 1;
 }
 
-struct FolveConfig {
-  FolveConfig() : base_dir(NULL), config_dir(NULL), port(-1) {}
-  const char *base_dir;
-  const char *mount_point;
-  const char *config_dir;
-  int port;
-};
-
 enum {
   FOLVE_OPT_PORT = 42,
   FOLVE_OPT_PREBUFFER,
   FOLVE_OPT_REFRESH_TIME,
   FOLVE_OPT_CONFIG,
   FOLVE_OPT_OVERSIZE_PREDICT,
+  FOLVE_OPT_PID_FILE,
   FOLVE_OPT_DEBUG,
   FOLVE_OPT_DEBUG_READDIR,
   FOLVE_OPT_GAPLESS,
@@ -345,6 +345,21 @@ int FolveOptionHandling(void *data, const char *arg, int key,
       rt->parameter_error= true;
     } else {
       rt->fs->set_file_oversize_factor(value);
+    }
+    return 0;
+  }
+
+  case FOLVE_OPT_PID_FILE: {
+    const char *pid_file = arg + 2;
+    if (pid_file[0] != '/') {
+      // We need to canonicalize the filename because our
+      // cwd will change after becoming a daemon.
+      char *buf = (char*) malloc(PATH_MAX);  // will leak. Ok.
+      char *result = getcwd(buf, PATH_MAX);
+      result = strcat(result, "/");
+      rt->pid_file = strcat(result, pid_file);
+    } else {
+      rt->pid_file = strdup(pid_file);
     }
     return 0;
   }
@@ -418,6 +433,7 @@ int main(int argc, char *argv[]) {
     FUSE_OPT_KEY("-D",  FOLVE_OPT_DEBUG),
     FUSE_OPT_KEY("-R ",  FOLVE_OPT_DEBUG_READDIR),
     FUSE_OPT_KEY("-O ",  FOLVE_OPT_OVERSIZE_PREDICT),
+    FUSE_OPT_KEY("-P ",  FOLVE_OPT_PID_FILE),
     FUSE_OPT_KEY("-g",  FOLVE_OPT_GAPLESS),
     FUSE_OPT_END   // This fails to compile for fuse <= 2.8.1; get >= 2.8.4
   };

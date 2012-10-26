@@ -167,11 +167,15 @@ please let me know.)
       -r <refresh> : Seconds between refresh of status page;
                      Default is 10 seconds; switch off with -1.
       -g           : Gapless convolving alphabetically adjacent files.
-      -b <KibiByte>: Pre-buffer files by given KiB.
-      -D           : Moderate volume Folve debug messages to syslog.
-      -f           : Operate in foreground; useful for debugging.
+      -b <KibiByte>: Predictive pre-buffer by given KiB (64...16384).
+      -O <factor>  : Oversize: Multiply orig. file sizes with this. Default 1.25.
       -o <mnt-opt> : other generic mount parameters passed to FUSE.
+      -P <pid-file>: Write PID to this file.
+      -D           : Moderate volume Folve debug messages to syslog,
+                     and some more detailed configuration info in UI
+      -f           : Operate in foreground; useful for debugging.
       -d           : High volume FUSE debug log. Implies -f.
+      -R <file>    : Debug readdir() & stat() calls. Output to file.
 
 If you're listening to classical music, opera or live-recordings, then you
 certainly want to switch on gapless convolving with `-g`. If a file ends with
