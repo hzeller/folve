@@ -58,8 +58,8 @@ static time_t GetModificationTime(const std::string &filename) {
 SoundProcessor::SoundProcessor(const ZitaConfig &config, const std::string &cfg)
   : zita_config_(config), config_file_(cfg),
     config_file_timestamp_(GetModificationTime(cfg)),
-    buffer_(new float[config.fragm * config.ninp]),
-    channels_(config.ninp),
+    buffer_(new float[config.fragm
+                      * std::max(input_channels(), output_channels())]),
     input_pos_(0), output_pos_(0),
     max_out_value_observed_(0.0) {
   Reset();
@@ -76,7 +76,8 @@ int SoundProcessor::FillBuffer(SNDFILE *in) {
   const int samples_needed = zita_config_.fragm - input_pos_;
   assert(samples_needed);  // Otherwise, call WriteProcessed() first.
   output_pos_ = -1;
-  int r = sf_readf_float(in, buffer_ + input_pos_ * channels_, samples_needed);
+  int r = sf_readf_float(in, buffer_ + input_pos_ * input_channels(),
+                         samples_needed);
   input_pos_ += r;
   return r;
 }
@@ -86,7 +87,7 @@ void SoundProcessor::WriteProcessed(SNDFILE *out, int sample_count) {
     Process();
   }
   assert(sample_count <= zita_config_.fragm - output_pos_);
-  sf_writef_float(out, buffer_ + output_pos_ * channels_, sample_count);
+  sf_writef_float(out, buffer_ + output_pos_ * output_channels(), sample_count);
   output_pos_ += sample_count;
   if (output_pos_ == zita_config_.fragm) {
     input_pos_ = 0;
@@ -96,25 +97,25 @@ void SoundProcessor::WriteProcessed(SNDFILE *out, int sample_count) {
 void SoundProcessor::Process() {
   const int samples_missing = zita_config_.fragm - input_pos_;
   if (samples_missing) {
-    memset(buffer_ + input_pos_ * channels_, 0x00,
-           samples_missing * channels_ * sizeof(float));
+    memset(buffer_ + input_pos_ * input_channels(), 0x00,
+           samples_missing * input_channels() * sizeof(float));
   }
 
   // Flatten channels: LRLRLRLRLR -> LLLLL and RRRRR
-  for (int ch = 0; ch < channels_; ++ch) {
+  for (int ch = 0; ch < input_channels(); ++ch) {
     float *dest = zita_config_.convproc->inpdata(ch);
     for (int j = 0; j < input_pos_; ++j) {
-      dest[j] = buffer_[j * channels_ + ch];
+      dest[j] = buffer_[j * input_channels() + ch];
     }
   }
 
   zita_config_.convproc->process();
 
   // Join channels again.
-  for (int ch = 0; ch < channels_; ++ch) {
+  for (int ch = 0; ch < output_channels(); ++ch) {
     float *source = zita_config_.convproc->outdata(ch);
     for (int j = 0; j < input_pos_; ++j) {
-      buffer_[j * channels_ + ch] = source[j];
+      buffer_[j * output_channels() + ch] = source[j];
       const float out_abs = source[j];
       if (out_abs > max_out_value_observed_) {
         max_out_value_observed_ = out_abs;

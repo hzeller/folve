@@ -53,6 +53,7 @@ public:
 
   // -- ConversionBuffer::SoundSource interface.
   virtual void SetOutputSoundfile(ConversionBuffer *out_buffer,
+                                  const SF_INFO &info,
                                   SNDFILE *sndfile);
   virtual bool AddMoreSoundData();
 

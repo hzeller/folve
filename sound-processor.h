@@ -34,6 +34,9 @@ public:
   // Fill Buffer from given sound file. Returns number of samples read.
   int FillBuffer(SNDFILE *in);
 
+  inline int input_channels() const { return zita_config_.ninp; }
+  inline int output_channels() const { return zita_config_.nout;} 
+
   // Returns if the input buffer has enought samples for the FIR-filter
   // to process. If not, another call to FillBuffer() is needed.
   bool is_input_buffer_complete() const {
@@ -74,7 +77,6 @@ private:
   const time_t config_file_timestamp_;
 
   float *const buffer_;
-  const int channels_;
   // TODO: instead of two positions, better have one position and two states
   // READ, WRITE
   int input_pos_;

@@ -58,7 +58,7 @@ FileHandler *ConvolveFileHandler::Create(FolveFilesystem *fs,
   if ((in_info.format & SF_FORMAT_SUBMASK) == SF_FORMAT_PCM_24) bits = 24;
   if ((in_info.format & SF_FORMAT_SUBMASK) == SF_FORMAT_PCM_32) bits = 32;
 
-  // Remember whatever we could got to know in the partial file info.
+  // Remember whatever we could get to know in the partial file info.
   Appendf(&partial_file_info->format, "%.1fkHz, %d Bit",
           in_info.samplerate / 1000.0, bits);
   partial_file_info->duration_seconds = in_info.frames / in_info.samplerate;
@@ -233,10 +233,14 @@ ConvolveFileHandler::ConvolveFileHandler(FolveFilesystem *fs,
     out_info.format = in_info.format;
   }
 
+  out_info.channels = processor->output_channels();
+  DLogf("Output channels: %d", out_info.channels);
+
   output_buffer_ = new ConversionBuffer(this, out_info);
 }
 
 void ConvolveFileHandler::SetOutputSoundfile(ConversionBuffer *out_buffer,
+                                             const SF_INFO &info,
                                              SNDFILE *sndfile) {
   snd_out_ = sndfile;
   if (snd_out_ == NULL) {
@@ -264,12 +268,17 @@ void ConvolveFileHandler::SetOutputSoundfile(ConversionBuffer *out_buffer,
   // redact the values for min/max blocksize and min/max framesize with
   // what SNDFILE is going to use, otherwise programs will trip over this.
   // http://flac.sourceforge.net/format.html
+  // Also, number of output channels might be different.
   if (copy_flac_header_verbatim_) {
     out_buffer->WriteCharAt((1152 & 0xFF00) >> 8,  8);
     out_buffer->WriteCharAt((1152 & 0x00FF)     ,  9);
     out_buffer->WriteCharAt((1152 & 0xFF00) >> 8, 10);
     out_buffer->WriteCharAt((1152 & 0x00FF)     , 11);
     for (int i = 12; i < 18; ++i) out_buffer->WriteCharAt(0, i); // framesize
+    // upper nibble: lowest 4 bit of samplerate, lower nibble: channels << 1
+    // 1 bit free.
+    out_buffer->WriteCharAt((in_info_.samplerate  & 0x0f) << 4
+                            | (info.channels - 1) << 1, 20);
   } else {
     // .. and if SNDFILE writes the header, it misses out in writing the
     // number of samples to be expected. So let's fill that in.

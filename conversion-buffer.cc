@@ -50,7 +50,7 @@ ConversionBuffer::ConversionBuffer(SoundSource *source, const SF_INFO &info)
   free(filename);
 
   // After file-open: SetOutputSoundfile() already might attempt to write data.
-  source_->SetOutputSoundfile(this, CreateOutputSoundfile(info));
+  source_->SetOutputSoundfile(this, info, CreateOutputSoundfile(info));
 }
 
 ConversionBuffer::~ConversionBuffer() {

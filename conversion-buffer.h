@@ -41,6 +41,7 @@ public:
     // Ownership is passed to the SoundSource, receiver needs to
     // sf_close() the file.
     virtual void SetOutputSoundfile(ConversionBuffer *parent,
+                                    const SF_INFO &info,
                                     SNDFILE *sndfile) = 0;
 
     // This callback is called by the ConversionBuffer if it needs more data.
