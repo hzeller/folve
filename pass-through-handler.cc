@@ -52,6 +52,7 @@ int PassThroughHandler::Stat(struct stat *st) {
 void PassThroughHandler::GetHandlerStatus(HandlerStats *stats) {
   *stats = info_stats_;
   if (file_size_ > 0) {
+    max_accessed_ = std::min(max_accessed_, file_size_);
     stats->access_progress = 1.0 * max_accessed_ / file_size_;
     stats->buffer_progress = stats->access_progress;
   }
