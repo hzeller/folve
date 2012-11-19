@@ -41,8 +41,8 @@ SoundProcessor *SoundProcessor::Create(const std::string &config_file,
   { // fftw threading bug workaround, see above.
     folve::MutexLock l(&fftw_mutex);
     if ((config(&zita, config_file.c_str()) != 0)
-        || zita.convproc->inpdata(channels - 1) == NULL
-        || zita.convproc->outdata(channels - 1) == NULL) {
+        || zita.convproc->inpdata(zita.ninp - 1) == NULL
+        || zita.convproc->outdata(zita.nout - 1) == NULL) {
       return NULL;
     }
   }

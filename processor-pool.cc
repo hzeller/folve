@@ -84,8 +84,9 @@ SoundProcessor *ProcessorPool::GetOrCreate(const std::string &base_dir,
   if (result == NULL) {
     *errmsg = "Problem parsing " + config_path;
     syslog(LOG_ERR, "filter-config %s is broken.", config_path.c_str());
+  } else {
+    DLogf("Processor %p: Newly created [%s]", result, config_path.c_str());
   }
-  DLogf("Processor %p: Newly created [%s]", result, config_path.c_str());
   return result;
 }
 

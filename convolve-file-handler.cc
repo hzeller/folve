@@ -275,13 +275,19 @@ void ConvolveFileHandler::SetOutputSoundfile(ConversionBuffer *out_buffer,
     out_buffer->WriteCharAt((1152 & 0xFF00) >> 8, 10);
     out_buffer->WriteCharAt((1152 & 0x00FF)     , 11);
     for (int i = 12; i < 18; ++i) out_buffer->WriteCharAt(0, i); // framesize
-    // upper nibble: lowest 4 bit of samplerate, lower nibble: channels << 1
-    // 1 bit free.
+    // Byte 20:
+    //  XXXX YYY Z
+    //  X: lowest 4 bit samplerate; Y: channels - 1; Z: upper bit bit/sample
+    int bits = 16;
+    if ((info.format & SF_FORMAT_SUBMASK) == SF_FORMAT_PCM_24) bits = 24;
+    if ((info.format & SF_FORMAT_SUBMASK) == SF_FORMAT_PCM_32) bits = 32;
     out_buffer->WriteCharAt((in_info_.samplerate  & 0x0f) << 4
-                            | (info.channels - 1) << 1, 20);
-  } else {
+                            | (info.channels - 1)  << 1
+                            | ((bits - 1 ) & 0x10) >> 4,
+                            20);
+  } else if ((info.format & SF_FORMAT_TYPEMASK) == SF_FORMAT_FLAC) {
     // .. and if SNDFILE writes the header, it misses out in writing the
-    // number of samples to be expected. So let's fill that in.
+    // number of samples to be expected. So let's fill that in for flac files.
     // The MD5 sum starts at position strlen("fLaC") + 4 + 18 = 26
     // The 32 bits before that are the samples (and another 4 bit before that,
     // ignoring that for now).

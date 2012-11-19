@@ -30,7 +30,10 @@
 #include "zita-sstring.h"
 
 struct ZitaConfig {
-  Convproc *convproc;
+  const char *config_file;   // Configuration file we're reading from.
+  Convproc *convproc;        // Resulting filter object.
+
+  // Parameters.
   int latency;
   int options;
   int fsamp;
@@ -38,7 +41,6 @@ struct ZitaConfig {
   int ninp;
   int nout;
   int size;
-  const char *config_file;
 };
 
 enum { NOERR, ERR_OTHER, ERR_SYNTAX, ERR_PARAM, ERR_ALLOC, ERR_CANTCD, ERR_COMMAND, ERR_NOCONV, ERR_IONUM };
