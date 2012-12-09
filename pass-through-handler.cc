@@ -41,8 +41,10 @@ PassThroughHandler::~PassThroughHandler() { close(filedes_); }
 
 int PassThroughHandler::Read(char *buf, size_t size, off_t offset) {
   const int result = pread(filedes_, buf, size, offset);
-  max_accessed_ = std::max(max_accessed_, (long unsigned int) offset + result);
-  return result == -1 ? -errno : result;
+  if (result == -1)
+    return -errno;
+  max_accessed_ = std::max<size_t>(max_accessed_, offset + result);
+  return result;
 }
 
 int PassThroughHandler::Stat(struct stat *st) {

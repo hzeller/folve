@@ -36,7 +36,7 @@ public:
 private:
   const int filedes_;
   size_t file_size_;
-  long unsigned int max_accessed_;
+  size_t max_accessed_;
   HandlerStats info_stats_;
 };
 
