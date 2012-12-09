@@ -45,7 +45,7 @@ int PassThroughHandler::Read(char *buf, size_t size, off_t offset) {
   const int result = pread(filedes_, buf, size, offset);
   if (result < 0)
     return -errno;
-  max_accessed_ = std::max<size_t>(max_accessed_, offset + result);
+  max_accessed_ = std::max<off_t>(max_accessed_, offset + result);
   return result;
 }
 
