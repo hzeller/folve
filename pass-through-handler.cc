@@ -23,6 +23,8 @@
 #include <unistd.h>
 #include <errno.h>
 
+#include <algorithm>
+
 #include "util.h"
 
 using folve::DLogf;
@@ -41,7 +43,7 @@ PassThroughHandler::~PassThroughHandler() { close(filedes_); }
 
 int PassThroughHandler::Read(char *buf, size_t size, off_t offset) {
   const int result = pread(filedes_, buf, size, offset);
-  if (result == -1)
+  if (result < 0)
     return -errno;
   max_accessed_ = std::max<size_t>(max_accessed_, offset + result);
   return result;
