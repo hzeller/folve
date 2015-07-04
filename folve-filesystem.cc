@@ -1,3 +1,4 @@
+//  -*- mode: c++; c-basic-offset: 2; indent-tabs-mode: nil; -*-
 //  Folve - A fuse filesystem that convolves audio files on-the-fly.
 //
 //  Copyright (C) 2012 Henner Zeller <h.zeller@acm.org>
@@ -43,7 +44,8 @@
 #include "util.h"
 
 FolveFilesystem::FolveFilesystem()
-  : gapless_processing_(false), pre_buffer_size_(-1), open_file_cache_(4),
+  : gapless_processing_(false), pre_buffer_size_(2048 << 10),
+    open_file_cache_(4),
     processor_pool_(3), buffer_thread_(NULL),
     total_file_openings_(0), total_file_reopen_(0),
     // oversize factor of 1.25 seems to be a good initial size.

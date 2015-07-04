@@ -1,3 +1,4 @@
+//  -*- mode: c++; c-basic-offset: 2; indent-tabs-mode: nil; -*-
 //  Folve - A fuse filesystem that convolves audio files on-the-fly.
 //
 //  Copyright (C) 2012 Henner Zeller <h.zeller@acm.org>
@@ -287,7 +288,8 @@ static int usage(const char *prg) {
          "\t-r <refresh> : Seconds between refresh of status page;\n"
          "\t               Default is %d seconds; switch off with -1.\n"
          "\t-g           : Gapless convolving alphabetically adjacent files.\n"
-         "\t-b <KibiByte>: Predictive pre-buffer by given KiB (%d...%d).\n"
+         "\t-b <KibiByte>: Predictive pre-buffer by given KiB (%d...%d). "
+         "Disable with -1. Default 2048.\n"
          "\t-O <factor>  : Oversize: Multiply orig. file sizes with this. "
          "Default 1.25.\n"
          "\t-o <mnt-opt> : other generic mount parameters passed to FUSE.\n"
@@ -376,14 +378,14 @@ int FolveOptionHandling(void *data, const char *arg, int key,
       fprintf(stderr, "-b %.1f out of range. More than %d KiB prebuffer ("
               "that is a lot!).\n", value, kUsefulMaxBuf);
       rt->parameter_error= true;
-    } else if (value < kUsefulMinBuf) {
+    } else if (value >= 0 && value < kUsefulMinBuf) {
       fprintf(stderr, "-b %.1f is really small. You want more than %d KiB to "
               "be useful, typically between 1024 and 8192 "
               "(roughly 100 KiB is ~1 second buffer).\n",
               value, kUsefulMinBuf);
       rt->parameter_error= true;
     } else {
-      rt->fs->set_pre_buffer_size(value * (1 << 10));
+      rt->fs->set_pre_buffer_size(value < 0 ? -1 : value * (1 << 10));
     }
     return 0;
   }
@@ -408,7 +410,7 @@ int FolveOptionHandling(void *data, const char *arg, int key,
     return 0;
 
   case FOLVE_OPT_DEBUG_READDIR:
-    rt->readdir_dump_file = fopen(arg + 2, "w"); 
+    rt->readdir_dump_file = fopen(arg + 2, "w");
     rlog.WriteInit();
     return 0;
 
