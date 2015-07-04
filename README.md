@@ -1,6 +1,9 @@
 Folve - FUSE convolve
 =====================
 Folve is a FUSE filesystem that convolves audio files on-the-fly including gapless support.
+Controllable via web interface.
+
+![Folve screen](./img/folve-screen.png)
 
 Overview
 --------
@@ -186,6 +189,12 @@ audio player you need to look what that equivalent is (some support it right out
 the box).
 
      mplayer --gapless-audio /tmp/test-mount/*
+
+In the folve web-frontend, you see the gapless joining with little arrows `->`.
+You also see that folve already startes pre-buffering the beginning of the
+next file while it still plays the previous one
+
+![Gapless joining](./img/folve-gapless-prebuffer.png)
 
 ### General usage: ###
 
