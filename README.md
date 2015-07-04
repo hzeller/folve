@@ -35,9 +35,10 @@ an independent convolve option, but they all can read files.
 Filesystem accesses are optimized for streaming. If files are read sequentially,
 we only need to convolve whatever is requested, which minimizes CPU use if
 you do not need the full file. Simply playing a file in real-time will use very
-little CPU (on my notebook ~3% on one core). So this should work as well on
-low-CPU machines; on a Raspberry Pi 2, the CPU load to convolve a 44.1kHz/16 Bit file
-is about 22%. Folve can make use of multiple cores in parallel file accesses.
+little CPU (on my fairly old notebook ~3% on one core). So this should work as
+well on low-CPU machines; on a Raspberry Pi 2, the CPU load to convolve a
+44.1kHz/16 Bit file is about 22%. Folve can make use of multiple cores in
+parallel file accesses.
 
 Because input and output files are compressed, we cannot predict what the
 relationship between file-offset and sample-number is; so skipping forward
@@ -88,6 +89,11 @@ via the package manager:
     sudo make install
 
 For hints on how to compile on older systems see [INSTALL.md](./INSTALL.md).
+
+Sometimes, running folve complains that it can't access `/dev/fuse`. In that
+case, you need to put your user into that group
+`sudo usermod -G fuse $USER` (then open new shell or reboot). Or you can run
+folve as root.
 
 (TODO: create a debian package)
 
@@ -210,22 +216,22 @@ next file while it still plays the previous one:
 ```
 usage: ./folve [options] <original-dir> <mount-point-dir>
 Options: (in sequence of usefulness)
-        -C <cfg-dir> : Convolver base configuration directory.
-                       Sub-directories name the different filters.
-                       Select on the HTTP status page.
-        -p <port>    : Port to run the HTTP status server on.
-        -r <refresh> : Seconds between refresh of status page;
-                       Default is 10 seconds; switch off with -1.
-        -g           : Gapless convolving alphabetically adjacent files.
-        -b <KibiByte>: Predictive pre-buffer by given KiB (64...16384). Disable with -1. Default 128.
-        -O <factor>  : Oversize: Multiply orig. file sizes with this. Default 1.25.
-        -o <mnt-opt> : other generic mount parameters passed to FUSE.
-        -P <pid-file>: Write PID to this file.
-        -D           : Moderate volume Folve debug messages to syslog,
-                       and some more detailed configuration info in UI
-        -f           : Operate in foreground; useful for debugging.
-        -d           : High volume FUSE debug log. Implies -f.
-        -R <file>    : Debug readdir() & stat() calls. Output to file.
+    -C <cfg-dir> : Convolver base configuration directory.
+                   Sub-directories name the different filters.
+                   Select on the HTTP status page.
+    -p <port>    : Port to run the HTTP status server on.
+    -r <refresh> : Seconds between refresh of status page;
+                   Default is 10 seconds; switch off with -1.
+    -g           : Gapless convolving alphabetically adjacent files.
+    -b <KibiByte>: Predictive pre-buffer by given KiB (64...16384). Disable with -1. Default 128.
+    -O <factor>  : Oversize: Multiply orig. file sizes with this. Default 1.25.
+    -o <mnt-opt> : other generic mount parameters passed to FUSE.
+    -P <pid-file>: Write PID to this file.
+    -D           : Moderate volume Folve debug messages to syslog,
+                   and some more detailed configuration info in UI
+    -f           : Operate in foreground; useful for debugging.
+    -d           : High volume FUSE debug log. Implies -f.
+    -R <file>    : Debug readdir() & stat() calls. Output to file.
 ```
 
 If you're listening to classical music, opera or live-recordings, then you
@@ -237,7 +243,7 @@ directory -- and the result is split between these two files.
 The buffer size `-b` flag tells folve how much it should attempt to pre-convolve
 a file if CPU permits. The default settings is pretty minimial; you typically want
 this to be above 1024, in particular if your player reading from the filesystem
-does not a good job of pre-buffering itself.
+does not do a good job of pre-buffering itself.
 
 ### Misc ###
 To manually switch the configuration from the command line, you can use `wget`
