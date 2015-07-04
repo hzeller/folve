@@ -36,7 +36,8 @@ Filesystem accesses are optimized for streaming. If files are read sequentially,
 we only need to convolve whatever is requested, which minimizes CPU use if
 you do not need the full file. Simply playing a file in real-time will use very
 little CPU (on my notebook ~3% on one core). So this should work as well on
-low-CPU machines (like NAS servers; have not tried that yet).
+low-CPU machines; on a Raspberry Pi 2, the CPU load to convolve a 44.1kHz/16 Bit file
+is about 22%. Folve can make use of multiple cores in parallel file accesses.
 
 Because input and output files are compressed, we cannot predict what the
 relationship between file-offset and sample-number is; so skipping forward
@@ -73,16 +74,20 @@ This project is notably based on
  * Microhttpd webserver library <http://www.gnu.org/software/libmicrohttpd/>
 
 
-### Compiling on Ubuntu (tested on 11.10 and 12.04) ###
+### Compiling ###
+Tested on Ubuntu (tested on > 11.10), various Debian versions and the
+common Debian version on the Raspberry Pi.
 
-  This requires the latest versions of some development libraries.
+For compilation, we need some development libraries, easiest to install
+via the package manager:
 
     sudo apt-get install libsndfile-dev libflac-dev libzita-convolver-dev \
                          libfuse-dev libmicrohttpd-dev
+    # Now just compile folve.
     make
     sudo make install
 
-For hints on how to compile on older systems see INSTALL.md.
+For hints on how to compile on older systems see [INSTALL.md](./INSTALL.md).
 
 (TODO: create a debian package)
 
@@ -212,7 +217,7 @@ Options: (in sequence of usefulness)
         -r <refresh> : Seconds between refresh of status page;
                        Default is 10 seconds; switch off with -1.
         -g           : Gapless convolving alphabetically adjacent files.
-        -b <KibiByte>: Predictive pre-buffer by given KiB (64...16384). Disable with -1. Default 2048.
+        -b <KibiByte>: Predictive pre-buffer by given KiB (64...16384). Disable with -1. Default 128.
         -O <factor>  : Oversize: Multiply orig. file sizes with this. Default 1.25.
         -o <mnt-opt> : other generic mount parameters passed to FUSE.
         -P <pid-file>: Write PID to this file.
@@ -228,6 +233,11 @@ certainly want to switch on gapless convolving with `-g`. If a file ends with
 not enough samples to fill the FIR filter input, the gap is bridged by
 including the first samples of the alphabetically next file in that
 directory -- and the result is split between these two files.
+
+The buffer size `-b` flag tells folve how much it should attempt to pre-convolve
+a file if CPU permits. The default settings is pretty minimial; you typically want
+this to be above 1024, in particular if your player reading from the filesystem
+does not a good job of pre-buffering itself.
 
 ### Misc ###
 To manually switch the configuration from the command line, you can use `wget`

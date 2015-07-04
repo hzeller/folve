@@ -289,7 +289,7 @@ static int usage(const char *prg) {
          "\t               Default is %d seconds; switch off with -1.\n"
          "\t-g           : Gapless convolving alphabetically adjacent files.\n"
          "\t-b <KibiByte>: Predictive pre-buffer by given KiB (%d...%d). "
-         "Disable with -1. Default 2048.\n"
+         "Disable with -1. Default 128.\n"
          "\t-O <factor>  : Oversize: Multiply orig. file sizes with this. "
          "Default 1.25.\n"
          "\t-o <mnt-opt> : other generic mount parameters passed to FUSE.\n"

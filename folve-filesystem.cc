@@ -44,7 +44,7 @@
 #include "util.h"
 
 FolveFilesystem::FolveFilesystem()
-  : gapless_processing_(false), pre_buffer_size_(2048 << 10),
+  : gapless_processing_(false), pre_buffer_size_(128 << 10),
     open_file_cache_(4),
     processor_pool_(3), buffer_thread_(NULL),
     total_file_openings_(0), total_file_reopen_(0),
