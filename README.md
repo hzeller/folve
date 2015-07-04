@@ -171,7 +171,8 @@ but there is no pause - or gap - between these tracks).
 Gapless convolving in folve needs to do that as well; however it needs to predict
 what file the player is about to open. On the filesystem layer it can't definitiely
 know what that would be. However by common convention, files that are
-consecutive are alphabetically sorted in the fileysten (01-foo.flac, 02-bar.flac..).
+consecutive are alphabetically sorted in the fileysten
+(`01-foo.flac`, `02-bar.flac`..).
 With that heuristic, folve can provide reliable gapless convolving.
 
 You can switch it on with the `-g` option:
@@ -180,9 +181,9 @@ You can switch it on with the `-g` option:
             /path/to/your/directory/with/flacs /tmp/test-mount
 
 Of course, you need to make sure to use players that can do gapless playback. In our
-simple example with the mplayer, you need to use the `--gapless-audio` option. You
-typically would use a different audio player so make sure to switch it on there if it
-is not already.
+simple example with the mplayer, you need to use the `--gapless-audio` option; in your
+audio player you need to look what that equivalent is (some support it right out of
+the box).
 
      mplayer --gapless-audio /tmp/test-mount/*
 
