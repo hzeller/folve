@@ -1,7 +1,8 @@
 Folve - FUSE convolve
 =====================
 Folve is a FUSE filesystem that convolves audio files on-the-fly including gapless support.
-Controllable via web interface.
+
+Filter switching and general status provided via web interface.
 
 ![Folve screen](./img/folve-screen.png)
 
@@ -192,30 +193,31 @@ the box).
 
 In the folve web-frontend, you see the gapless joining with little arrows `->`.
 You also see that folve already startes pre-buffering the beginning of the
-next file while it still plays the previous one
+next file while it still plays the previous one:
 
 ![Gapless joining](./img/folve-gapless-prebuffer.png)
 
 ### General usage: ###
-
-    usage: folve [options] <original-dir> <mount-point-dir>
-    Options: (in sequence of usefulness)
-      -C <cfg-dir> : Convolver base configuration directory.
-                     Sub-directories name the different filters.
-                     Select on the HTTP status page.
-      -p <port>    : Port to run the HTTP status server on.
-      -r <refresh> : Seconds between refresh of status page;
-                     Default is 10 seconds; switch off with -1.
-      -g           : Gapless convolving alphabetically adjacent files.
-      -b <KibiByte>: Predictive pre-buffer by given KiB (64...16384).
-      -O <factor>  : Oversize: Multiply orig. file sizes with this. Default 1.25.
-      -o <mnt-opt> : other generic mount parameters passed to FUSE.
-      -P <pid-file>: Write PID to this file.
-      -D           : Moderate volume Folve debug messages to syslog,
-                     and some more detailed configuration info in UI
-      -f           : Operate in foreground; useful for debugging.
-      -d           : High volume FUSE debug log. Implies -f.
-      -R <file>    : Debug readdir() & stat() calls. Output to file.
+```
+usage: ./folve [options] <original-dir> <mount-point-dir>
+Options: (in sequence of usefulness)
+        -C <cfg-dir> : Convolver base configuration directory.
+                       Sub-directories name the different filters.
+                       Select on the HTTP status page.
+        -p <port>    : Port to run the HTTP status server on.
+        -r <refresh> : Seconds between refresh of status page;
+                       Default is 10 seconds; switch off with -1.
+        -g           : Gapless convolving alphabetically adjacent files.
+        -b <KibiByte>: Predictive pre-buffer by given KiB (64...16384). Disable with -1. Default 2048.
+        -O <factor>  : Oversize: Multiply orig. file sizes with this. Default 1.25.
+        -o <mnt-opt> : other generic mount parameters passed to FUSE.
+        -P <pid-file>: Write PID to this file.
+        -D           : Moderate volume Folve debug messages to syslog,
+                       and some more detailed configuration info in UI
+        -f           : Operate in foreground; useful for debugging.
+        -d           : High volume FUSE debug log. Implies -f.
+        -R <file>    : Debug readdir() & stat() calls. Output to file.
+```
 
 If you're listening to classical music, opera or live-recordings, then you
 certainly want to switch on gapless convolving with `-g`. If a file ends with
