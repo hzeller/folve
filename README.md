@@ -39,6 +39,8 @@ little CPU (on my fairly old notebook ~3% on one core). So this should work as
 well on low-CPU machines; on a Raspberry Pi 2, the CPU load to convolve a
 44.1kHz/16 Bit file is about 22%. Folve can make use of multiple cores in
 parallel file accesses.
+Many NAS systems have enough CPU to transparently run folve even for sophisticated
+filters.
 
 Because input and output files are compressed, we cannot predict what the
 relationship between file-offset and sample-number is; so skipping forward
