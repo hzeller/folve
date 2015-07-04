@@ -130,7 +130,7 @@ bool SoundProcessor::ConfigStillUpToDate() const {
   // config is still the same timestamp.
   return config_file_timestamp_ == GetModificationTime(config_file_);
 }
-    
+
 void SoundProcessor::ResetMaxValues() {
   max_out_value_observed_ = 0.0;
 }

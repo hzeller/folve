@@ -1,7 +1,7 @@
 // -------------------------------------------------------------------------
 //
 //    Copyright (C) 2009-2010 Fons Adriaensen <fons@linuxaudio.org>
-//    
+//
 //    This program is free software; you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
 //    the Free Software Foundation; either version 2 of the License, or
@@ -22,7 +22,7 @@
 #include <ctype.h>
 
 
-#define SQUOTE 39 
+#define SQUOTE 39
 #define DQUOTE 34
 #define BSLASH 92
 
@@ -111,7 +111,6 @@ int sstring (const char *srce, char *dest, int size)
 	}
 	// Normal character.
 	dest [j++] = c;
-    }	    
+    }
     return 0;
 }
-

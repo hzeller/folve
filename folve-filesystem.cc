@@ -170,7 +170,7 @@ bool FolveFilesystem::SanitizeConfigSubdir(std::string *subdir_path) const {
 
   // Derive from sanitized dir. So someone can write lowpass/../highpass
   // or '.' for empty filter. Or ./highpass. And all work.
-  *subdir_path = ((strlen(verified) == base_config_dir_.length()) 
+  *subdir_path = ((strlen(verified) == base_config_dir_.length())
                   ? ""   // chose subdir '.'
                   : verified + base_config_dir_.length() + 1 /*slash*/);
   return true;
@@ -256,4 +256,3 @@ const std::set<std::string> FolveFilesystem::ListConfigDirs(bool warn_invalid)
   closedir(dp);
   return result;
 }
-

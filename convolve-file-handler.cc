@@ -2,7 +2,7 @@
 //  Folve - A fuse filesystem that convolves audio files on-the-fly.
 //
 //  Copyright (C) 2012 Henner Zeller <h.zeller@acm.org>
-//    
+//
 //  This program is free software; you can redistribute it and/or modify
 //  it under the terms of the GNU General Public License as published by
 //  the Free Software Foundation; either version 3 of the License, or
@@ -79,7 +79,7 @@ FileHandler *ConvolveFileHandler::Create(FolveFilesystem *fs,
                                  underlying_file, filedes, snd, in_info,
                                  *partial_file_info, processor);
 }
-  
+
 ConvolveFileHandler::~ConvolveFileHandler() {
   output_buffer_->NotifyFileComplete();
   fs_->QuitBuffering(output_buffer_);  // stop working on our files.
@@ -490,7 +490,7 @@ void ConvolveFileHandler::Close() {
     syslog(LOG_ERR, "Observed output clipping in '%s': "
            "Max=%.3f; Multiply gain with <= %.5f in %s",
            base_stats_.filename.c_str(), base_stats_.max_output_value,
-           1.0 / base_stats_.max_output_value, 
+           1.0 / base_stats_.max_output_value,
            processor_ != NULL ? processor_->config_file().c_str() : "filter");
   }
   fs_->processor_pool()->Return(processor_);

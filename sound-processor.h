@@ -2,7 +2,7 @@
 //  Folve - A fuse filesystem that convolves audio files on-the-fly.
 //
 //  Copyright (C) 2012 Henner Zeller <h.zeller@acm.org>
-//    
+//
 //  This program is free software; you can redistribute it and/or modify
 //  it under the terms of the GNU General Public License as published by
 //  the Free Software Foundation; either version 3 of the License, or
@@ -35,7 +35,7 @@ public:
   int FillBuffer(SNDFILE *in);
 
   inline int input_channels() const { return zita_config_.ninp; }
-  inline int output_channels() const { return zita_config_.nout;} 
+  inline int output_channels() const { return zita_config_.nout;}
 
   // Returns if the input buffer has enought samples for the FIR-filter
   // to process. If not, another call to FillBuffer() is needed.
@@ -63,7 +63,7 @@ public:
 
   // Config file used to create this processor.
   const std::string &config_file() const { return config_file_; }
-  const time_t config_file_timestamp() const { return config_file_timestamp_; }
+  time_t config_file_timestamp() const { return config_file_timestamp_; }
 
   // Verifies if configuration is still up-to-date.
   bool ConfigStillUpToDate() const;

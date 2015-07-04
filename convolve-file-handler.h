@@ -2,7 +2,7 @@
 //  Folve - A fuse filesystem that convolves audio files on-the-fly.
 //
 //  Copyright (C) 2012 Henner Zeller <h.zeller@acm.org>
-//    
+//
 //  This program is free software; you can redistribute it and/or modify
 //  it under the terms of the GNU General Public License as published by
 //  the Free Software Foundation; either version 3 of the License, or
@@ -41,7 +41,7 @@ public:
                              const std::string &filter_subdir,
                              const std::string &zita_config_dir,
                              HandlerStats *partial_file_info);
-  
+
   virtual ~ConvolveFileHandler();
 
   // -- FileHandler interface

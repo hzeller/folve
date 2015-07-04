@@ -72,7 +72,7 @@ public:
 
   // Accept processor passed on from the previous file. Can return false
   // if this FileHandler cannot use it (e.g. it alrady started convolving).
-  // The Receiver must not use this processor until 
+  // The Receiver must not use this processor until
   // NotifyPassedProcessorUnreferenced() is called.
   virtual bool PassoverProcessor(SoundProcessor *s) { return false; }
 

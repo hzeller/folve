@@ -57,5 +57,3 @@ extern void makeports (void);
 
 
 #endif
-
-

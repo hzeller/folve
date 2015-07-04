@@ -1,7 +1,7 @@
 //  -----------------------------------------------------------------------------
 //
 //  Copyright (C) 2006-2011 Fons Adriaensen <fons@linuxaudio.org>
-//  
+//
 //  Modifications to work with Folve
 //  Copyright (C) 2012 Henner Zeller <h.zeller@acm.org>
 //
@@ -55,7 +55,7 @@ static int readfile (ZitaConfig *cfg,
     unsigned int  delay;
     unsigned int  offset;
     unsigned int  length;
-    unsigned int  ichan, nchan; 
+    unsigned int  ichan, nchan;
     int           n, ifram, nfram, err;
     char          file [1024];
     char          path [1024];
@@ -74,14 +74,14 @@ static int readfile (ZitaConfig *cfg,
 	{
 	    delay -= k;
 	}
-	else 
+	else
 	{
 	    k -= delay;
 	    delay = 0;
 	    offset += k;
 	    syslog(LOG_ERR, "%s:%d: First %d frames removed by latency compensation.\n", cfg->config_file, lnum, k);
 	}
-    }		
+    }
     err = check_inout (cfg, ip1, op1);
     if (err) return err;
 
@@ -98,7 +98,7 @@ static int readfile (ZitaConfig *cfg,
        syslog(LOG_ERR, "%s:%d: Unable to open '%s' >%s<.\n", cfg->config_file,
               lnum, path, cdir);
         return ERR_OTHER;
-    } 
+    }
 
     if (audio.rate () != (int) cfg->fsamp)
     {
@@ -114,22 +114,22 @@ static int readfile (ZitaConfig *cfg,
                cfg->config_file, lnum);
         audio.close ();
         return ERR_OTHER;
-    } 
+    }
     if (offset && audio.seek (offset))
     {
         syslog(LOG_ERR, "%s:%d: Can't seek to offset.\n",
                cfg->config_file, lnum);
         audio.close ();
         return ERR_OTHER;
-    } 
+    }
     if (! length) length = nfram - offset;
-    if (length > cfg->size - delay) 
+    if (length > cfg->size - delay)
     {
 	length = cfg->size - delay;
    	syslog(LOG_ERR, "%s:%d: Data truncated.\n", cfg->config_file, lnum);
     }
 
-    try 
+    try
     {
         buff = new float [BSIZE * nchan];
     }
@@ -282,12 +282,12 @@ int config (ZitaConfig *cfg, const char *config_file)
     char          cdir [1024];
     char          *p, *q;
 
-    if (! (F = fopen (config_file, "r"))) 
+    if (! (F = fopen (config_file, "r")))
     {
         syslog(LOG_ERR, "Can't open '%s' for reading\n", config_file);
         return -1;
-    } 
-    
+    }
+
     // dirname() modifies the input
     char *config_name_copy = strdup(config_file);
     strcpy (cdir, dirname(config_name_copy));
@@ -301,7 +301,7 @@ int config (ZitaConfig *cfg, const char *config_file)
     while (! stat && fgets (line, 1024, F))
     {
         lnum++;
-        p = line; 
+        p = line;
         if (*p != '/')
 	{
             while (isspace (*p)) p++;
@@ -325,14 +325,14 @@ int config (ZitaConfig *cfg, const char *config_file)
               strcat(cdir, "/");
               strcat(cdir, tmp);
             }
-        }	
+        }
         else if (! strcmp (p, "/convolver/new"))   stat = convnew (cfg, q, lnum);
         else if (! strcmp (p, "/impulse/read"))    stat = readfile (cfg, q, lnum, cdir);
-        else if (! strcmp (p, "/impulse/dirac"))   stat = impdirac (cfg, q, lnum); 
-        else if (! strcmp (p, "/impulse/hilbert")) stat = imphilbert (cfg, q, lnum); 
-        else if (! strcmp (p, "/impulse/copy"))    stat = impcopy (cfg, q, lnum); 
-        else if (! strcmp (p, "/input/name"))      stat = inpname (cfg, q); 
-        else if (! strcmp (p, "/output/name"))     stat = outname (cfg, q); 
+        else if (! strcmp (p, "/impulse/dirac"))   stat = impdirac (cfg, q, lnum);
+        else if (! strcmp (p, "/impulse/hilbert")) stat = imphilbert (cfg, q, lnum);
+        else if (! strcmp (p, "/impulse/copy"))    stat = impcopy (cfg, q, lnum);
+        else if (! strcmp (p, "/input/name"))      stat = inpname (cfg, q);
+        else if (! strcmp (p, "/output/name"))     stat = outname (cfg, q);
         else stat = ERR_COMMAND;
     }
 
@@ -365,10 +365,9 @@ int config (ZitaConfig *cfg, const char *config_file)
             syslog(LOG_ERR, "Bad input or output number.\n");
 	    break;
 	default:
-	    syslog(LOG_ERR, "Unknown error.\n");		     
+	    syslog(LOG_ERR, "Unknown error.\n");
 	}
     }
 
     return stat;
 }
-
