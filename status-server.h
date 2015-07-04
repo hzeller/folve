@@ -82,8 +82,6 @@ private:
   int expunged_retired_;
   folve::Mutex retired_mutex_;
 
-  double total_seconds_filtered_;
-  double total_seconds_music_seen_;
   int meta_refresh_time_;
   FolveFilesystem *filesystem_;
   struct MHD_Daemon *daemon_;
