@@ -1,6 +1,6 @@
 Folve - FUSE convolve
 =====================
-Folve is a FUSE filesystem that convolves audio files on-the-fly.
+Folve is a FUSE filesystem that convolves audio files on-the-fly including gapless support.
 
 Overview
 --------
@@ -76,7 +76,7 @@ This project is notably based on
 
 For hints on how to compile on older systems see INSTALL.md.
 
-(TODO: debian package)
+(TODO: create a debian package)
 
 ### Let's test it! ###
 Folve requires at least two parameters: the directory where your original
@@ -85,8 +85,8 @@ FLAC files reside and the mount point of this filesystem.
 Also, do be useful, you need to supply the directory that contains filter
 directories with the `-C <config-dir>` option.
 Very useful is the `-p <port>` that starts a HTTP status server. Let's use
-some example filters from this distribution;
-if you are in the Folve source directory, you find the directory `demo-filters/`
+some example filters from this distribution.
+If you are in the Folve source directory, you find the directory `demo-filters/`
 that contains subdirectories with filters. If we pass this directory to folve,
 folve will search in this directory for named filters:
 
@@ -94,8 +94,12 @@ folve will search in this directory for named filters:
     ./folve -C demo-filters -p 17322 -f \
             /path/to/your/directory/with/flacs /tmp/test-mount
 
-Now you can access the fileystem under that mount point; it has the same
-structure as your original directory.
+The `-f` option makes folve run in the foreground.
+
+Now you can access the fileystem under that generated mount point
+`/tmp/test-mount`; it has the same structure as your original directory.
+So in another shell, you can now run any music player that reads files
+and point it to the new location:
 
     mplayer /tmp/test-mount/foo.flac
 
@@ -155,6 +159,32 @@ the output is filtered on-the-fly, otherwise the original file is returned.
 
 (I am looking for filter construction tools on Linux; if you know some,
 please let me know.)
+
+### Gapless joining ###
+In gapless playback the media players make sure that there is no audible gap
+between playing one file and the next, by joining the last waveform sample of
+the last file with the first of the next.
+(If you never heard this term, it is mostly useful for recording of concerts
+where there is one continuous recording that are logically separated in tracks,
+but there is no pause - or gap - between these tracks).
+
+Gapless convolving in folve needs to do that as well; however it needs to predict
+what file the player is about to open. On the filesystem layer it can't definitiely
+know what that would be. However by common convention, files that are
+consecutive are alphabetically sorted in the fileysten (01-foo.flac, 02-bar.flac..).
+With that heuristic, folve can provide reliable gapless convolving.
+
+You can switch it on with the `-g` option:
+
+    ./folve -C demo-filters -p 17322 -g \
+            /path/to/your/directory/with/flacs /tmp/test-mount
+
+Of course, you need to make sure to use players that can do gapless playback. In our
+simple example with the mplayer, you need to use the `--gapless-audio` option. You
+typically would use a different audio player so make sure to switch it on there if it
+is not already.
+
+     mplayer --gapless-audio /tmp/test-mount/*
 
 ### General usage: ###
 
