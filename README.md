@@ -1,8 +1,13 @@
 Folve - FUSE convolve
 =====================
-Folve is a FUSE filesystem that convolves audio files on-the-fly including gapless support.
+Folve is a FUSE filesystem that convolves audio files on-the-fly including
+gapless support.
 
-Filter switching and general status provided via web interface.
+Need to have precision-filtered audio adapted for your speakers and room (or just
+for effects), but your audio system doesn't have plug-ins for Finite-Impulse-Response
+filters and just can read files ? Folve is for you!
+
+Filter selection and general status provided via web interface.
 
 ![Folve screen](./img/folve-screen.png)
 
@@ -52,9 +57,8 @@ media server, Folve extracts and serves the headers from the original files
 before continuing with the convolved audio stream.
 
 Folve has been tested with some players and media servers (and
-works around bugs in these). Still, this is the first version made public, so
-expect rough edges. Please report observations with particular media servers
-or provide patches through github
+works around bugs in these). Please report strange observations with particular
+media servers or provide patches through github
 <https://github.com/hzeller/folve>.
 
 This project is notably based on
