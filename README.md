@@ -243,9 +243,9 @@ including the first samples of the alphabetically next file in that
 directory -- and the result is split between these two files.
 
 The buffer size `-b` flag tells folve how much it should attempt to pre-convolve
-a file if CPU permits. The default settings is pretty minimial; you typically want
-this to be above 1024, in particular if your player reading from the filesystem
-does not do a good job of pre-buffering itself.
+a file if CPU permits. The default setting is pretty minimial; you typically want
+this to be at or above 1024, in particular if your player reading from the
+filesystem does not do a good job of pre-buffering itself.
 
 ### Misc ###
 To manually switch the configuration from the command line, you can use `wget`
