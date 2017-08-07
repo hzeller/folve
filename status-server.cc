@@ -94,7 +94,7 @@ static const char kCSS[] =
   " td { text-wrap:none; white-space:nowrap; }\n"
   " .fn { font-size:small; text-wrap:none; white-space:nowrap; }\n"  // filename
   " .pf { width:" PROGRESS_WIDTH "px;\n"                   // progress frame
-  "       background: white; border:1px solid black; }\n" 
+  "       background: white; border:1px solid black; }\n"
   " .nf { text-align:right; }\n"                           // number formatting.
   " .fb { background-color:#c0c0c0;"                       // format box
   "        border-radius: 3px;\n"
@@ -150,13 +150,15 @@ int StatusServer::HandleHttp(void* user_argument,
     server->SetFilter(MHD_lookup_connection_value(connection,
                                                   MHD_GET_ARGUMENT_KIND, "f"));
     // We redirect to slash after this, to remove parameters from the GET-URL
-    response = MHD_create_response_from_data(0, (void*)"", MHD_NO, MHD_NO);
+    response = MHD_create_response_from_buffer(0, (void*)"",
+                                               MHD_RESPMEM_PERSISTENT);
     MHD_add_response_header(response, "Location", "/");
     ret = MHD_queue_response(connection, 302, response);
   } else {
     const std::string &page = server->CreateHttpPage();
-    response = MHD_create_response_from_data(page.length(), (void*) page.data(),
-                                             MHD_NO, MHD_NO);
+    response = MHD_create_response_from_buffer(page.length(),
+                                               (void*) page.data(),
+                                               MHD_RESPMEM_MUST_COPY);
     MHD_add_response_header(response, "Content-Type",
                             "text/html; charset=utf-8");
     ret = MHD_queue_response(connection, MHD_HTTP_OK, response);
@@ -401,7 +403,7 @@ void StatusServer::CreatePage(bool for_http, std::string *content) {
             filesystem_->underlying_dir().c_str(),
             filesystem_->base_config_dir().c_str());
   }
-  
+
   AppendSettingsForm(for_http, content);
 
   std::vector<HandlerStats> stat_list;
