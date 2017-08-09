@@ -96,18 +96,6 @@ private:
   folve::Mutex io_mutex_;
 } rlog;
 
-static char *concat_path(char *buf, const char *a, const char *b) {
-  strcpy(buf, a);
-  strcat(buf, b);
-  return buf;
-}
-
-// Given a relative path from the root of the mounted file-system, get the
-// original file from the source filesystem.
-static const char *assemble_orig_path(char *buf, const char *path) {
-  return concat_path(buf, folve_rt.fs->underlying_dir().c_str(), path);
-}
-
 // Essentially lstat(). Just forward to the original filesystem (this
 // will by lying: our convolved files are of different size...)
 static int folve_getattr(const char *path, struct stat *stbuf) {
@@ -121,8 +109,7 @@ static int folve_getattr(const char *path, struct stat *stbuf) {
   // estimate.
   int result = folve_rt.fs->StatByFilename(path, stbuf);
   if (result != 0) {
-    char path_buf[PATH_MAX];
-    result = lstat(assemble_orig_path(path_buf, path), stbuf);
+    result = lstat(folve_rt.fs->GetUnderlyingFile(path).c_str(), stbuf);
     rlog.Log("STAT %s mode=%03o %s %s %s", path,
              stbuf->st_mode & 0777, S_ISDIR(stbuf->st_mode) ? "DIR" : "",
              (result == -1) ? strerror(errno) : "",
@@ -145,12 +132,21 @@ static int folve_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     struct stat st;
     memset(&st, 0, sizeof(st));
     filler(buf, kStatusFileName + 1, &st, 0);
+
+    // If configured, toplevel directories represent the filter names
+    if (folve_rt.fs->toplevel_directory_is_filter()) {
+      for (const std::string& cfg : folve_rt.fs->GetAvailableConfigDirs()) {
+        // Use underscore for the passthrough-path
+        const char *pathname = cfg.empty() ? "_" : cfg.c_str();
+        memset(&st, 0, sizeof(st));
+        filler(buf, pathname, &st, 0);
+      }
+      return 0;
+    }
   }
 
   DIR *dp;
-  char path_buf[PATH_MAX];
-
-  dp = opendir(assemble_orig_path(path_buf, path));
+  dp = opendir(folve_rt.fs->GetUnderlyingFile(path).c_str());
   if (dp == NULL)
     return -errno;
 
@@ -176,8 +172,7 @@ static int folve_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
 // readlink(): forward to original filesystem.
 static int folve_readlink(const char *path, char *buf, size_t size) {
-  char path_buf[PATH_MAX];
-  const int result = readlink(assemble_orig_path(path_buf, path),
+  const int result = readlink(folve_rt.fs->GetUnderlyingFile(path).c_str(),
                               buf, size - 1);
   if (result == -1)
     return -errno;
@@ -202,9 +197,9 @@ static int folve_open(const char *path, struct fuse_file_info *fi) {
   // stuff a pointer to our file handler object in there :)
   // (Yay, someone was thinking while developing that API).
   FileHandler *handler = folve_rt.fs->GetOrCreateHandler(path);
+  fi->fh = (uint64_t) handler;
   if (handler == NULL)
     return -errno;
-  fi->fh = (uint64_t) handler;
   return 0;
 }
 
@@ -279,6 +274,8 @@ static int usage(const char *prg) {
          "\t-C <cfg-dir> : Convolver base configuration directory.\n"
          "\t               Sub-directories name the different filters.\n"
          "\t               Select on the HTTP status page.\n"
+         "\t-t           : Filternames show up as toplevel directory instead\n"
+         "\t               of being switched in the HTTP status server.\n"
          "\t-p <port>    : Port to run the HTTP status server on.\n"
          "\t-r <refresh> : Seconds between refresh of status page;\n"
          "\t               Default is %d seconds; switch off with -1.\n"
@@ -308,6 +305,7 @@ enum {
   FOLVE_OPT_DEBUG,
   FOLVE_OPT_DEBUG_READDIR,
   FOLVE_OPT_GAPLESS,
+  FOLVE_OPT_TOPLEVEL_DIR_FILTER,
 };
 
 int FolveOptionHandling(void *data, const char *arg, int key,
@@ -412,6 +410,10 @@ int FolveOptionHandling(void *data, const char *arg, int key,
   case FOLVE_OPT_GAPLESS:
     rt->fs->set_gapless_processing(true);
     return 0;
+
+  case FOLVE_OPT_TOPLEVEL_DIR_FILTER:
+    rt->fs->set_toplevel_directory_is_filter(true);
+    return 0;
   }
   return 1;
 }
@@ -434,6 +436,7 @@ int main(int argc, char *argv[]) {
     FUSE_OPT_KEY("-O ",  FOLVE_OPT_OVERSIZE_PREDICT),
     FUSE_OPT_KEY("-P ",  FOLVE_OPT_PID_FILE),
     FUSE_OPT_KEY("-g",  FOLVE_OPT_GAPLESS),
+    FUSE_OPT_KEY("-t",  FOLVE_OPT_TOPLEVEL_DIR_FILTER),
     FUSE_OPT_END   // This fails to compile for fuse <= 2.8.1; get >= 2.8.4
   };
   struct fuse_args args = FUSE_ARGS_INIT(argc, argv);

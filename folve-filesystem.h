@@ -1,8 +1,8 @@
-//  -*- c++ -*-
+//  -*- mode: c++; c-basic-offset: 2; indent-tabs-mode: nil; -*-
 //  Folve - A fuse filesystem that convolves audio files on-the-fly.
 //
 //  Copyright (C) 2012 Henner Zeller <h.zeller@acm.org>
-//    
+//
 //  This program is free software; you can redistribute it and/or modify
 //  it under the terms of the GNU General Public License as published by
 //  the Free Software Foundation; either version 3 of the License, or
@@ -30,7 +30,7 @@
 #include "processor-pool.h"
 
 #ifndef FOLVE_VERSION
-#define FOLVE_VERSION "[unknown version - compile from git]"
+#  define FOLVE_VERSION "[unknown version - compile from git]"
 #endif
 
 class ConversionBuffer;
@@ -50,6 +50,10 @@ public:
     base_config_dir_ = config_dir;
   }
   const std::string &base_config_dir() const { return base_config_dir_; }
+
+  // Given the path in the folve-filesystem, return the underlying operating
+  // system path.
+  std::string GetUnderlyingFile(const char *path) const;
 
   // Return a set of available named configurations. Essentially the names
   // of subdirectories in the configuration dir.
@@ -73,7 +77,7 @@ public:
   // path.
   // Returns NULL, if it cannot be created.
   FileHandler *GetOrCreateHandler(const char *fs_path);
-  
+
   // Inform filesystem that this file handler is not needed anymore
   // (FS still might consider keeping it around for a while).
   void Close(const char *fs_path, const FileHandler *handler);
@@ -92,6 +96,9 @@ public:
 
   void set_gapless_processing(bool b) { gapless_processing_ = b; }
   bool gapless_processing() const { return gapless_processing_; }
+
+  void set_toplevel_directory_is_filter(bool b) { toplevel_dir_is_filter_ = b; }
+  bool toplevel_directory_is_filter() const { return toplevel_dir_is_filter_; }
 
   // Should we attempt to pre-buffer files ?
   void set_pre_buffer_size(int b) { pre_buffer_size_ = b; }
@@ -135,11 +142,15 @@ private:
   // reported.
   const std::set<std::string> ListConfigDirs(bool warn_invalid) const;
 
+  // Extract filter name from path if needed.
+  bool ExtractFilterName(const char *path, std::string *filter) const;
+
   std::string underlying_dir_;
   std::string base_config_dir_;
 
   std::string current_config_subdir_;
   bool gapless_processing_;
+  bool toplevel_dir_is_filter_;
   int pre_buffer_size_;
   FileHandlerCache open_file_cache_;
   ProcessorPool processor_pool_;

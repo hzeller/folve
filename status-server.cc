@@ -361,7 +361,7 @@ void StatusServer::AppendSettingsForm(bool for_http, std::string *out) {
                 "Affects re- or newly opened files.</span>");
     filter_switched_ = false;  // only show once.
   }
-  out->append("</p><hr style='clear:both;'/>");
+  out->append("</p>");
 }
 
 struct CompareStats {
@@ -404,7 +404,12 @@ void StatusServer::CreatePage(bool for_http, std::string *content) {
             filesystem_->base_config_dir().c_str());
   }
 
-  AppendSettingsForm(for_http, content);
+  if (!filesystem_->toplevel_directory_is_filter()) {
+      // Only show settings form if we are not representing the toplevel
+      // directories as filters.
+      AppendSettingsForm(for_http, content);
+  }
+  content->append("<hr style='clear:both;'/>");
 
   std::vector<HandlerStats> stat_list;
   filesystem_->handler_cache()->GetStats(&stat_list);

@@ -44,7 +44,8 @@
 #include "util.h"
 
 FolveFilesystem::FolveFilesystem()
-  : gapless_processing_(false), pre_buffer_size_(128 << 10),
+  : gapless_processing_(false), toplevel_dir_is_filter_(false),
+    pre_buffer_size_(128 << 10),
     open_file_cache_(4),
     processor_pool_(3), buffer_thread_(NULL),
     total_file_openings_(0), total_file_reopen_(0),
@@ -91,10 +92,28 @@ std::string FolveFilesystem::CacheKey(const std::string &config_path,
   return config_path + fs_path;
 }
 
+bool FolveFilesystem::ExtractFilterName(const char *path,
+                                        std::string *filter) const {
+  if (toplevel_directory_is_filter()) {
+    const char *found = strchr(path + 1, '/');
+    if (found == NULL) return false;  // not even a complete first path-element
+    filter->assign(path + 1, found - path - 1);
+    if (*filter == "_") { filter->clear(); }
+    return GetAvailableConfigDirs().count(*filter) != 0;
+  } else {
+    *filter = current_config_subdir_;
+    return true;
+  }
+}
+
 FileHandler *FolveFilesystem::GetOrCreateHandler(const char *fs_path) {
-  const std::string config_path = current_config_subdir_;
+  std::string config_path;
+  if (!ExtractFilterName(fs_path, &config_path)) {
+    errno = ENOENT;   // Invalid toplevel directory.
+    return NULL;
+  }
   const std::string cache_key = CacheKey(config_path, fs_path);
-  const std::string underlying_file = underlying_dir() + fs_path;
+  const std::string underlying_file = GetUnderlyingFile(fs_path);
   FileHandler *handler = open_file_cache_.FindAndPin(cache_key);
   if (handler == NULL) {
     int filedes = open(underlying_file.c_str(), O_RDONLY);
@@ -109,6 +128,18 @@ FileHandler *FolveFilesystem::GetOrCreateHandler(const char *fs_path) {
   }
   return handler;
 }
+
+std::string FolveFilesystem::GetUnderlyingFile(const char *path) const {
+  if (toplevel_directory_is_filter()) {  // chuck of the first part.
+    const char *found = strchr(path + 1, '/');
+    path = found ? found : "";
+    // TODO: we're not testing if the toplevel directory=filtername actually
+    // exists. So it is possible to ls /mnt/invalid-dir. Not a big deal and
+    // costs some config-dir scanning, so avoiding for performance right now.
+  }
+  return underlying_dir() + path;
+}
+
 
 int FolveFilesystem::StatByFilename(const char *fs_path, struct stat *st) {
   const std::string cache_key = CacheKey(current_config_subdir_, fs_path);
@@ -137,7 +168,7 @@ static bool IsDirectory(const std::string &path) {
 bool FolveFilesystem::ListDirectory(const std::string &fs_dir,
                                     const std::string &suffix,
                                     std::set<std::string> *files) {
-  const std::string real_dir = underlying_dir() + fs_dir;
+  const std::string real_dir = GetUnderlyingFile(fs_dir.c_str());
   DIR *dp = opendir(real_dir.c_str());
   if (dp == NULL) return false;
   struct dirent *dent;

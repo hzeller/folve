@@ -14,6 +14,11 @@ Filter selection and general status provided via web interface.
 Overview
 --------
 
+Folve provides a filesystem that convolves files on-the-fly as a media server
+or application reads them. This helps in cases where media servers or
+applications do not provide an independent convolve option, but only can read
+files.
+
 The Folve FUSE filesystem takes a path to a directory of FLAC files, and provides
 these files at a mount point. Other file formats than FLAC should work as well,
 but not all are working well for streaming yet (and before you ask: MP3 is not
@@ -24,58 +29,6 @@ When a FLAC file is accessed through the mount point, Folve automatically
 convolves its original counterpart on-the-fly with a Finite Impulse
 Response (FIR) filter. The FIR filter is based on the jconvolver convolution
 engine.
-
-Folve can use the same filter configuration files that jconvolver uses. Folve
-requires a naming scheme, described later, for these files.
-
-In essence, Folve provides a filesystem that convolves files as a media server
-or application reads them; many media servers or applications do not provide
-an independent convolve option, but they all can read files.
-
-Filesystem accesses are optimized for streaming. If files are read sequentially,
-we only need to convolve whatever is requested, which minimizes CPU use if
-you do not need the full file. Simply playing a file in real-time will use very
-little CPU (on my fairly old notebook ~3% on one core). So this should work as
-well on low-CPU machines; on a Raspberry Pi 2, the CPU load to convolve a
-44.1kHz/16 Bit file is about 22%. Folve can make use of multiple cores in
-parallel file accesses.
-Many NAS systems have enough CPU to transparently run folve even for sophisticated
-filters.
-
-Because input and output files are compressed, we cannot predict what the
-relationship between file-offset and sample-number is; so skipping forward
-requires to convolve everything up to the point (the convolver is pretty fast
-though, so you'll hardly notice).
-
-While indexing, some media servers try to skip to the end of the file (do not
-know why, to check if the end is there ?), so there is code that detects this
-case so that we do not end up convolving whole files just for this. Also, some
-media servers continually watch the file size while playing, so we adapt
-predictions of the final filesize depending on the observed compression ratio.
-
-The files are decoded with libsndfile, convolved, and re-encoded with
-libsndfile. Libsndfile is very flexible in reading/writing all kinds
-of audio files, but the support for rich header tags is limited. To not loose
-information from the FLAC headers when indexing Folve-served files with a
-media server, Folve extracts and serves the headers from the original files
-before continuing with the convolved audio stream.
-
-Folve has been tested with some players and media servers (and
-works around bugs in these). Please report strange observations with particular
-media servers or provide patches through github
-<https://github.com/hzeller/folve>.
-
-This project is notably based on
-
- * FUSE: Filesystem in Userspace   <http://fuse.sourceforge.net/>
- * Zita Convolver <http://kokkinizita.linuxaudio.org/linuxaudio/downloads/zita-convolver-3.1.0.tar.bz2>
- * JConvolver <http://apps.linuxaudio.org/apps/all/jconvolver>
-     * Program files in the Folve project named zita-*.{h,cc} are derivatives of
-       files found in the jconvolver project. They implement the compatible
-       configuration file parsing.
- * LibSndfile r/w audio files <http://www.mega-nerd.com/libsndfile/>
- * Microhttpd webserver library <http://www.gnu.org/software/libmicrohttpd/>
-
 
 ### Compiling ###
 Tested on Ubuntu (tested on > 11.10), various Debian versions and the
@@ -139,9 +92,49 @@ directory with the `fusermount` command:
 
     fusermount -u /tmp/test-mount
 
+### Filter switching or filtered directory
+There are two modes in which you can operate `folve` in: filter switching or
+filtered directory.
+
+#### Filter switching ####
+The default mode is to mirror the original directory structure at the toplevel
+of the mount point. You then can change the currently active filter via the
+web-frontend (whose port you choose with the `-p` option). There are tabs at the
+top of the page that allow to choose the current filter:
+
+![](./img/folve-filter-choice.png)
+
+The mounting point directory looks like the original directory:
+
+![](./img/switching-dir.png)
+
+(You also see, that there is a `folve-status.html` file in the toplevel
+directory, which show a readonly version of the status page also served via
+the web-server).
+
+#### Filtered directory ####
+
+You can also choose to have the different filtered versions show up in
+different toplevel directories; choose this with the `-t` option:
+
+```
+-t           : Filternames show up as toplevel directory instead
+               of being switched in the HTTP status server.
+```
+
+![](./img/filter-dir.png)
+
+The toplevel directory contains names that are named like the available filters.
+Under each of these filter-directories, the original directory is mirrored. You
+choose the filter by playing the audio file in the corresponding directory.
+
+There is one special directory `_` (underscore) that contains the unfiltered
+content.
+
 ### Filter Configuration ###
-With the `-C` option, you give folve a directory in which it looks for
-subdirectories with named filter configurations.
+With the uppercase `-C` option, you give folve a directory in which it looks for
+subdirectories with named filter configurations. See
+the example [`demo-filters/`](./demo-filters) in this project.
 
 Filters are WAV files containing an impulse response (IR). This is
 used by jconvolver's convolution engine to create a
@@ -201,12 +194,10 @@ You can switch it on with the `-g` option:
     ./folve -C demo-filters -p 17322 -g \
             /path/to/your/directory/with/flacs /tmp/test-mount
 
-Of course, you need to make sure to use players that can do gapless playback. In our
-simple example with the mplayer, you need to use the `--gapless-audio` option; in your
-audio player you need to look what that equivalent is (some support it right out of
-the box).
-
-     mplayer --gapless-audio /tmp/test-mount/*
+Of course, you need to make sure to use players that can do gapless playback.
+In our older versions of mplayer you need to use the `--gapless-audio` option to
+make use of it, in your audio player you need to look what that equivalent is
+(some support it right out of the box).
 
 In the folve web-frontend, you see the gapless joining with little arrows `->`.
 You also see that folve already startes pre-buffering the beginning of the
@@ -218,22 +209,24 @@ next file while it still plays the previous one:
 ```
 usage: ./folve [options] <original-dir> <mount-point-dir>
 Options: (in sequence of usefulness)
-    -C <cfg-dir> : Convolver base configuration directory.
-                   Sub-directories name the different filters.
-                   Select on the HTTP status page.
-    -p <port>    : Port to run the HTTP status server on.
-    -r <refresh> : Seconds between refresh of status page;
-                   Default is 10 seconds; switch off with -1.
-    -g           : Gapless convolving alphabetically adjacent files.
-    -b <KibiByte>: Predictive pre-buffer by given KiB (64...16384). Disable with -1. Default 128.
-    -O <factor>  : Oversize: Multiply orig. file sizes with this. Default 1.25.
-    -o <mnt-opt> : other generic mount parameters passed to FUSE.
-    -P <pid-file>: Write PID to this file.
-    -D           : Moderate volume Folve debug messages to syslog,
-                   and some more detailed configuration info in UI
-    -f           : Operate in foreground; useful for debugging.
-    -d           : High volume FUSE debug log. Implies -f.
-    -R <file>    : Debug readdir() & stat() calls. Output to file.
+        -C <cfg-dir> : Convolver base configuration directory.
+                       Sub-directories name the different filters.
+                       Select on the HTTP status page.
+        -t           : Filternames show up as toplevel directory instead
+                       of being switched in the HTTP status server.
+        -p <port>    : Port to run the HTTP status server on.
+        -r <refresh> : Seconds between refresh of status page;
+                       Default is 10 seconds; switch off with -1.
+        -g           : Gapless convolving alphabetically adjacent files.
+        -b <KibiByte>: Predictive pre-buffer by given KiB (64...16384). Disable with -1. Default 128.
+        -O <factor>  : Oversize: Multiply orig. file sizes with this. Default 1.25.
+        -o <mnt-opt> : other generic mount parameters passed to FUSE.
+        -P <pid-file>: Write PID to this file.
+        -D           : Moderate volume Folve debug messages to syslog,
+                       and some more detailed configuration info in UI
+        -f           : Operate in foreground; useful for debugging.
+        -d           : High volume FUSE debug log. Implies -f.
+        -R <file>    : Debug readdir() & stat() calls. Output to file.
 ```
 
 If you're listening to classical music, opera or live-recordings, then you
@@ -258,3 +251,50 @@ The parameter given to `f=` is the name of the subdirectory in your base
 configuration directory. An empty string is no filter, i.e. 'pass through'.
 (And no, there is no security built-in. If you want people from
 messing with the configuration of your Folve-daemon, do not use `-p <port>` :)).
+
+## Details ##
+Filesystem accesses are optimized for streaming. If files are read sequentially,
+we only need to convolve whatever is requested, which minimizes CPU use if
+you do not need the full file. Simply playing a file in real-time will use very
+little CPU (on my fairly old notebook ~3% on one core). So this should work as
+well on low-CPU machines; on a Raspberry Pi 2, the CPU load to convolve a
+44.1kHz/16 Bit file is about 22%. Folve can make use of multiple cores in
+parallel file accesses.
+Many NAS systems have enough CPU to transparently run folve even for
+sophisticated filters.
+
+Because input and output files are compressed, we cannot predict what the
+relationship between file-offset and sample-number is; so skipping forward
+requires to convolve everything up to the point (the convolver is pretty fast
+though, so you'll hardly notice).
+
+While indexing, some media servers try to skip to the end of the file (do not
+know why, to check if the end is there ?), so there is code that detects this
+case so that we do not end up convolving whole files just for this. Also, some
+media servers continually watch the file size while playing, so we adapt
+predictions of the final filesize depending on the observed compression ratio.
+
+The files are decoded with libsndfile, convolved, and re-encoded with
+libsndfile. Libsndfile is very flexible in reading/writing all kinds
+of audio files, but the support for rich header tags is limited. To not loose
+information from the FLAC headers when indexing Folve-served files with a
+media server, Folve extracts and serves the headers from the original files
+before continuing with the convolved audio stream.
+
+Folve has been tested with some players and media servers (and
+works around bugs in these). Please report strange observations with particular
+media servers or provide patches through github
+<https://github.com/hzeller/folve>.
+
+## Project dependencies ##
+
+This project is notably based on
+
+ * FUSE: Filesystem in Userspace   <http://fuse.sourceforge.net/>
+ * Zita Convolver <http://kokkinizita.linuxaudio.org/linuxaudio/downloads/zita-convolver-3.1.0.tar.bz2>
+ * JConvolver <http://apps.linuxaudio.org/apps/all/jconvolver>
+     * Program files in the Folve project named zita-*.{h,cc} are derivatives of
+       files found in the jconvolver project. They implement the compatible
+       configuration file parsing.
+ * LibSndfile r/w audio files <http://www.mega-nerd.com/libsndfile/>
+ * Microhttpd webserver library <http://www.gnu.org/software/libmicrohttpd/>
