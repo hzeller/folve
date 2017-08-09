@@ -135,9 +135,11 @@ static int folve_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
     // If configured, toplevel directories represent the filter names
     if (folve_rt.fs->toplevel_directory_is_filter()) {
-      for (const std::string& cfg : folve_rt.fs->GetAvailableConfigDirs()) {
+      typedef std::set<std::string> dirset_t;
+      const dirset_t &dirs = folve_rt.fs->GetAvailableConfigDirs();
+      for (dirset_t::const_iterator it = dirs.begin(); it != dirs.end(); ++it) {
         // Use underscore for the passthrough-path
-        const char *pathname = cfg.empty() ? "_" : cfg.c_str();
+        const char *pathname = it->empty() ? "_" : it->c_str();
         memset(&st, 0, sizeof(st));
         filler(buf, pathname, &st, 0);
       }
