@@ -30,6 +30,18 @@
 #include "util.h"
 #include "zita-config.h"
 
+/*
+ * The blocksize we are going to write the output flac files with. This
+ * is essentially a constant of the internals between libsndfile and libflac.
+ * There should be a better way to extract this value, but for now we just
+ * define it to whatever was observed.
+ * (e.g. somewhere in the past it changed from 1152 to 4096).
+ * Made an #define so that we can override it on the compile commandline.
+ */
+#ifndef FLAC_BLOCK_SIZE
+#  define FLAC_BLOCK_SIZE 4096
+#endif
+
 using folve::DLogf;
 using folve::Appendf;
 using folve::StringPrintf;
@@ -112,6 +124,7 @@ int ConvolveFileHandler::Read(char *buf, size_t size, off_t offset) {
       return 0;
     }
   }
+
   // The following read might block and call WriteToSoundfile() until the
   // buffer is filled.
   int result = output_buffer_->Read(buf, size, offset);
@@ -270,10 +283,10 @@ void ConvolveFileHandler::SetOutputSoundfile(ConversionBuffer *out_buffer,
   // http://flac.sourceforge.net/format.html
   // Also, number of output channels might be different.
   if (copy_flac_header_verbatim_) {
-    out_buffer->WriteCharAt((1152 & 0xFF00) >> 8,  8);
-    out_buffer->WriteCharAt((1152 & 0x00FF)     ,  9);
-    out_buffer->WriteCharAt((1152 & 0xFF00) >> 8, 10);
-    out_buffer->WriteCharAt((1152 & 0x00FF)     , 11);
+    out_buffer->WriteCharAt((FLAC_BLOCK_SIZE & 0xFF00) >> 8,  8);
+    out_buffer->WriteCharAt((FLAC_BLOCK_SIZE & 0x00FF)     ,  9);
+    out_buffer->WriteCharAt((FLAC_BLOCK_SIZE & 0xFF00) >> 8, 10);
+    out_buffer->WriteCharAt((FLAC_BLOCK_SIZE & 0x00FF)     , 11);
     for (int i = 12; i < 18; ++i) out_buffer->WriteCharAt(0, i); // framesize
     // Byte 20:
     //  XXXX YYY Z
