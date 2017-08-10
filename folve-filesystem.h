@@ -41,6 +41,12 @@ public:
   // for this to be properly initialized.
   FolveFilesystem();
 
+  // Enable workaround for flac header flushing.
+  void set_workaround_flac_header_issue(bool b) {
+    workaround_flac_header_issue_ = b;
+  }
+  bool workaround_flac_header_issue() const { return workaround_flac_header_issue_; }
+
   // Underlying directory - the directory we read files from.
   void set_underlying_dir(const std::string &dir) { underlying_dir_ = dir; }
   const std::string &underlying_dir() const { return underlying_dir_; }
@@ -158,6 +164,13 @@ private:
   int total_file_openings_;
   int total_file_reopen_;
   float file_oversize_factor_;
+
+  // Work around a range of versions of libsndfile/libflac that can't deal with
+  // flushing headers first.
+  // fixed in https://github.com/erikd/libsndfile/commit/a81308ee40dc11ebffa2740272b611170f069ec7
+  // Need to keep this here for a while until usual distributions have moved
+  // on.
+  bool workaround_flac_header_issue_;
 };
 
 #endif // FOLVE_FILESYSTEM_H

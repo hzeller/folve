@@ -227,6 +227,10 @@ ConvolveFileHandler::ConvolveFileHandler(FolveFilesystem *fs,
   // sndfile. So if we have one, just copy it.
   copy_flac_header_verbatim_ = LooksLikeInputIsFlac(in_info, filedes);
 
+  if (fs_->workaround_flac_header_issue()) {
+    copy_flac_header_verbatim_ = false;  // Disable again in that case.
+  }
+
   // Create a conversion buffer that creates a soundfile of a particular
   // format that we choose here. Essentially we want to generate mostly what
   // our input is.
@@ -274,7 +278,9 @@ void ConvolveFileHandler::SetOutputSoundfile(ConversionBuffer *out_buffer,
   // We need to do this even if we copied our own header: that way we make
   // sure that the sndfile-header is flushed into the nirwana before we
   // re-enable sndfile_writes.
-  sf_command(snd_out_, SFC_UPDATE_HEADER_NOW, NULL, 0);
+  if (!fs_->workaround_flac_header_issue()) {
+    sf_command(snd_out_, SFC_UPDATE_HEADER_NOW, NULL, 0);
+  }
 
   // -- time for some hackery ...
   // If we have copied the header over from the original, we need to

@@ -50,7 +50,8 @@ FolveFilesystem::FolveFilesystem()
     processor_pool_(3), buffer_thread_(NULL),
     total_file_openings_(0), total_file_reopen_(0),
     // oversize factor of 1.25 seems to be a good initial size.
-    file_oversize_factor_(1.25) {
+    file_oversize_factor_(1.25),
+    workaround_flac_header_issue_(false) {
 }
 
 void FolveFilesystem::RequestPrebuffer(ConversionBuffer *buffer) {
