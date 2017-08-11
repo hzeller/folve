@@ -98,8 +98,9 @@ filtered directory.
 
 #### Filter switching ####
 The default mode is to mirror the original directory structure at the toplevel
-of the mount point. You then can change the currently active filter via the
-web-frontend (whose port you choose with the `-p` option). There are tabs at the
+of the mount point. If you have multiple filters configured, you then can
+change the currently active filter via the web-frontend (whose port you
+choose with the `-p` option). There are tabs at the
 top of the page that allow to choose the current filter:
 
 ![](./img/folve-filter-choice.png)
@@ -111,6 +112,10 @@ The mounting point directory looks like the original directory:
 (You also see, that there is a `folve-status.html` file in the toplevel
 directory, which show a readonly version of the status page also served via
 the web-server).
+
+This is typically the most useful mode: you present a single directory
+structure to the music player, but can choose to change the filter at
+runtime. Files opened after such change will have the new filter applied.
 
 #### Filtered directory ####
 
@@ -130,6 +135,11 @@ choose the filter by playing the audio file in the corresponding directory.
 
 There is one special directory `_` (underscore) that contains the unfiltered
 content.
+
+This mode is useful to do comparisons between different versions simply
+by comparing the same file in differnt directories; for music indexing
+applications (e.g. mpd, amarok) this mode might be confusing as it finds the
+exact piece of music multiple times for each filter you have configured.
 
 ### Filter Configuration ###
 With the uppercase `-C` option, you give folve a directory in which it looks for
