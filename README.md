@@ -164,9 +164,11 @@ There is one special directory `_` (underscore) that contains the unfiltered
 content.
 
 This mode is useful to do comparisons between different versions simply
-by comparing the same file in differnt directories; for music indexing
-applications (e.g. mpd, amarok) this mode might be confusing as it finds the
-exact piece of music multiple times for each filter you have configured.
+by comparing the same file in differnt directories. It is also needed if
+you want to use multiple filters concurrently without one global mode switch.
+For music indexing applications (e.g. mpd, amarok) this mode might be
+confusing as it finds the exact piece of music multiple times for each filter
+you have configured.
 
 ### Filter Configuration ###
 With the uppercase `-C` option, you give folve a directory in which it looks for
