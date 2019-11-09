@@ -60,7 +60,7 @@ static struct FolveRuntime {
   StatusServer *status_server;
 } folve_rt;
 
-// Logger that only prints to stderr; used for
+// Logger that only prints to stderr; used when -R given on commandline.
 class ReaddirLogger {
 public:
   ReaddirLogger() : start_time_(folve::CurrentTime()) {}
@@ -253,6 +253,16 @@ static void *folve_init(struct fuse_conn_info *conn) {
          "(with %s). ", GetLibraryDependencyVersions().c_str());
   syslog(LOG_INFO, "Serving '%s' on mount point '%s'",
          folve_rt.fs->underlying_dir().c_str(), folve_rt.mount_point);
+
+  // Until we have a fuse-file to write the desired filter to, let's suggest
+  // necessary configuration to either provide port or -t if none is provided.
+  if (folve_rt.status_port < 0
+      && !folve_rt.fs->toplevel_directory_is_filter()){
+    syslog(LOG_INFO, "Note: without -p<port> status port, you can't access "
+           "the http status page to switch filters "
+           "(Alternatively, use -t to have toplevel filtered dirs).");
+  }
+
   const bool flac_header_init_issues
     = (sf_version_string() < std::string("libsndfile-1.0.29"));
   folve_rt.fs->set_workaround_flac_header_issue(flac_header_init_issues);
