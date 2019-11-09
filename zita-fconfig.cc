@@ -1,9 +1,14 @@
 //  -----------------------------------------------------------------------------
 //
 //  Copyright (C) 2006-2011 Fons Adriaensen <fons@linuxaudio.org>
-//  
-//  Modifications to work with Folve
+//
+//  [ This derivative is based on fconfig.cc in jconvolver 0.9.2.
+//
+//  Modifications to work with Folve, most notably allowing to have multiple
+//  concurrent configurations loaded and convolvers active.
+//  Logging of outputs with syslog() instead of fprintf():
 //  Copyright (C) 2012 Henner Zeller <h.zeller@acm.org>
+//  ]
 //
 //  This program is free software; you can redistribute it and/or modify
 //  it under the terms of the GNU General Public License as published by
@@ -71,13 +76,22 @@ int convnew (ZitaConfig *cfg, const char *line, int lnum)
       cfg->fragm /= 2;
     }
     cfg->convproc->set_options (cfg->options);
-    cfg->convproc->set_density (dens);
+#if ZITA_CONVOLVER_MAJOR_VERSION >= 4
     if (cfg->convproc->configure (cfg->ninp, cfg->nout, cfg->size,
-                                  cfg->fragm, cfg->fragm, cfg->fragm))
-      {   
+                                  cfg->fragm, cfg->fragm, cfg->fragm, dens))
+    {
         syslog(LOG_ERR, "Can't initialise convolution engine\n");
         return ERR_OTHER;
     }
+#else
+    cfg->convproc->set_density (dens);
+    if (cfg->convproc->configure (cfg->ninp, cfg->nout, cfg->size,
+                                  cfg->fragm, cfg->fragm, cfg->fragm))
+    {
+        syslog(LOG_ERR, "Can't initialise convolution engine\n");
+        return ERR_OTHER;
+    }
+#endif
 
     return 0;
 }
@@ -93,4 +107,3 @@ int outname (ZitaConfig *, const char *)
 {
     return 0;
 }
-
