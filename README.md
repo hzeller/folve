@@ -45,6 +45,25 @@ via the package manager:
 
 For hints on how to compile on older systems see [INSTALL.md](./INSTALL.md).
 
+----
+#### libsndfile-dev
+
+libsndfile is distributed on debian systems in version 1.0.28.
+There is a problem with flac-header handling in that version that
+resulted in a folve [issue](https://github.com/hzeller/folve/issues/1).
+It is worked around in folve now to an extend, but it is better to get the
+[fixed](https://github.com/erikd/libsndfile/pull/307) upstream sndfile
+development version.
+However, that has not been released yet as new version number. So it is best to
+[compile the latest libsndfile from git](https://github.com/erikd/libsndfile)
+and use that. Make sure to install all the necessary libraries before running
+its `./configure`
+
+```
+sudo apt-get install libflac-dev libvorbis-dev libogg-dev libopus-dev
+```
+---
+
 Sometimes, running folve complains that it can't access `/dev/fuse`. In that
 case, you need to put your user into that group
 `sudo usermod -G fuse $USER` (then open new shell or reboot). Or you can run

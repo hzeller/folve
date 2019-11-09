@@ -245,7 +245,7 @@ static void *folve_init(struct fuse_conn_info *conn) {
     = (sf_version_string() < std::string("libsndfile-1.0.29"));
   folve_rt.fs->set_workaround_flac_header_issue(flac_header_init_issues);
   if (flac_header_init_issues) {
-    syslog(LOG_INFO, "This sndfile version has known issues writing headers. Switching to compatibility mode. Please use version > 1.0.29 of libsndfile.");
+    syslog(LOG_INFO, "This sndfile version has known issues writing headers. Switching to compatibility mode. Please use version >= 1.0.29 of libsndfile (you might need to compile from source if there is no such release yet).");
   }
   if (folve::IsDebugLogEnabled()) {
     syslog(LOG_INFO, "Debug logging enabled (-D)");
