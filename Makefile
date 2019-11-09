@@ -3,10 +3,13 @@ PREFIX=/usr/local
 
 F_VERSION=$(shell git log -n1 --date=short --format="%cd (commit=%h)" 2>/dev/null || echo "[unknown version - compile from git]")
 
-CFLAGS=-D_FILE_OFFSET_BITS=64 -Wall -Wextra -W -Wno-unused-parameter -O3 -DFOLVE_VERSION='"$(F_VERSION)"'
+SNDFILE_INC?=$(shell pkg-config --cflags sndfile)
+SNDFILE_LIB?=$(shell pkg-config --libs sndfile)
+
+CFLAGS=-D_FILE_OFFSET_BITS=64 -Wall -Wextra -W -Wno-unused-parameter -O3 -DFOLVE_VERSION='"$(F_VERSION)"' $(SNDFILE_INC)
 
 CXXFLAGS=$(CFLAGS)
-LDFLAGS=-lfuse -lsndfile -lzita-convolver -lmicrohttpd -lfftw3f -lpthread
+LDFLAGS=-lfuse -lzita-convolver -lmicrohttpd -lfftw3f $(SNDFILE_LIB) -lpthread
 
 ifdef LINK_STATIC
 # static linking requires us to be much more explicit when linking
