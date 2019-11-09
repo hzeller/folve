@@ -46,6 +46,7 @@ via the package manager:
 For hints on how to compile on older systems see [INSTALL.md](./INSTALL.md).
 
 ----
+
 #### libsndfile-dev
 
 libsndfile is distributed on debian systems in version 1.0.28.
@@ -57,6 +58,7 @@ development version.
 However, that has not been released yet as new version number. So it is best to
 [compile the latest libsndfile from git](https://github.com/erikd/libsndfile)
 and use that.
+
 ---
 
 Sometimes, running folve complains that it can't access `/dev/fuse`. In that
