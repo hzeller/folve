@@ -27,12 +27,12 @@ than MP3).
 
 When a FLAC file is accessed through the mount point, Folve automatically
 convolves its original counterpart on-the-fly with a Finite Impulse
-Response (FIR) filter. The FIR filter is based on the jconvolver convolution
-engine.
+Response (FIR) filter. The FIR filter is based on Fons Adriaensen's
+jconvolver convolution engine (zita convolver).
 
 ### Compiling ###
-Tested on Ubuntu (tested on > 11.10), various Debian versions and the
-common Debian version on the Raspberry Pi.
+Tested on Ubuntu, various Debian versions and the common Debian version on
+the Raspberry Pi.
 
 For compilation, we need some development libraries, easiest to install
 via the package manager:
@@ -101,8 +101,15 @@ Folve provides a HTTP status page; have a look at
     http://localhost:17322/
 
 (or whatever port you chose with the `-p 17322` option)
-There you can switch the filter; after you changed it in the UI, re-open
-the same FLAC file with your media player: you'll hear the difference.
+
+In the status page, you can switch the filter; after you changed it in the
+UI, re-open the same FLAC file with your media player: you'll hear the
+difference.
+
+Check out the included SantaLucia filter for instance: all your music now
+sounds like it was played in a huge church! In fact, the FIR filter was
+created by recording an impulse response (read: gun shot) in the Santa Lucia
+Basilica in Bologna, Italy.
 
 To terminate this instance of folve, you can just press CTRL-C as we've run it
 in the foreground (the `-f` option did this). In real life, you'd run it as
@@ -126,15 +133,16 @@ top of the page that allow to choose the current filter:
 
 The mounting point directory looks like the original directory:
 
-![](./img/switching-dir.png)
+<img src="./img/switching-dir.png" width="643"/>
 
 (You also see, that there is a `folve-status.html` file in the toplevel
 directory, which show a readonly version of the status page also served via
 the web-server).
 
 This is typically the most useful mode: you present a single directory
-structure to the music player, but can choose to change the filter at
-runtime. Files opened after such change will have the new filter applied.
+structure to the music player or server which it only has to index once.
+You then can choose to change the filter at runtime. Files opened after
+such change will have the new filter applied.
 
 #### Filtered directory ####
 
@@ -146,7 +154,7 @@ different toplevel directories; choose this with the `-t` option:
                of being switched in the HTTP status server.
 ```
 
-![](./img/filter-dir.png)
+<img src="./img/filter-dir.png" width="609"/>
 
 The toplevel directory contains names that are named like the available filters.
 Under each of these filter-directories, the original directory is mirrored. You
@@ -172,9 +180,10 @@ used by jconvolver's convolution engine to create a
 
 Text configuration files refer to these WAV files and add parameters such as
 filter gain and channel mapping. These configuration files are read by Folve.
-See the samples in the `demo-filters/` directory. The README.CONFIG in the
-[jconvolver](http://apps.linuxaudio.org/apps/all/jconvolver)
-project describes the details of the configuration format.
+See the samples in the `demo-filters/` directory. The
+[README.CONFIG](./README.CONFIG.txt) describes the detailed configuration
+options. To make it easier for everyone already using
+[jconvolver] of fconvolver, folve uses the same configuration format.
 
 Since the filter is dependent on the sampling rate, we need to choose the right
 filter depending on the input file we see. This is why you give Folve a whole
@@ -270,8 +279,8 @@ this to be at or above 1024, in particular if your player reading from the
 filesystem does not do a good job of pre-buffering itself.
 
 ### Misc ###
-To manually switch the configuration from the command line, you can use `wget`
-or `curl`, whatever you prefer:
+To switch the configuration manually or from a script instead of the
+status page, you can use `wget` or `curl`, whatever you prefer:
 
     wget -q -O/dev/null http://localhost:17322/settings?f=highpass
     curl http://localhost:17322/settings?f=SantaLucia
@@ -327,3 +336,6 @@ This project is notably based on
        the compatible configuration file parsing.
  * LibSndfile r/w audio files <http://www.mega-nerd.com/libsndfile/>
  * Microhttpd webserver library <http://www.gnu.org/software/libmicrohttpd/>
+
+
+[jconvolver]: http://apps.linuxaudio.org/apps/all/jconvolver
