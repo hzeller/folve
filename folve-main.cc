@@ -35,6 +35,7 @@
 #include <sys/types.h>
 #include <syslog.h>
 #include <unistd.h>
+#include <zita-convolver.h>  // for major/minor version number.
 
 #include "folve-filesystem.h"
 #include "status-server.h"
@@ -224,6 +225,18 @@ static int folve_fgetattr(const char *path, struct stat *result,
   return reinterpret_cast<FileHandler *>(fi->fh)->Stat(result);
 }
 
+static std::string GetLibraryDependencyVersions() {
+  char buffer[256];
+  snprintf(buffer, sizeof(buffer),
+           "fuse=%d.%d; "
+           "sndfile=%s; "
+           "zita-convolver=%d.%d",
+           FUSE_MAJOR_VERSION, FUSE_MINOR_VERSION,
+           sf_version_string(),
+           ZITA_CONVOLVER_MAJOR_VERSION, ZITA_CONVOLVER_MINOR_VERSION);
+  return buffer;
+}
+
 static void *folve_init(struct fuse_conn_info *conn) {
   if (folve_rt.pid_file) {
     FILE *p = fopen(folve_rt.pid_file, "w+");
@@ -237,8 +250,7 @@ static void *folve_init(struct fuse_conn_info *conn) {
   snprintf(ident, ident_len, "folve[%d]", getpid());
   openlog(ident, LOG_CONS|LOG_PERROR, LOG_USER);
   syslog(LOG_INFO, "Version " FOLVE_VERSION " started "
-         "(with fuse=%d.%d; sndfile=%s). ",
-         FUSE_MAJOR_VERSION, FUSE_MINOR_VERSION, sf_version_string());
+         "(with %s). ", GetLibraryDependencyVersions().c_str());
   syslog(LOG_INFO, "Serving '%s' on mount point '%s'",
          folve_rt.fs->underlying_dir().c_str(), folve_rt.mount_point);
   const bool flac_header_init_issues
@@ -277,7 +289,12 @@ static void folve_destroy(void *) {
 }
 
 static int usage(const char *prg) {
-  printf("usage: %s [options] <original-dir> <mount-point-dir>\n", prg);
+  printf("Folve is a FUSE filesystem that convolves audio files on-the-fly.\n");
+  printf("Version " FOLVE_VERSION "; linked against %s\n",
+         GetLibraryDependencyVersions().c_str());
+  printf("License: GNU GPL v3.0\n");
+
+  printf("\nusage: %s [options] <original-dir> <mount-point-dir>\n", prg);
   printf("Options: (in sequence of usefulness)\n"
          "\t-C <cfg-dir> : Convolver base configuration directory.\n"
          "\t               Sub-directories name the different filters.\n"
