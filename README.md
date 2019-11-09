@@ -319,11 +319,11 @@ media servers or provide patches through github
 
 This project is notably based on
 
- * FUSE: Filesystem in Userspace   <http://fuse.sourceforge.net/>
- * Zita Convolver <http://kokkinizita.linuxaudio.org/linuxaudio/downloads/zita-convolver-3.1.0.tar.bz2>
+ * FUSE: Filesystem in Userspace   <https://github.com/libfuse/libfuse>
+ * Zita Convolver <http://kokkinizita.linuxaudio.org/linuxaudio/downloads/zita-convolver-4.0.3.tar.bz2>  (also compatible with 3.1.0 version).
  * JConvolver <http://apps.linuxaudio.org/apps/all/jconvolver>
      * Program files in the Folve project named zita-*.{h,cc} are derivatives of
-       files found in the jconvolver project. They implement the compatible
-       configuration file parsing.
+       files found in the jconvolver 0.9.2 project. They implement
+       the compatible configuration file parsing.
  * LibSndfile r/w audio files <http://www.mega-nerd.com/libsndfile/>
  * Microhttpd webserver library <http://www.gnu.org/software/libmicrohttpd/>
