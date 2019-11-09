@@ -133,7 +133,7 @@ top of the page that allow to choose the current filter:
 
 The mounting point directory looks like the original directory:
 
-<img src="./img/switching-dir.png" width="643"/>
+![](./img/switching-dir.png)
 
 (You also see, that there is a `folve-status.html` file in the toplevel
 directory, which show a readonly version of the status page also served via
@@ -154,7 +154,7 @@ different toplevel directories; choose this with the `-t` option:
                of being switched in the HTTP status server.
 ```
 
-<img src="./img/filter-dir.png" width="609"/>
+![](./img/filter-dir.png)
 
 The toplevel directory contains names that are named like the available filters.
 Under each of these filter-directories, the original directory is mirrored. You
