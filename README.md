@@ -56,12 +56,7 @@ It is worked around in folve now to an extend, but it is better to get the
 development version.
 However, that has not been released yet as new version number. So it is best to
 [compile the latest libsndfile from git](https://github.com/erikd/libsndfile)
-and use that. Make sure to install all the necessary libraries before running
-its `./configure`
-
-```
-sudo apt-get install libflac-dev libvorbis-dev libogg-dev libopus-dev
-```
+and use that.
 ---
 
 Sometimes, running folve complains that it can't access `/dev/fuse`. In that
