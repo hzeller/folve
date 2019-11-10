@@ -294,14 +294,59 @@ configuration directory. An empty string is no filter, i.e. 'pass through'.
 (And no, there is no security built-in. If you want people from
 messing with the configuration of your Folve-daemon, do not use `-p <port>` :)).
 
+### Shortcomings ###
+
+There is one problem with online rewriting compressed files: we don't know
+what the final size of the file will be as the content will be different.
+
+Folve can't know the correct filesize before it has it processed, but it has
+to return something in an `ls -l` or when a streaming program is asking for
+the size of a file (the `stat()` call).
+In this case it has to report an estimated value; it tries to err on the
+large size: report a larger size than we might end up with. It
+derives this from the input file size and multiplies it with some factor. The
+`-O` flag determines that factor. By default that is 1.25, so Folve will report
+a size that is 25% larger than the original as long as it doesn't know anything
+more.
+
+While convolving it will get a better estimate of the final file-size, in
+particular when it finished the file. It will adjust the size as it
+is being refined, but it will only report larger sizes than shown initially (so
+size will always be reported at least 25% larger, even if the resulting file
+turns out to be 50% smaller).
+Empirically, it is better to over-report the file size than returning a too
+small value. Reporting smaller values means that many programs stop reading
+early, while they are fine if the file is smaller than expected.
+
+This usually is not a problem if the reading program behaves
+well with a zero return code of `read()` that indicates end-of-file.
+If they don't, you'd typically see as symptom a large amount of CPU use
+of the reading program and an `strace` will show repeated read calls beyond
+the end of file. It is worthfile making these read routines more resilient.
+For instance here is a pending [minidlna patch] that does that.
+
+So the heuristic Folve applies might make it fragile for some programs that
+rely on the reported size. This can certainly be improved. For instance,
+we could always emit non-compressed flac files and thus would be able to
+exactly calculate the file-size from the number of samples. This would blow
+up the file sizes of course, which is not so much of a problem for storage (as
+all the converted files are ephemeral while being convolved), but
+for streaming: files streamed from there will impose more network traffic.
+
+If you run into such a problem that might be related to the reported size,
+please file an issue that explains what happens. Maybe we can work on a better
+heuristic in that case, actually implement the non-compression flac and/or
+make the consuming program more resilient if possible (like the minidlna patch
+mentioned above).
+
 ## Details ##
 Filesystem accesses are optimized for streaming. If files are read sequentially,
 we only need to convolve whatever is requested, which minimizes CPU use if
 you do not need the full file. Simply playing a file in real-time will use very
 little CPU (on my fairly old notebook ~3% on one core). So this should work as
-well on low-CPU machines; on a Raspberry Pi 2, the CPU load to convolve a
-44.1kHz/16 Bit file is about 22%. Folve can make use of multiple cores in
-parallel file accesses.
+well on low-CPU machines; on a fairly old Raspberry Pi 2, the CPU load to
+convolve a 44.1kHz/16 Bit file is about 22%. Folve can make use of multiple
+cores in parallel file accesses.
 Many NAS systems have enough CPU to transparently run folve even for
 sophisticated filters.
 
@@ -343,3 +388,4 @@ This project is notably based on
 
 
 [jconvolver]: http://apps.linuxaudio.org/apps/all/jconvolver
+[minidlna patch]: https://sourceforge.net/u/hzeller/minidlna.fork/ci/630ccd27d546aa434301139d12545750d021f5db/
