@@ -81,7 +81,7 @@ that contains subdirectories with filters. If we pass this directory to folve,
 folve will search in this directory for named filters:
 
     mkdir /tmp/test-mount
-    ./folve -f -C demo-filters -p 17322 -iSantaLucia \
+    ./folve -f -C demo-filters -i SantaLucia -p 17322 \
             /path/to/your/directory/with/flacs /tmp/test-mount
 
 The `-f` option makes folve run in the foreground.
@@ -182,7 +182,7 @@ filter gain and channel mapping. These configuration files are read by Folve.
 See the samples in the `demo-filters/` directory. The
 [README.CONFIG](./README.CONFIG.txt) describes the detailed configuration
 options. To make it easier for everyone already using
-[jconvolver] of fconvolver, folve uses the same configuration format.
+[jconvolver] or fconvolver, folve uses the same configuration format.
 
 Since the filter is dependent on the sampling rate, we need to choose the right
 filter depending on the input file we see. This is why you give Folve a whole
