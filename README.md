@@ -327,17 +327,17 @@ For instance here is a pending [minidlna patch] that does that.
 
 So the heuristic Folve applies might make it fragile for some programs that
 rely on the reported size. This can certainly be improved. For instance,
-we could always emit non-compressed flac files and thus would be able to
-exactly calculate the file-size from the number of samples. This would blow
+if it was possible to emit flacs with predictable sizes, we would be able to
+exactly calculate the file-size from the number of samples (but, AFAIK,
+there is no such PCM-through mode). This would also blow
 up the file sizes of course, which is not so much of a problem for storage (as
 all the converted files are ephemeral while being convolved), but
 for streaming: files streamed from there will impose more network traffic.
 
 If you run into such a problem that might be related to the reported size,
 please file an issue that explains what happens. Maybe we can work on a better
-heuristic in that case, actually implement the non-compression flac and/or
-make the consuming program more resilient if possible (like the minidlna patch
-mentioned above).
+heuristic in that case and/or make the consuming program more resilient
+if possible (like the minidlna patch mentioned above).
 
 ## Details ##
 Filesystem accesses are optimized for streaming. If files are read sequentially,
