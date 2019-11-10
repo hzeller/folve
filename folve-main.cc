@@ -306,6 +306,7 @@ static int usage(const char *prg) {
 
   printf("\nusage: %s [options] <original-dir> <mount-point-dir>\n", prg);
   printf("Options: (in sequence of usefulness)\n"
+         "\t-o <mnt-opt> : Fuse mount parameters (see man mount.fuse).\n"
          "\t-C <cfg-dir> : Convolver base configuration directory.\n"
          "\t               Sub-directories name the different filters.\n"
          "\t               Select on the HTTP status page.\n"
@@ -319,7 +320,6 @@ static int usage(const char *prg) {
          "Disable with -1. Default 128.\n"
          "\t-O <factor>  : Oversize: Multiply orig. file sizes with this. "
          "Default 1.25.\n"
-         "\t-o <mnt-opt> : other generic mount parameters passed to FUSE.\n"
          "\t-P <pid-file>: Write PID to this file.\n"
          "\t-D           : Moderate volume Folve debug messages to syslog,\n"
          "\t               and some more detailed configuration info in UI\n"

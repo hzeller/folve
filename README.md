@@ -37,8 +37,8 @@ the Raspberry Pi.
 For compilation, we need some development libraries, easiest to install
 via the package manager:
 
-    sudo apt-get install libsndfile-dev libflac-dev libzita-convolver-dev \
-                         libfuse-dev libmicrohttpd-dev
+    sudo apt-get install fuse libflac-dev libzita-convolver-dev \
+                         libfuse-dev libmicrohttpd-dev libsndfile-dev
     # Now just compile folve.
     make
     sudo make install
@@ -246,6 +246,7 @@ next file while it still plays the previous one:
 ```
 usage: ./folve [options] <original-dir> <mount-point-dir>
 Options: (in sequence of usefulness)
+        -o <mnt-opt> : Fuse mount parameters (see man mount.fuse).
         -C <cfg-dir> : Convolver base configuration directory.
                        Sub-directories name the different filters.
                        Select on the HTTP status page.
@@ -257,7 +258,6 @@ Options: (in sequence of usefulness)
         -g           : Gapless convolving alphabetically adjacent files.
         -b <KibiByte>: Predictive pre-buffer by given KiB (64...16384). Disable with -1. Default 128.
         -O <factor>  : Oversize: Multiply orig. file sizes with this. Default 1.25.
-        -o <mnt-opt> : other generic mount parameters passed to FUSE.
         -P <pid-file>: Write PID to this file.
         -D           : Moderate volume Folve debug messages to syslog,
                        and some more detailed configuration info in UI
@@ -265,6 +265,10 @@ Options: (in sequence of usefulness)
         -d           : High volume FUSE debug log. Implies -f.
         -R <file>    : Debug readdir() & stat() calls. Output to file.
 ```
+
+The mount options `-o` allow you to tweak how the file-system is mounted.
+For instane if the user starting folve (let's say `daemon`) is different from
+the user accessing the files, you might need the `allow_other` option.
 
 If you're listening to classical music, opera or live-recordings, then you
 certainly want to switch on gapless convolving with `-g`. If a file ends with
