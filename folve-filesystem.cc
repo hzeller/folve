@@ -107,7 +107,8 @@ bool FolveFilesystem::ExtractFilterName(const char *path,
   }
 }
 
-FileHandler *FolveFilesystem::GetOrCreateHandler(const char *fs_path) {
+FileHandler *FolveFilesystem::GetOrCreateHandler(const char *fs_path,
+                                                 bool want_gapless) {
   std::string config_path;
   if (!ExtractFilterName(fs_path, &config_path)) {
     errno = ENOENT;   // Invalid toplevel directory.
@@ -115,7 +116,7 @@ FileHandler *FolveFilesystem::GetOrCreateHandler(const char *fs_path) {
   }
   const std::string cache_key = CacheKey(config_path, fs_path);
   const std::string underlying_file = GetUnderlyingFile(fs_path);
-  FileHandler *handler = open_file_cache_.FindAndPin(cache_key);
+  FileHandler *handler = open_file_cache_.FindAndPin(cache_key, want_gapless);
   if (handler == NULL) {
     int filedes = open(underlying_file.c_str(), O_RDONLY);
     if (filedes < 0)

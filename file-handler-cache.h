@@ -1,4 +1,4 @@
-// -*- c++ -*-
+//  -*- mode: c++; c-basic-offset: 2; indent-tabs-mode: nil; -*-
 //  Folve - A fuse filesystem that convolves audio files on-the-fly.
 //
 //  Copyright (C) 2012 Henner Zeller <h.zeller@acm.org>
@@ -58,8 +58,11 @@ public:
   FileHandler *InsertPinned(const std::string &key, FileHandler *handler);
 
   // Find an object in this map and pin it down so that it is not evicted.
-  // You've to Unpin() it after use.
-  FileHandler *FindAndPin(const std::string &key);
+  // If an existing file-handler is returned (not NULL), you have to Unpin()
+  // after use.
+  // If "prefer_gapless" is set, prefer to only return a FileHandler that
+  // actually is gapless or NULL if we don't have one (best effort).
+  FileHandler *FindAndPin(const std::string &key, bool prefer_gapless = false);
 
   // Unpin object. If the last object is unpinned, the PinnedMap may decide
   // to delete it later (though typically will keep it around for a while).

@@ -398,7 +398,7 @@ bool ConvolveFileHandler::AddMoreSoundData() {
       = (ExtractDirAndSuffix(base_stats_.filename, &fs_dir, &file_suffix)
          && fs_->ListDirectory(fs_dir, file_suffix, &dirset)
          && (found = dirset.upper_bound(base_stats_.filename)) != dirset.end()
-         && (next_file = fs_->GetOrCreateHandler(found->c_str()))
+         && (next_file = fs_->GetOrCreateHandler(found->c_str(), true))
          && next_file->PassoverProcessor(processor_));
     if (passed_processor) {
       DLogf("Processor %p: Gapless pass-on from "

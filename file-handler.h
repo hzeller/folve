@@ -1,4 +1,4 @@
-// -*- c++ -*-
+//  -*- mode: c++; c-basic-offset: 2; indent-tabs-mode: nil; -*-
 //  Folve - A fuse filesystem that convolves audio files on-the-fly.
 //
 //  Copyright (C) 2012 Henner Zeller <h.zeller@acm.org>
@@ -69,6 +69,7 @@ public:
 
   // Get handler status.
   virtual void GetHandlerStatus(HandlerStats *s) = 0;
+  virtual bool is_gapless() const { return false; }
 
   // Accept processor passed on from the previous file. Can return false
   // if this FileHandler cannot use it (e.g. it alrady started convolving).

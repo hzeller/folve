@@ -199,7 +199,7 @@ static int folve_open(const char *path, struct fuse_file_info *fi) {
   // The file-handle has the neat property to be 64 bit - so we can actually
   // stuff a pointer to our file handler object in there :)
   // (Yay, someone was thinking while developing that API).
-  FileHandler *handler = folve_rt.fs->GetOrCreateHandler(path);
+  FileHandler *handler = folve_rt.fs->GetOrCreateHandler(path, false);
   fi->fh = (uint64_t) handler;
   if (handler == NULL)
     return -errno;

@@ -80,9 +80,10 @@ public:
   void SetupInitialConfig();
 
   // Create a new filter given the filesystem path and the underlying
-  // path.
+  // path. If "want_gapless", then attempt to only return one that starts
+  // gapless or can me made into one.
   // Returns NULL, if it cannot be created.
-  FileHandler *GetOrCreateHandler(const char *fs_path);
+  FileHandler *GetOrCreateHandler(const char *fs_path, bool want_gapless);
 
   // Inform filesystem that this file handler is not needed anymore
   // (FS still might consider keeping it around for a while).

@@ -47,6 +47,7 @@ public:
   // -- FileHandler interface
   virtual int Read(char *buf, size_t size, off_t offset);
   virtual void GetHandlerStatus(HandlerStats *stats);
+  virtual bool is_gapless() const { return base_stats_.in_gapless; }
   virtual int Stat(struct stat *st);
   virtual bool PassoverProcessor(SoundProcessor *passover_processor);
   virtual void NotifyPassedProcessorUnreferenced();

@@ -1,3 +1,4 @@
+//  -*- mode: c++; c-basic-offset: 2; indent-tabs-mode: nil; -*-
 //  Folve - A fuse filesystem that convolves audio files on-the-fly.
 //
 //  Copyright (C) 2012 Henner Zeller <h.zeller@acm.org>
@@ -70,14 +71,31 @@ FileHandler *FileHandlerCache::InsertPinned(const std::string &key,
   return result;
 }
 
-FileHandler *FileHandlerCache::FindAndPin(const std::string &key) {
-  folve::MutexLock l(&mutex_);
-  CacheMap::iterator found = cache_.find(key);
-  if (found == cache_.end())
-    return NULL;
-  ++found->second->references;
-  found->second->last_access = folve::CurrentTime();
-  return found->second->handler;
+FileHandler *FileHandlerCache::FindAndPin(const std::string &key,
+                                          bool prefer_gapless) {
+  FileHandler *to_delete = NULL;
+  {
+    folve::MutexLock l(&mutex_);
+    CacheMap::iterator found = cache_.find(key);
+    if (found == cache_.end())
+      return NULL;
+
+    // If a gapless one is requested, but we only have one that is not
+    // gapless but idle, we can pretend we don't have it at all.
+    // TODO: also make this work if the handler is non-idle and have a
+    // second one that is.
+    if (prefer_gapless && found->second->references == 0
+        && !found->second->handler->is_gapless()) {
+      to_delete = Erase_Locked(found);
+    }
+    else {
+      ++found->second->references;
+      found->second->last_access = folve::CurrentTime();
+      return found->second->handler;
+    }
+  }
+  delete to_delete;
+  return NULL;
 }
 
 void FileHandlerCache::Unpin(const std::string &key) {
@@ -146,4 +164,3 @@ void FileHandlerCache::CleanupOldestUnreferenced_Locked(
     to_delete->push_back(Erase_Locked(for_removal[i]));
   }
 }
-
