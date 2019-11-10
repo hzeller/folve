@@ -81,7 +81,7 @@ that contains subdirectories with filters. If we pass this directory to folve,
 folve will search in this directory for named filters:
 
     mkdir /tmp/test-mount
-    ./folve -C demo-filters -p 17322 -f \
+    ./folve -f -C demo-filters -p 17322 -iSantaLucia \
             /path/to/your/directory/with/flacs /tmp/test-mount
 
 The `-f` option makes folve run in the foreground.
@@ -252,6 +252,7 @@ Options: (in sequence of usefulness)
                        Select on the HTTP status page.
         -t           : Filternames show up as toplevel directory instead
                        of being switched in the HTTP status server.
+        -i <filter>  : Name of filter to start with if -t is not given
         -p <port>    : Port to run the HTTP status server on.
         -r <refresh> : Seconds between refresh of status page;
                        Default is 10 seconds; switch off with -1.

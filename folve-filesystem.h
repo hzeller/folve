@@ -107,6 +107,14 @@ public:
   void set_toplevel_directory_is_filter(bool b) { toplevel_dir_is_filter_ = b; }
   bool toplevel_directory_is_filter() const { return toplevel_dir_is_filter_; }
 
+  // Initial choice of filter
+  void set_initial_filter_config(const std::string& filter_cfg) {
+    initial_filter_config_ = filter_cfg;
+  }
+  const std::string &initial_filter_config() const {
+    return initial_filter_config_;
+  }
+
   // Should we attempt to pre-buffer files ?
   void set_pre_buffer_size(int b) { pre_buffer_size_ = b; }
   int pre_buffer_size() const { return pre_buffer_size_; }
@@ -154,6 +162,7 @@ private:
 
   std::string underlying_dir_;
   std::string base_config_dir_;
+  std::string initial_filter_config_;
 
   std::string current_config_subdir_;
   bool gapless_processing_;

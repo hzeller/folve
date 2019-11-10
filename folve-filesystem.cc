@@ -214,8 +214,7 @@ bool FolveFilesystem::SanitizeConfigSubdir(std::string *subdir_path) const {
 bool FolveFilesystem::SwitchCurrentConfigDir(const std::string &subdir_in) {
   std::string subdir = subdir_in;
   if (!subdir.empty() && !SanitizeConfigSubdir(&subdir)) {
-    syslog(LOG_INFO, "Invalid config switch attempt to '%s'",
-           subdir_in.c_str());
+    syslog(LOG_INFO, "Can't switch to unknown filter '%s'", subdir_in.c_str());
     return false;
   }
   if (subdir != current_config_subdir_) {
@@ -223,7 +222,7 @@ bool FolveFilesystem::SwitchCurrentConfigDir(const std::string &subdir_in) {
     if (subdir.empty()) {
       syslog(LOG_INFO, "Switching to pass-through mode.");
     } else {
-      syslog(LOG_INFO, "Switching config directory to '%s'", subdir.c_str());
+      syslog(LOG_INFO, "Switching filter config to '%s'", subdir.c_str());
     }
     return true;
   }
@@ -258,10 +257,7 @@ void FolveFilesystem::SetupInitialConfig() {
     syslog(LOG_NOTICE, "No filter configuration directories given. "
            "Any files will be just passed through verbatim.");
   }
-  if (available_dirs.size() > 1) {
-    // By default, lets set the index to the first filter the user provided.
-    SwitchCurrentConfigDir(*++available_dirs.begin());
-  }
+  SwitchCurrentConfigDir(initial_filter_config_);
 }
 
 const std::set<std::string> FolveFilesystem::GetAvailableConfigDirs() const {

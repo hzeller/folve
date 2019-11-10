@@ -263,6 +263,13 @@ static void *folve_init(struct fuse_conn_info *conn) {
            "(Alternatively, use -t to have toplevel filtered dirs).");
   }
 
+  if (folve_rt.fs->toplevel_directory_is_filter()
+      && !folve_rt.fs->initial_filter_config().empty()) {
+    syslog(LOG_INFO, "Note: having toplevel filter directories (-t) does not "
+           "make sense to combine with setting initial filter (-i)");
+    folve_rt.fs->set_initial_filter_config("");
+  }
+
   const bool flac_header_init_issues
     = (sf_version_string() < std::string("libsndfile-1.0.29"));
   folve_rt.fs->set_workaround_flac_header_issue(flac_header_init_issues);
@@ -312,6 +319,7 @@ static int usage(const char *prg) {
          "\t               Select on the HTTP status page.\n"
          "\t-t           : Filternames show up as toplevel directory instead\n"
          "\t               of being switched in the HTTP status server.\n"
+         "\t-i <filter>  : Name of filter to start with if -t is not given\n"
          "\t-p <port>    : Port to run the HTTP status server on.\n"
          "\t-r <refresh> : Seconds between refresh of status page;\n"
          "\t               Default is %d seconds; switch off with -1.\n"
@@ -335,6 +343,7 @@ enum {
   FOLVE_OPT_PREBUFFER,
   FOLVE_OPT_REFRESH_TIME,
   FOLVE_OPT_CONFIG,
+  FOLVE_OPT_INITIAL_FILTER,
   FOLVE_OPT_OVERSIZE_PREDICT,
   FOLVE_OPT_PID_FILE,
   FOLVE_OPT_DEBUG,
@@ -433,6 +442,10 @@ int FolveOptionHandling(void *data, const char *arg, int key,
     return 0;
   }
 
+  case FOLVE_OPT_INITIAL_FILTER:
+    rt->fs->set_initial_filter_config(arg + 2);
+    return 0;
+
   case FOLVE_OPT_DEBUG:
     folve::EnableDebugLog(true);
     return 0;
@@ -466,6 +479,7 @@ int main(int argc, char *argv[]) {
     FUSE_OPT_KEY("-b ", FOLVE_OPT_PREBUFFER),
     FUSE_OPT_KEY("-r ", FOLVE_OPT_REFRESH_TIME),
     FUSE_OPT_KEY("-C ", FOLVE_OPT_CONFIG),
+    FUSE_OPT_KEY("-i ", FOLVE_OPT_INITIAL_FILTER),
     FUSE_OPT_KEY("-D",  FOLVE_OPT_DEBUG),
     FUSE_OPT_KEY("-R ",  FOLVE_OPT_DEBUG_READDIR),
     FUSE_OPT_KEY("-O ",  FOLVE_OPT_OVERSIZE_PREDICT),
