@@ -37,8 +37,8 @@ the Raspberry Pi.
 For compilation, we need some development libraries, easiest to install
 via the package manager:
 
-    sudo apt-get install fuse libflac-dev libzita-convolver-dev \
-                         libfuse-dev libmicrohttpd-dev libsndfile-dev
+    sudo apt-get install pkg-config libflac-dev libzita-convolver-dev \
+                         libfuse3-dev libmicrohttpd-dev libsndfile-dev
     # Now just compile folve.
     make
     sudo make install

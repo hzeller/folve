@@ -16,9 +16,8 @@
 //  You should have received a copy of the GNU General Public License
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Use latest version.
-#define FUSE_USE_VERSION 26
-#include <fuse/fuse.h>
+#define FUSE_USE_VERSION 30
+#include <fuse.h>
 
 #include <dirent.h>
 #include <errno.h>
@@ -99,7 +98,14 @@ private:
 
 // Essentially lstat(). Just forward to the original filesystem (this
 // will by lying: our convolved files are of different size...)
-static int folve_getattr(const char *path, struct stat *stbuf) {
+static int folve_getattr(const char *path, struct stat *stbuf,
+                         struct fuse_file_info *fi) {
+  if (fi != NULL) {
+    // Open file; simple.
+    return reinterpret_cast<FileHandler *>(fi->fh)->Stat(stbuf);
+  }
+
+  // Not open; find the same info by filename.
   if (strcmp(path, kStatusFileName) == 0) {
     FileHandler *status = folve_rt.status_server->CreateStatusFileHandler();
     status->Stat(stbuf);
@@ -128,11 +134,12 @@ static int folve_getattr(const char *path, struct stat *stbuf) {
 
 // readdir(). Just forward to original filesystem.
 static int folve_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
-                         off_t offset, struct fuse_file_info *fi) {
+                         off_t offset, struct fuse_file_info *fi,
+                         fuse_readdir_flags flags) {
   if (strcmp(path, "/") == 0) {
     struct stat st;
     memset(&st, 0, sizeof(st));
-    filler(buf, kStatusFileName + 1, &st, 0);
+    filler(buf, kStatusFileName + 1, &st, 0, FUSE_FILL_DIR_PLUS);
 
     // If configured, toplevel directories represent the filter names
     if (folve_rt.fs->toplevel_directory_is_filter()) {
@@ -142,7 +149,7 @@ static int folve_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
         // Use underscore for the passthrough-path
         const char *pathname = it->empty() ? "_" : it->c_str();
         memset(&st, 0, sizeof(st));
-        filler(buf, pathname, &st, 0);
+        filler(buf, pathname, &st, 0, FUSE_FILL_DIR_PLUS);
       }
       return 0;
     }
@@ -162,7 +169,7 @@ static int folve_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     st.st_mode = de->d_type << 12;
     const char *entry_name = de->d_name;
     rlog.Log("ITEM %s%s%s\n", path, strlen(path) > 1 ? "/" : "", de->d_name);
-    if (filler(buf, entry_name, &st, 0)) {
+    if (filler(buf, entry_name, &st, 0, FUSE_FILL_DIR_PLUS)) {
       rlog.Log("DONE (%s)\n", de->d_name);
       break;
     }
@@ -220,11 +227,6 @@ static int folve_release(const char *path, struct fuse_file_info *fi) {
   return 0;
 }
 
-static int folve_fgetattr(const char *path, struct stat *result,
-                          struct fuse_file_info *fi) {
-  return reinterpret_cast<FileHandler *>(fi->fh)->Stat(result);
-}
-
 static std::string GetLibraryDependencyVersions() {
   char buffer[256];
   snprintf(buffer, sizeof(buffer),
@@ -237,7 +239,7 @@ static std::string GetLibraryDependencyVersions() {
   return buffer;
 }
 
-static void *folve_init(struct fuse_conn_info *conn) {
+static void *folve_init(struct fuse_conn_info *conn, struct fuse_config *) {
   if (folve_rt.pid_file) {
     FILE *p = fopen(folve_rt.pid_file, "w+");
     if (p) {
@@ -512,7 +514,6 @@ int main(int argc, char *argv[]) {
 
   // Actual workhorse: reading a file and returning predicted file-size
   folve_operations.read      = folve_read;
-  folve_operations.fgetattr  = folve_fgetattr;
   folve_operations.getattr   = folve_getattr;
 
   return fuse_main(args.argc, args.argv, &folve_operations, NULL);

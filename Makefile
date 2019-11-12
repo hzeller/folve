@@ -6,10 +6,12 @@ F_VERSION=$(shell git log -n1 --date=short --format="%cd (commit=%h)" 2>/dev/nul
 SNDFILE_INC?=$(shell pkg-config --cflags sndfile)
 SNDFILE_LIB?=$(shell pkg-config --libs sndfile)
 
-CFLAGS=-D_FILE_OFFSET_BITS=64 -Wall -Wextra -W -Wno-unused-parameter -O3 -DFOLVE_VERSION='"$(F_VERSION)"' $(SNDFILE_INC)
+FUSE_INC?=$(shell pkg-config --cflags fuse3)
+FUSE_LIB?=$(shell pkg-config --libs fuse3)
 
-CXXFLAGS=$(CFLAGS)
-LDFLAGS=-lfuse -lzita-convolver -lmicrohttpd -lfftw3f $(SNDFILE_LIB) -lpthread
+CXXFLAGS=-D_FILE_OFFSET_BITS=64 -Wall -Wextra -W -Wno-unused-parameter -O3 -DFOLVE_VERSION='"$(F_VERSION)"' $(SNDFILE_INC) $(FUSE_INC)
+
+LDFLAGS= -lzita-convolver -lmicrohttpd -lfftw3f $(FUSE_LIB) $(SNDFILE_LIB) -lpthread
 
 ifdef LINK_STATIC
 # static linking requires us to be much more explicit when linking
@@ -24,7 +26,7 @@ OBJECTS = folve-main.o folve-filesystem.o conversion-buffer.o \
           zita-audiofile.o zita-config.o zita-fconfig.o zita-sstring.o
 
 folve: $(OBJECTS)
-	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS) $(LD_STATIC)
+	$(CXX) $^ -o $@ $(LDFLAGS) $(LD_STATIC)
 
 install: folve
 	install folve $(PREFIX)/bin
