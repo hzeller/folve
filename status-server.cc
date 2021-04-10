@@ -136,15 +136,16 @@ private:
 
 // Callback function called by micro http daemon. Gets the StatusServer pointer
 // in the user_argument.
-int StatusServer::HandleHttp(void* user_argument,
-                             struct MHD_Connection *connection,
-                             const char *url, const char *method,
-                             const char *version,
-                             const char *upload_data, size_t *upload_size,
-                             void**) {
+StatusServer::HandleHttpResult
+StatusServer::HandleHttp(void* user_argument,
+                         struct MHD_Connection *connection,
+                         const char *url, const char *method,
+                         const char *version,
+                         const char *upload_data, size_t *upload_size,
+                         void**) {
   StatusServer* server = (StatusServer*) user_argument;
   struct MHD_Response *response;
-  int ret;
+  HandleHttpResult ret;
 
   if (strcmp(url, kSettingsUrl) == 0) {
     server->SetFilter(MHD_lookup_connection_value(connection,

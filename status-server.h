@@ -19,6 +19,8 @@
 #ifndef FOLVE_STATUS_SERVER_H
 #define FOLVE_STATUS_SERVER_H
 
+#include <microhttpd.h>
+
 #include <string>
 #include <deque>
 
@@ -50,11 +52,17 @@ private:
   class HtmlFileHandler;
   friend class HtmlFileHandler;
 
+#if MHD_VERSION >= 0x00097101
+  typedef MHD_Result HandleHttpResult;
+#else
+  typedef int HandleHttpResult;
+#endif
+
   // micro-httpd callback
-  static int HandleHttp(void* user_argument,
-                        struct MHD_Connection *,
-                        const char *, const char *, const char *,
-                        const char *, size_t *, void **);
+  static HandleHttpResult HandleHttp(void* user_argument,
+                                     struct MHD_Connection *,
+                                     const char *, const char *, const char *,
+                                     const char *, size_t *, void **);
 
   void CreatePage(bool for_http, std::string *content);
 
