@@ -103,7 +103,7 @@ ssize_t ConversionBuffer::Append(const void *data, size_t count) {
   int remaining = count;
   const char *buf = (const char*)data;
   while (remaining > 0) {
-    int w = write(out_filedes_, data, count);
+    const int w = write(out_filedes_, buf, remaining);
     if (w < 0) return -errno;
     remaining -= w;
     buf += w;
@@ -124,7 +124,7 @@ ssize_t ConversionBuffer::SndAppend(const void *data, size_t count) {
 
 void ConversionBuffer::HeaderFinished() { header_end_ = FileSize(); }
 
-// The following are rather informal; because we access them in 
+// The following are rather informal; because we access them in
 // StatusServer:
 //  FileCacheHandler::GetHandlerStatus() -> ConversionBuffer::FileSize()
 // PreBufferThread:

@@ -52,7 +52,7 @@ private:
   class HtmlFileHandler;
   friend class HtmlFileHandler;
 
-#if MHD_VERSION >= 0x00097101
+#if MHD_VERSION >= 0x00097002
   typedef MHD_Result HandleHttpResult;
 #else
   typedef int HandleHttpResult;

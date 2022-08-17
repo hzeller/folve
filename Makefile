@@ -1,4 +1,4 @@
-CXX=g++
+CXX?=g++
 PREFIX=/usr/local
 
 F_VERSION=$(shell git log -n1 --date=short --format="%cd (commit=%h)" 2>/dev/null || echo "[unknown version - compile from git]")
@@ -29,6 +29,7 @@ folve: $(OBJECTS)
 	$(CXX) $^ -o $@ $(LDFLAGS) $(LD_STATIC)
 
 install: folve
+	mkdir -p $(PREFIX)/bin
 	install folve $(PREFIX)/bin
 
 clean:

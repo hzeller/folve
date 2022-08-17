@@ -16,9 +16,10 @@
 
 #include "buffer-thread.h"
 
+#include <algorithm>
 #include <assert.h>
 #include <pthread.h>
-#include <algorithm>
+#include <sched.h>
 
 #include "conversion-buffer.h"
 #include "util.h"
@@ -99,6 +100,6 @@ void BufferThread::Run() {
       current_work_buffer_ = NULL;
       pthread_cond_signal(&picked_work_);
     }
-    pthread_yield();
+    sched_yield();
   }
 }
