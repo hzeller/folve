@@ -31,6 +31,8 @@ Response (FIR) filter. The FIR filter is based on Fons Adriaensen's
 jconvolver convolution engine (zita convolver).
 
 ### Compiling ###
+
+#### Debian
 Tested on Ubuntu, various Debian versions and the common Debian version on
 the Raspberry Pi.
 
@@ -67,6 +69,10 @@ case, you need to put your user into that group
 folve as root.
 
 (TODO: create a debian package)
+
+#### Nix
+For nix, there is a `default.nix` that you can use directly to `nix-build`
+or use in a nix-shell to get the dependencies.
 
 ### Let's test it! ###
 Folve requires at least two parameters: the directory where your original
@@ -323,7 +329,7 @@ well with a zero return code of `read()` that indicates end-of-file.
 If they don't, you'd typically see as symptom a large amount of CPU use
 of the reading program and an `strace` will show repeated read calls beyond
 the end of file. It is worthfile making these read routines more resilient.
-For instance here is a pending [minidlna patch] that does that.
+For instance here is the [minidlna patch] that fixed it there.
 
 So the heuristic Folve applies might make it fragile for some programs that
 rely on the reported size. This can certainly be improved. For instance,
