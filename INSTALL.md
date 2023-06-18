@@ -26,7 +26,7 @@ To install in the default location /usr/local/bin, just do
 ```
 
 
-## Older Systems ##
+## Older Systems (before ~2014) ##
 
 Older systems, e.g. Ubuntu 10.04 lack sufficiently recent libraries for FUSE
 and the zita convolver. In that case, don't install these with `apt-get`; in

@@ -45,21 +45,31 @@ via the package manager:
     make
     sudo make install
 
+
+#### NixOS
+
+There is a [default.nix](./default.nix) that provides all necessary
+dependencies for compilation, just run `nix-shell`.
+
+(You can also use this to build a derivation from the current latest
+released version).
+
 For hints on how to compile on older systems see [INSTALL.md](./INSTALL.md).
 
 ----
 
 #### libsndfile-dev
 
-libsndfile is distributed on debian systems in version 1.0.28.
+libsndfile is distributed on many even somewhat recent debian systems in
+version 1.0.28.
+
 There is a problem with flac-header handling in that version that
 resulted in a folve [issue](https://github.com/hzeller/folve/issues/1).
 It is worked around in folve now to an extend, but it is better to get the
 [fixed](https://github.com/erikd/libsndfile/pull/307) upstream sndfile
 development version.
-However, that has not been released yet as new version number. So it is best to
-[compile the latest libsndfile from git](https://github.com/erikd/libsndfile)
-and use that.
+
+This has been release in libsndfile >= 1.0.29 which is desriable to use.
 
 ---
 
@@ -70,9 +80,6 @@ folve as root.
 
 (TODO: create a debian package)
 
-#### Nix
-For nix, there is a `default.nix` that you can use directly to `nix-build`
-or use in a nix-shell to get the dependencies.
 
 ### Let's test it! ###
 Folve requires at least two parameters: the directory where your original
