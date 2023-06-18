@@ -96,6 +96,19 @@ private:
   folve::Mutex io_mutex_;
 } rlog;
 
+static bool MightBePassthroughFile(const char *name) {
+  if (!name  || (name = strrchr(name, '.')) == 0) {
+    return false;
+  }
+  // Typical cover picture types that we don't want size-inflated (minidlna
+  // trips over that).
+  return ((strcasecmp(name, ".png") == 0) ||
+          (strcasecmp(name, ".jpg") == 0) ||
+          (strcasecmp(name, ".jpeg") == 0) ||
+          (strcasecmp(name, ".svn") == 0) ||
+          (strcasecmp(name, ".txt") == 0));
+}
+
 // Essentially lstat(). Just forward to the original filesystem (this
 // will by lying: our convolved files are of different size...)
 static int folve_getattr(const char *path, struct stat *stbuf,
@@ -106,24 +119,31 @@ static int folve_getattr(const char *path, struct stat *stbuf,
   }
 
   // Not open; find the same info by filename.
-  if (strcmp(path, kStatusFileName) == 0) {
+
+  if (strcmp(path, kStatusFileName) == 0) {  // folve-status.html
     FileHandler *status = folve_rt.status_server->CreateStatusFileHandler();
     status->Stat(stbuf);
     delete status;
     return 0;
   }
+
   // If this is a currently open filename, we might be able to output a better
   // estimate.
   int result = folve_rt.fs->StatByFilename(path, stbuf);
   if (result != 0) {
+    // Fallback; There is no file-handler open for it. Let's ask our underlying
+    // filesystem directly.
     result = lstat(folve_rt.fs->GetUnderlyingFile(path).c_str(), stbuf);
     rlog.Log("STAT %s mode=%03o %s %s %s", path,
              stbuf->st_mode & 0777, S_ISDIR(stbuf->st_mode) ? "DIR" : "",
              (result == -1) ? strerror(errno) : "",
              ctime(&stbuf->st_mtime));  // ctime ends with \n, so put that last
-    stbuf->st_size *= folve_rt.fs->file_oversize_factor();
-    if (result == -1)
+    if (!MightBePassthroughFile(path)) {
+      stbuf->st_size *= folve_rt.fs->file_oversize_factor();
+    }
+    if (result == -1) {
       return -errno;
+    }
   } else {
     rlog.Log("FOLVE-Stat %s\n", path);
   }

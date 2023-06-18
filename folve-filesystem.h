@@ -35,6 +35,7 @@
 
 class ConversionBuffer;
 class BufferThread;
+
 class FolveFilesystem {
 public:
   // Create a new filesystem. At least SetBasedir() needs to be called

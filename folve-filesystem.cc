@@ -146,8 +146,7 @@ std::string FolveFilesystem::GetUnderlyingFile(const char *path) const {
 int FolveFilesystem::StatByFilename(const char *fs_path, struct stat *st) {
   const std::string cache_key = CacheKey(current_config_subdir_, fs_path);
   FileHandler *handler = open_file_cache_.FindAndPin(cache_key);
-  if (handler == 0)
-    return -1;
+  if (!handler) return -1;
   ssize_t result = handler->Stat(st);
   open_file_cache_.Unpin(cache_key);
   return result;
@@ -162,8 +161,7 @@ void FolveFilesystem::Close(const char *fs_path, const FileHandler *handler) {
 static bool IsDirectory(const std::string &path) {
   if (path.empty()) return false;
   struct stat st;
-  if (stat(path.c_str(), &st) != 0)
-    return false;
+  if (stat(path.c_str(), &st) != 0) return false;
   return (st.st_mode & S_IFMT) == S_IFDIR;
 }
 
